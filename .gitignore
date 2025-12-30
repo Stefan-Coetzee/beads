@@ -1,21 +1,45 @@
-# Binaries
-/beads
-/bd
-*.exe
-*.dll
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
 *.so
-*.dylib
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Test binaries
-*.test
-*.out
-/bd-test
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
 
-# Go workspace file
-go.work
+# uv
+.uv/
+uv.lock
 
-# Go build cache
-pkg/
+# Environment variables
+.env
+.env.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+backup.sql
 
 # IDE
 .vscode/
@@ -24,99 +48,15 @@ pkg/
 *.swo
 *~
 
-# Claude Code
-.claude/settings.local.json
-
 # OS
 .DS_Store
 Thumbs.db
 
-# SQLite databases (now using JSONL as source of truth)
-*.db
-*.db-journal
-*.db-wal
-*.db-shm
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
 
-# Daemon runtime files
-.beads/daemon.log
-.beads/daemon.pid
-.beads/daemon.lock
-.beads/daemon-error
-.beads/bd.sock
-.beads/.exclusive-lock
-
-# .beads directory files (keep JSONL only)
-.beads/.gitignore
-.beads/db.sqlite
-.beads/bd.db
-
-# Keep JSONL exports (source of truth for git)
-!.beads/*.jsonl
-
-# 3-way merge snapshot files (local-only, for deletion tracking)
-.beads/beads.base.jsonl
-.beads/beads.left.jsonl
-.beads/beads.base.meta.json
-.beads/beads.left.meta.json
-
-# Note: .beads/deletions.jsonl is intentionally NOT ignored
-# It must be tracked in git for cross-clone deletion propagation (bd-imj)
-
-# Git merge driver temp files (created during conflicts with numbered extensions)
-.beads/*.json[0-9]
-.beads/*.jsonl[0-9]
-
-# Ignore nix result
-result
-
-# direnv (machine-specific environment)
-.envrc
-
-# GoReleaser build artifacts
-dist/
-Formula/bd.rb
-
-# Git worktrees
-.worktrees/
-.beads/pollution-backup.jsonl
-
-# npm package - exclude downloaded binaries and archives
-npm-package/bin/bd
-npm-package/bin/*.tar.gz
-npm-package/bin/*.zip
-npm-package/bin/CHANGELOG.md
-npm-package/bin/LICENSE
-npm-package/bin/README.md
-npm-package/node_modules/
-npm-package/package-lock.json
-.beads/beads.db?*
-bd-original
-mcp_agent_mail/
-bd-test
-bd-fixed
-.cursor/
-
-# Python cache files
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-.envrc
-
-# Performance profiling files (benchmarks, bd doctor --perf, and bd --profile)
-*.prof
-*.out
-beads-perf-*.prof
-bench-cpu-*.prof
-bd-profile-*.prof
-bd-trace-*.out
-# AI planning documents (ephemeral)
-history/
-
-# Gas Town agent state
-state.json
-.beads/redirect
-
-# Claude Code runtime
-.runtime/
+# Alembic
+alembic/versions/*.pyc

@@ -1,69 +1,99 @@
-# bd - Beads
+# Learning Task Tracker (LTT)
 
-**Distributed, git-backed graph issue tracker for AI agents.**
+A Python-based learning task management system adapted from [beads](https://github.com/steveyegge/beads), designed to power AI tutoring agents at scale.
 
-[![License](https://img.shields.io/github/license/steveyegge/beads)](LICENSE)
-[![Go Report Card](https://goreportcard.com/badge/github.com/steveyegge/beads)](https://goreportcard.com/report/github.com/steveyegge/beads)
-[![Release](https://img.shields.io/github/v/release/steveyegge/beads)](https://github.com/steveyegge/beads/releases)
-[![npm version](https://img.shields.io/npm/v/@beads/bd)](https://www.npmjs.com/package/@beads/bd)
-[![PyPI](https://img.shields.io/pypi/v/beads-mcp)](https://pypi.org/project/beads-mcp/)
+## Overview
 
-Beads provides a persistent, structured memory for coding agents. It replaces messy markdown plans with a dependency-aware graph, allowing agents to handle long-horizon tasks without losing context.
+LTT provides a **data tooling layer** that enables AI tutoring agents to:
+- Guide learners through structured projects
+- Track progress through hierarchical tasks
+- Validate submissions (proof of work)
+- Maintain context across sessions
+- Facilitate pedagogically-aware conversations
 
-## ⚡ Quick Start
+## Architecture
+
+The system implements a **Template + Instance** architecture:
+- **Template Layer**: Shared curriculum content (authored once, used by all learners)
+- **Instance Layer**: Per-learner progress and work products
+
+See [PRD](python-port/docs/PRD.md) for detailed architecture and specifications.
+
+## Quick Start
+
+### 1. Install Dependencies
 
 ```bash
-# Install (macOS/Linux)
-curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash
+# Using uv (recommended)
+uv sync
 
-# Initialize (Humans run this once)
-bd init
-
-# Tell your agent
-echo "Use 'bd' for task tracking" >> AGENTS.md
-
+# Install with dev dependencies
+uv sync --extra dev
 ```
 
-## 🛠 Features
+### 2. Start Database
 
-* **Git as Database:** Issues stored as JSONL in `.beads/`. Versioned, branched, and merged like code.
-* **Agent-Optimized:** JSON output, dependency tracking, and auto-ready task detection.
-* **Zero Conflict:** Hash-based IDs (`bd-a1b2`) prevent merge collisions in multi-agent/multi-branch workflows.
-* **Invisible Infrastructure:** SQLite local cache for speed; background daemon for auto-sync.
-* **Compaction:** Semantic "memory decay" summarizes old closed tasks to save context window.
+```bash
+# Start PostgreSQL 17
+docker-compose up -d
 
-## 📖 Essential Commands
+# Verify it's running
+docker-compose ps
+```
 
-| Command | Action |
-| --- | --- |
-| `bd ready` | List tasks with no open blockers. |
-| `bd create "Title" -p 0` | Create a P0 task. |
-| `bd dep add <child> <parent>` | Link tasks (blocks, related, parent-child). |
-| `bd show <id>` | View task details and audit trail. |
+### 3. Run Migrations
 
-## 🔗 Hierarchy & Workflow
+```bash
+# Create .env file
+cp .env.example .env
 
-Beads supports hierarchical IDs for epics:
+# Run migrations
+uv run alembic upgrade head
+```
 
-* `bd-a3f8` (Epic)
-* `bd-a3f8.1` (Task)
-* `bd-a3f8.1.1` (Sub-task)
+### 4. Verify Installation
 
-**Stealth Mode:** Run `bd init --stealth` to use Beads locally without committing files to the main repo. Perfect for personal use on shared projects.
+```bash
+# Run tests
+uv run pytest
 
-## 📦 Installation
+# Check code quality
+uv run ruff check src/
+uv run mypy src/
+```
 
-* **npm:** `npm install -g @beads/bd`
-* **Homebrew:** `brew install steveyegge/beads/bd`
-* **Go:** `go install github.com/steveyegge/beads/cmd/bd@latest`
+## Project Structure
 
-**Requirements:** Linux (glibc 2.32+), macOS, or Windows.
+```
+src/ltt/
+├── models/          # Pydantic and SQLAlchemy models
+├── db/              # Database connection and migrations
+├── utils/           # ID generation and utilities
+├── services/        # Business logic (coming soon)
+├── cli/             # Admin CLI (coming soon)
+└── api/             # FastAPI endpoints (coming soon)
+```
 
-## 🌐 Community Tools
+## Development
 
-See [docs/COMMUNITY_TOOLS.md](docs/COMMUNITY_TOOLS.md) for a curated list of community-built UIs, extensions, and integrations—including terminal interfaces, web UIs, editor extensions, and native apps.
+See [DATABASE.md](DATABASE.md) for database management.
 
-## 📝 Documentation
+See [python-port/docs/](python-port/docs/) for detailed specifications:
+- [PRD.md](python-port/docs/PRD.md) - Product requirements
+- [01-data-models.md](python-port/docs/01-data-models.md) - Data model specifications
+- [ADR-001](python-port/docs/adr/001-learner-scoped-task-progress.md) - Architecture decisions
 
-* [Installing](docs/INSTALLING.md) | [Agent Workflow](AGENT_INSTRUCTIONS.md) | [Sync Branch Mode](docs/PROTECTED_BRANCHES.md) | [Troubleshooting](docs/TROUBLESHOOTING.md) | [FAQ](docs/FAQ.md)
-* [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/steveyegge/beads)
+## Tech Stack
+
+- **Language**: Python 3.12+
+- **Type Safety**: Pydantic v2
+- **Database**: PostgreSQL 17
+- **ORM**: SQLAlchemy 2.0 (async)
+- **Migrations**: Alembic
+- **CLI**: Typer
+- **API**: FastAPI
+- **Testing**: pytest
+
+## License
+
+MIT
