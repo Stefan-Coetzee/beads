@@ -154,6 +154,13 @@ async def update_status(
 
     # Additional validation for closing
     if new_status == TaskStatus.CLOSED:
+        # Check validation requirements (subtasks must have passing validation)
+        from ltt.services.validation_service import can_close_task as can_close_validation
+
+        can_close, reason = await can_close_validation(session, task_id, learner_id)
+        if not can_close:
+            raise InvalidStatusTransitionError(reason)
+
         # Check that all children are closed FOR THIS LEARNER
         result = await session.execute(select(TaskModel).where(TaskModel.parent_id == task_id))
         children = result.scalars().all()

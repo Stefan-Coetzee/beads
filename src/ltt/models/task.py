@@ -12,6 +12,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import ARRAY, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
@@ -54,6 +55,15 @@ class TaskBase(BaseModel):
     # Learning-specific fields
     content: str | None = Field(default=None, description="Inline learning content")
     content_refs: list[str] = Field(default_factory=list, description="References to content IDs")
+
+    # Pedagogical guidance fields
+    tutor_guidance: dict | None = Field(
+        default=None,
+        description="Guidance for LLM tutors: teaching_approach, discussion_prompts, common_mistakes, hints_to_give",
+    )
+    narrative_context: str | None = Field(
+        default=None, description="Real-world narrative context (primarily for projects)"
+    )
 
 
 class TaskCreate(TaskBase):
@@ -162,6 +172,10 @@ class TaskModel(Base, TimestampMixin):
     # Learning content
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
     content_refs: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+
+    # Pedagogical guidance fields
+    tutor_guidance: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    narrative_context: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Versioning
     version: Mapped[int] = mapped_column(Integer, default=1)

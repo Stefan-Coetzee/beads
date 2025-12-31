@@ -254,3 +254,238 @@ async def test_get_progress_none_when_not_exists(async_session):
     progress = await get_progress(async_session, task.id, learner_id)
 
     assert progress is None
+
+
+# ─────────────────────────────────────────────────────────────
+# Comprehensive Status Transition Tests
+# ─────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_transition_open_to_blocked(async_session):
+    """Test valid transition from OPEN to BLOCKED."""
+    task_data = TaskCreate(title="Test Task", task_type=TaskType.PROJECT)
+    task = await create_task(async_session, task_data)
+
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    # OPEN → BLOCKED (valid)
+    progress = await update_status(async_session, task.id, learner_id, TaskStatus.BLOCKED)
+
+    assert progress.status == TaskStatus.BLOCKED
+    assert progress.started_at is None  # Never started
+    assert progress.completed_at is None
+
+
+@pytest.mark.asyncio
+async def test_transition_in_progress_to_blocked(async_session):
+    """Test valid transition from IN_PROGRESS to BLOCKED."""
+    task_data = TaskCreate(title="Test Task", task_type=TaskType.PROJECT)
+    task = await create_task(async_session, task_data)
+
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    # Start task first
+    await start_task(async_session, task.id, learner_id)
+
+    # IN_PROGRESS → BLOCKED (valid)
+    progress = await update_status(async_session, task.id, learner_id, TaskStatus.BLOCKED)
+
+    assert progress.status == TaskStatus.BLOCKED
+    assert progress.started_at is not None  # Was started
+    assert progress.completed_at is None
+
+
+@pytest.mark.asyncio
+async def test_transition_blocked_to_open(async_session):
+    """Test valid transition from BLOCKED to OPEN."""
+    task_data = TaskCreate(title="Test Task", task_type=TaskType.PROJECT)
+    task = await create_task(async_session, task_data)
+
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    # Block the task first
+    await update_status(async_session, task.id, learner_id, TaskStatus.BLOCKED)
+
+    # BLOCKED → OPEN (valid)
+    progress = await update_status(async_session, task.id, learner_id, TaskStatus.OPEN)
+
+    assert progress.status == TaskStatus.OPEN
+
+
+@pytest.mark.asyncio
+async def test_transition_blocked_to_in_progress(async_session):
+    """Test valid transition from BLOCKED to IN_PROGRESS."""
+    task_data = TaskCreate(title="Test Task", task_type=TaskType.PROJECT)
+    task = await create_task(async_session, task_data)
+
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    # Block the task first
+    await update_status(async_session, task.id, learner_id, TaskStatus.BLOCKED)
+
+    # BLOCKED → IN_PROGRESS (valid)
+    progress = await update_status(async_session, task.id, learner_id, TaskStatus.IN_PROGRESS)
+
+    assert progress.status == TaskStatus.IN_PROGRESS
+    assert progress.started_at is not None  # Sets started_at
+
+
+@pytest.mark.asyncio
+async def test_transition_blocked_to_closed_forbidden(async_session):
+    """Test invalid transition from BLOCKED to CLOSED."""
+    task_data = TaskCreate(title="Test Task", task_type=TaskType.PROJECT)
+    task = await create_task(async_session, task_data)
+
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    # Block the task first
+    await update_status(async_session, task.id, learner_id, TaskStatus.BLOCKED)
+
+    # BLOCKED → CLOSED (invalid)
+    with pytest.raises(InvalidStatusTransitionError, match="Cannot transition from blocked to closed"):
+        await update_status(async_session, task.id, learner_id, TaskStatus.CLOSED)
+
+
+@pytest.mark.asyncio
+async def test_transition_closed_to_in_progress_forbidden(async_session):
+    """Test invalid transition from CLOSED to IN_PROGRESS."""
+    task_data = TaskCreate(title="Test Task", task_type=TaskType.PROJECT)
+    task = await create_task(async_session, task_data)
+
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    # Close the task
+    await start_task(async_session, task.id, learner_id)
+    await close_task(async_session, task.id, learner_id, "Done")
+
+    # CLOSED → IN_PROGRESS (invalid - can only reopen to OPEN)
+    with pytest.raises(
+        InvalidStatusTransitionError, match="Cannot transition from closed to in_progress"
+    ):
+        await update_status(async_session, task.id, learner_id, TaskStatus.IN_PROGRESS)
+
+
+@pytest.mark.asyncio
+async def test_transition_closed_to_blocked_forbidden(async_session):
+    """Test invalid transition from CLOSED to BLOCKED."""
+    task_data = TaskCreate(title="Test Task", task_type=TaskType.PROJECT)
+    task = await create_task(async_session, task_data)
+
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    # Close the task
+    await start_task(async_session, task.id, learner_id)
+    await close_task(async_session, task.id, learner_id, "Done")
+
+    # CLOSED → BLOCKED (invalid)
+    with pytest.raises(InvalidStatusTransitionError, match="Cannot transition from closed to blocked"):
+        await update_status(async_session, task.id, learner_id, TaskStatus.BLOCKED)
+
+
+@pytest.mark.asyncio
+async def test_start_task_already_in_progress(async_session):
+    """Test starting a task that's already in progress (should succeed - idempotent)."""
+    task_data = TaskCreate(title="Test Task", task_type=TaskType.PROJECT)
+    task = await create_task(async_session, task_data)
+
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    # Start task
+    await start_task(async_session, task.id, learner_id)
+
+    # Start again (IN_PROGRESS → IN_PROGRESS is not in VALID_TRANSITIONS)
+    # This should raise an error since the task is already in_progress
+    with pytest.raises(InvalidStatusTransitionError, match="Cannot transition from in_progress to in_progress"):
+        await start_task(async_session, task.id, learner_id)
+
+
+@pytest.mark.asyncio
+async def test_reopen_task_clears_completion_data(async_session):
+    """Test that reopening a task clears completed_at and close_reason."""
+    task_data = TaskCreate(title="Test Task", task_type=TaskType.PROJECT)
+    task = await create_task(async_session, task_data)
+
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    # Complete the task
+    await start_task(async_session, task.id, learner_id)
+    await close_task(async_session, task.id, learner_id, "Initial completion")
+
+    # Reopen it
+    progress = await reopen_task(async_session, task.id, learner_id)
+
+    assert progress.status == TaskStatus.OPEN
+    assert progress.completed_at is None
+    assert progress.close_reason is None
+    assert progress.started_at is not None  # Still has started_at
+
+
+@pytest.mark.asyncio
+async def test_transition_open_to_in_progress_sets_started_at(async_session):
+    """Test that OPEN → IN_PROGRESS sets started_at timestamp."""
+    task_data = TaskCreate(title="Test Task", task_type=TaskType.PROJECT)
+    task = await create_task(async_session, task_data)
+
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    # Verify initial state
+    initial_progress = await get_or_create_progress(async_session, task.id, learner_id)
+    assert initial_progress.started_at is None
+
+    # Start task
+    progress = await start_task(async_session, task.id, learner_id)
+
+    assert progress.started_at is not None
+    assert progress.completed_at is None
+
+
+@pytest.mark.asyncio
+async def test_transition_in_progress_to_closed_sets_completed_at(async_session):
+    """Test that IN_PROGRESS → CLOSED sets completed_at timestamp."""
+    task_data = TaskCreate(title="Test Task", task_type=TaskType.PROJECT)
+    task = await create_task(async_session, task_data)
+
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    await start_task(async_session, task.id, learner_id)
+
+    # Close task
+    progress = await close_task(async_session, task.id, learner_id, "Task completed")
+
+    assert progress.completed_at is not None
+    assert progress.close_reason == "Task completed"
+    assert progress.status == TaskStatus.CLOSED

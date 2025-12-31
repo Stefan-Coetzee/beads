@@ -786,3 +786,6 @@ class TestExport:
         """Export then import produces same structure."""
         ...
 ```
+## 8. Documentation
+
+Create comprehensive documentation on the input data structure and use so that the guide can assist a user in completely uploading a project into the project. 

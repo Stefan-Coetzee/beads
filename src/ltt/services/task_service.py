@@ -115,6 +115,8 @@ async def create_task(session: AsyncSession, task_data: TaskCreate) -> Task:
         estimated_minutes=task_data.estimated_minutes,
         content=task_data.content,
         content_refs=task_data.content_refs or [],
+        tutor_guidance=task_data.tutor_guidance,
+        narrative_context=task_data.narrative_context,
     )
 
     session.add(task_model)
