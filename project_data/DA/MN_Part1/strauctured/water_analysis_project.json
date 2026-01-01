@@ -1,0 +1,1056 @@
+{
+  "title": "Maji Ndogo Water Crisis - Part 1: Beginning Your Data Driven Journey",
+  "description": "Explore survey data from President Naledi's water quality initiative. Learn to navigate databases, understand water source types, identify data quality issues, and make corrections using SQL.",
+  "estimated_minutes": 300,
+  "learning_objectives": [
+    {
+      "level": "analyze",
+      "description": "Analyze survey data to identify patterns in water access and quality issues"
+    },
+    {
+      "level": "evaluate",
+      "description": "Evaluate data integrity by identifying contradictions and errors in records"
+    },
+    {
+      "level": "apply",
+      "description": "Apply SQL queries including SELECT, WHERE, LIKE, and UPDATE to explore and correct data"
+    },
+    {
+      "level": "create",
+      "description": "Create safe data modification workflows using backup tables and tested queries"
+    }
+  ],
+  "narrative_context": "You've joined President Aziza Naledi's initiative to solve Maji Ndogo's water crisis. A team of engineers, field workers, scientists, and analysts has collected 60,000 survey records about water sources across the country. Your mentor Chidi Kunto will guide you through this data - every query you write helps uncover the story of communities struggling for clean water. The insights you extract will shape real decisions about where to install water purification systems.",
+  "content": "# Welcome to the Maji Ndogo Water Analysis Project\n\nThis project takes you through a real-world data analysis scenario where you'll explore survey data about water sources in the fictional country of Maji Ndogo.\n\n## Database: md_water_services\n\nThe database contains the following tables:\n- **column_legend**: Data dictionary explaining each column\n- **employee**: Survey team member information\n- **global_water_access**: Comparative water access statistics\n- **location**: Geographic information (address, province, town, urban/rural)\n- **water_quality**: Subjective quality scores from surveyors\n- **visits**: Log of visits to water sources with queue times\n- **water_source**: Types of water sources and people served\n- **well_pollution**: Contamination test results for wells\n\n## Your Mentor: Chidi Kunto\n\nChidi is a senior data analyst who will guide you through this project. He'll break down President Naledi's instructions into clear tasks, share professional tips, and help you develop good data analysis habits.\n\n## What You'll Learn\n\n1. **Database exploration** - Using SHOW TABLES and SELECT to understand unfamiliar data\n2. **Data filtering** - Using WHERE clauses to find specific records\n3. **Pattern matching** - Using LIKE for text pattern searches\n4. **Data integrity** - Identifying contradictions and errors in data\n5. **Safe modifications** - Using backup tables and tested UPDATE queries",
+  "epics": [
+    {
+      "title": "Introduction",
+      "description": "Setting the stage for our data exploration journey",
+      "estimated_minutes": 30,
+      "priority": 0,
+      "learning_objectives": [
+        {
+          "level": "understand",
+          "description": "Understand the mission and context of the water crisis data analysis"
+        },
+        {
+          "level": "remember",
+          "description": "Recall the 5 main tasks that will guide the data exploration"
+        }
+      ],
+      "content": "Welcome to the Maji Ndogo Water Crisis project. You've been brought onto a team tasked with analyzing 60,000 survey records about water sources. President Aziza Naledi has called on her team to make sense of this data and extract meaningful insights that will help solve the country's water crisis.",
+      "tasks": [
+        {
+          "title": "Understand the mission",
+          "description": "Read President Naledi's message and understand the importance of the data analysis mission",
+          "estimated_minutes": 15,
+          "priority": 0,
+          "learning_objectives": [
+            {
+              "level": "understand",
+              "description": "Understand the real-world context and stakes of the data analysis"
+            }
+          ],
+          "content": "President Naledi has sent a message to the team about the importance of this work.",
+          "subtasks": [
+            {
+              "title": "Read President Naledi's message",
+              "subtask_type": "conversational",
+              "description": "Absorb the context and motivation for this data analysis project",
+              "estimated_minutes": 5,
+              "content": "Dear Team,\n\nCongratulations on the successful completion of our extensive survey. Your dedication and hard work have resulted in an invaluable asset - a database of 60,000 records, meticulously collected by our devoted team of engineers, field workers, scientists, and analysts.\n\nNow, the next crucial phase of our mission begins. We need to make sense of this immense data trove and extract meaningful insights. We must breathe life into these records and listen to the story they are telling us.\n\nI urge you to load this database and thoroughly acquaint yourselves with it. Dive deep, explore its structure, understand the variables and the connections between them. Each record is a chapter of our story; each query you run is a thread weaving that story together. This is a process of discovery - to uncover the patterns and nuances in our data. It's a chance to ask the right questions, to identify the pressing problems, and to set the course for our data-driven solutions.\n\nAs you proceed, always remember that every bit of information is a piece of the bigger puzzle. Every insight, no matter how small, brings us one step closer to solving our water crisis. Together, we have embarked on this journey to bring about change. Let's continue to march ahead with the same determination and resolve.\n\nI believe in our collective potential. Together, we will unravel the secrets held within these records, and use this knowledge to shape a brighter future for Maji Ndogo.\n\nBest regards,\nAziza Naledi",
+              "learning_objectives": [
+                {
+                  "level": "understand",
+                  "description": "Understand the importance and human impact of the data analysis work"
+                }
+              ],
+              "tutor_guidance": {
+                "teaching_approach": "Let this message sink in - emphasize that this is real-world context, not just an exercise",
+                "discussion_prompts": [
+                  "What types of water sources might exist in a country like Maji Ndogo?",
+                  "How would you identify communities with the worst water access?",
+                  "What would 'bad' water quality data look like?"
+                ]
+              }
+            },
+            {
+              "title": "Meet your mentor Chidi Kunto",
+              "subtask_type": "conversational",
+              "description": "Get introduced to Chidi, the senior data analyst who will guide you through this project",
+              "estimated_minutes": 5,
+              "dependencies": [
+                "Read President Naledi's message"
+              ],
+              "content": "Hey Team,\n\nHope this message finds you well. I'm Chidi Kunto, and I'm really excited to be working with all of you on this upcoming project.\n\nOur president, Aziza Naledi, has given us a monumental task. We've got this mountain of data, and it's our job to sift through it, finding those nuggets of insight that will help us solve our water crisis here in Maji Ndogo.\n\nBut you won't be doing this alone. As your mentor, I'll be here not just to guide you but also to show you firsthand how a real data project kicks off. I'll be taking Naledi's instructions and breaking them down into clear, manageable tasks. And of course, I'll be sharing a few valuable tricks of the trade along the way.\n\nI'll help you navigate through this data landscape, turning those raw numbers into meaningful insights. Just remember, every data point can be part of our solution, and every step you take in this project helps us get closer to our goal.\n\nI'm looking forward to working closely with each of you, learning about your unique perspectives, and figuring out how we can best collaborate as a team. With your skills and dedication, I'm confident we can unlock the potential of this data and make a real difference to the people of Maji Ndogo.\n\nPlease know that my virtual door is always open. If you need some guidance, want to clarify something, or just have something cool to share, feel free to reach out.\n\nHere's to an exciting journey ahead and the valuable lessons we'll learn together!\n\nCheers,\nChidi",
+              "learning_objectives": [
+                {
+                  "level": "understand",
+                  "description": "Understand the mentorship relationship and support available"
+                }
+              ]
+            },
+            {
+              "title": "Review the 5 tasks ahead",
+              "subtask_type": "conversational",
+              "description": "Understand the roadmap of tasks that Chidi has broken down from Naledi's instructions",
+              "estimated_minutes": 5,
+              "dependencies": [
+                "Meet your mentor Chidi Kunto"
+              ],
+              "content": "Hey there,\n\nYou've probably seen President Naledi's message by now. She has emphasised the importance of our newly collected survey data and how vital it is for us to dive in and start making sense of it. As the senior data analyst, I've taken a close look at her message and have broken it down into a series of tasks that we need to tackle. So, let's roll up our sleeves and get started!\n\n**1. Get to know our data:** Before we do anything else, let's take a good look at our data. We'll load up the database and pull up the first few records from each table. It's like getting to know a new city - we need to explore the lay of the land before we can start our journey.\n\n**2. Dive into the water sources:** We've got a whole table dedicated to the types of water sources in our database. Let's dig into it and figure out all the unique types of water sources we're dealing with.\n\n**3. Unpack the visits to water sources:** The 'visits' table in our database is like a logbook of all the trips made to different water sources. We need to unravel this logbook to understand the frequency and distribution of these visits. Let's identify which locations have been visited more than a certain number of times.\n\n**4. Assess the quality of water sources:** The quality of our water sources is a pretty big deal. We'll turn to the water_quality table to find records where the subjective_quality_score is within a certain range and the visit_count is above a certain threshold. This should help us spot the water sources that are frequently visited and have a decent quality score.\n\n**5. Investigate any pollution issues:** We can't overlook the pollution status of our water sources. Let's find those water sources where the pollution_tests result came back as 'dirty' or 'biologically contaminated'. This will help us flag the areas that need immediate attention.\n\nBy working through these tasks, we'll not only be answering President Naledi's call to explore the database and extract meaningful insights, but we'll also be honing our SQL skills. It's a win-win situation! So, are you ready to dive in and start exploring with me?\n\nLet's do this!",
+              "learning_objectives": [
+                {
+                  "level": "remember",
+                  "description": "Recall the 5 main tasks and their purposes"
+                }
+              ],
+              "tutor_guidance": {
+                "teaching_approach": "This is an overview - don't dive into details yet, just set expectations",
+                "discussion_prompts": [
+                  "Which of these 5 tasks sounds most interesting to you?",
+                  "Which task do you think will be most challenging?",
+                  "Why do you think we start with 'getting to know the data' before diving into analysis?"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Get to Know Our Data",
+      "description": "Exploring the foundational tables and their structure",
+      "estimated_minutes": 60,
+      "priority": 0,
+      "dependencies": [
+        "Introduction"
+      ],
+      "learning_objectives": [
+        {
+          "level": "apply",
+          "description": "Apply SELECT statements to explore unfamiliar database tables"
+        },
+        {
+          "level": "understand",
+          "description": "Understand the structure and purpose of location, visits, and water_source tables"
+        }
+      ],
+      "content": "Before we do anything else, let's take a good look at our data. We'll load up the database and pull up the first few records from each table. It's like getting to know a new city - we need to explore the lay of the land before we can start our journey.",
+      "tasks": [
+        {
+          "title": "Discover what tables exist",
+          "description": "Use SHOW TABLES to explore an unfamiliar database",
+          "estimated_minutes": 10,
+          "priority": 0,
+          "learning_objectives": [
+            {
+              "level": "remember",
+              "description": "Recall SHOW TABLES as a database exploration command"
+            }
+          ],
+          "content": "Start by retrieving the first few records from each table. How many tables are there in our database? What are the names of these tables? Once you've identified the tables, write a SELECT statement to retrieve the first five records from each table. As you look at the data, take note of the columns and their respective data types in each table. What information does each table contain?",
+          "subtasks": [
+            {
+              "title": "Run SHOW TABLES command",
+              "subtask_type": "exercise",
+              "description": "Use SHOW TABLES to see all tables in the md_water_services database",
+              "estimated_minutes": 5,
+              "acceptance_criteria": "- Student runs SHOW TABLES\n- Student can list the 8 tables discovered\n- Student understands this is the first step when exploring unfamiliar databases",
+              "content": "I don't think they showed you this at the Academy, but when you access a new database in MySQL, a handy initial query to run is SHOW TABLES. This will give you a list of all the tables in the database.\n\n```sql\nSHOW TABLES\n```\n\nYou should see something like this:\n\n| Tables_in_md_water_services |\n|-----------------------------|\n| column_legend |\n| employee |\n| global_water_access |\n| location |\n| water_quality |\n| visits |\n| water_source |\n| well_pollution |\n\nIt looks like someone took the time to name all of these tables pretty well because we can kind of figure out what each table is about without really having to think too hard. water_source probably logs information about each source like where it is, what type of source it is and so on.",
+              "learning_objectives": [
+                {
+                  "level": "apply",
+                  "description": "Apply SHOW TABLES to explore database structure"
+                }
+              ],
+              "tutor_guidance": {
+                "teaching_approach": "Emphasize this as a foundational habit for database exploration",
+                "hints_to_give": [
+                  "SHOW TABLES is helpful when dealing with unfamiliar databases",
+                  "Keep a data dictionary handy for quick reference"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "title": "Explore the location table",
+          "description": "Examine the location table to understand how geographic information is stored",
+          "estimated_minutes": 15,
+          "priority": 0,
+          "dependencies": [
+            "Discover what tables exist"
+          ],
+          "learning_objectives": [
+            {
+              "level": "apply",
+              "description": "Apply SELECT with LIMIT to preview table contents"
+            }
+          ],
+          "content": "So let's have a look at one of these tables. Let's use location so we can use that killer query, SELECT * but remember to limit it and tell it which table we are looking at.",
+          "subtasks": [
+            {
+              "title": "Query the location table",
+              "subtask_type": "exercise",
+              "description": "Write a SELECT query to view the first 5 records from the location table",
+              "estimated_minutes": 10,
+              "acceptance_criteria": "- Query uses SELECT * FROM location LIMIT 5\n- Student can identify the columns: location_id, address, province_name, town_name, location_type\n- Student understands this table stores geographic information",
+              "content": "Write a query to see the first 5 rows of the location table:\n\n**Expected query:**\n```sql\nSELECT *\nFROM location\nLIMIT 5\n```\n\nYou should get something like this:\n\n| location_id | address | province_name | town_name | location_type |\n|-------------|---------|---------------|-----------|---------------|\n| AkHa00000 | 2 Addis Ababa Road | Akatsi | Harare | Urban |\n| AkHa00001 | 10 Addis Ababa Road | Akatsi | Harare | Urban |\n| AkHa00002 | 9 Addis Ababa Road | Akatsi | Harare | Urban |\n| AkHa00003 | 139 Addis Ababa Road | Akatsi | Harare | Urban |\n| AkHa00004 | 17 Addis Ababa Road | Akatsi | Harare | Urban |\n\nSo we can see that this table has information on a specific location, with an address, the province and town the location is in, and if it's in a city (Urban) or not. We can't really see what location this is but we can see some sort of identifying number of that location.",
+              "learning_objectives": [
+                {
+                  "level": "apply",
+                  "description": "Apply SELECT * with LIMIT to preview table data"
+                }
+              ],
+              "tutor_guidance": {
+                "answer_rationale": "SELECT * FROM location LIMIT 5 shows the structure and sample data from the location table",
+                "hints_to_give": [
+                  "Use SELECT * to get all columns",
+                  "Use LIMIT to restrict the number of rows returned",
+                  "Don't forget to specify FROM which table"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "title": "Explore the visits table",
+          "description": "Examine the visits table to understand how water source visits are logged",
+          "estimated_minutes": 15,
+          "priority": 0,
+          "dependencies": [
+            "Explore the location table"
+          ],
+          "learning_objectives": [
+            {
+              "level": "understand",
+              "description": "Understand the relationship between visits, locations, and water sources"
+            }
+          ],
+          "content": "Ok, so let's look at the visits table.",
+          "subtasks": [
+            {
+              "title": "Query the visits table",
+              "subtask_type": "exercise",
+              "description": "Write a SELECT query to view the first 5 records from the visits table",
+              "estimated_minutes": 10,
+              "acceptance_criteria": "- Query uses SELECT * FROM visits LIMIT 5\n- Student can identify key columns: record_id, location_id, source_id, time_of_record, visit_count, time_in_queue, assigned_employee_id\n- Student understands the concept of foreign keys linking tables",
+              "content": "Query the visits table to see its structure:\n\n**Expected query:**\n```sql\nSELECT *\nFROM visits\nLIMIT 5\n```\n\nHere's what I get:\n\n| record_id | location_id | source_id | time_of_record | visit_count | time_in_queue | assigned_employee_id |\n|-----------|-------------|-----------|----------------|-------------|---------------|----------------------|\n| 0 | SoIl32582 | SoIl32582224 | 2021-01-01 09:10:00 | 1 | 15 | 12 |\n| 1 | KiRu28935 | KiRu28935224 | 2021-01-01 09:17:00 | 1 | 0 | 46 |\n| 2 | HaRu19752 | HaRu19752224 | 2021-01-01 09:36:00 | 1 | 62 | 40 |\n| 3 | AkLu01628 | AkLu01628224 | 2021-01-01 09:53:00 | 1 | 0 | 1 |\n| 4 | AkRu03357 | AkRu03357224 | 2021-01-01 10:11:00 | 1 | 28 | 14 |\n\nYeah, so this is a list of location_id, source_id, record_id, and a date and time, so it makes sense that someone (assigned_employee_id) visited some location (location_id) at some time (time_of_record) and found a 'source' there (source_id). Often the \"_id\" columns are related to another table. In this case, the source_id in the visits table refers to source_id in the water_source table. This is what we call a foreign key, but we'll get more into this next time.",
+              "learning_objectives": [
+                {
+                  "level": "understand",
+                  "description": "Understand how tables relate through foreign keys"
+                }
+              ],
+              "tutor_guidance": {
+                "answer_rationale": "The visits table logs each time an employee visited a location to record data about a water source",
+                "hints_to_give": [
+                  "Look for columns ending in '_id' - they often link to other tables",
+                  "time_in_queue tells us how long people wait for water"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "title": "Explore the water_source table",
+          "description": "Examine the water_source table to understand the types of water sources",
+          "estimated_minutes": 15,
+          "priority": 0,
+          "dependencies": [
+            "Explore the visits table"
+          ],
+          "learning_objectives": [
+            {
+              "level": "understand",
+              "description": "Understand what water sources are and how they're categorized"
+            }
+          ],
+          "content": "Ok, so let's look at the water_source table to see what a 'source' is. Normally \"_id\" columns are related to another table.",
+          "subtasks": [
+            {
+              "title": "Query the water_source table",
+              "subtask_type": "exercise",
+              "description": "Write a SELECT query to view the first 5 records from the water_source table",
+              "estimated_minutes": 10,
+              "acceptance_criteria": "- Query uses SELECT * FROM water_source LIMIT 5\n- Student can identify columns: source_id, type_of_water_source, number_of_people_served\n- Student understands that water sources serve different numbers of people",
+              "content": "Query the water_source table:\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_source\nLIMIT 5\n```\n\nI get:\n\n| source_id | type_of_water_source | number_of_people_served |\n|-----------|----------------------|-------------------------|\n| AkHa00000224 | tap_in_home | 956 |\n| AkHa00001224 | tap_in_home_broken | 930 |\n| AkHa00002224 | tap_in_home_broken | 486 |\n| AkHa00003224 | clean_well | 364 |\n| AkHa00004224 | tap_in_home_broken | 94 |\n\nNice! Ok, we're getting somewhere now... Water sources are where people get their water from! Ok, this database is actually complex, so maybe a good idea for you is to look at the rest of the tables quickly. You can just select them, but remember in good SQL there would be a data dictionary somewhere that documents all of this information, so you should read that as well, and even keep a copy of that close if we need to find information quickly.\n\nA data dictionary has been embedded into the database. If you query the data_dictionary table, an explanation of each column is given there.",
+              "learning_objectives": [
+                {
+                  "level": "understand",
+                  "description": "Understand the water_source table structure and its relationship to visits"
+                }
+              ],
+              "tutor_guidance": {
+                "answer_rationale": "Water sources are categorized by type (tap_in_home, well, etc.) and track how many people each source serves",
+                "hints_to_give": [
+                  "Notice the different types of water sources",
+                  "number_of_people_served tells us the scale of impact",
+                  "The data_dictionary table can help explain columns"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Dive into Water Sources",
+      "description": "Understanding different water source types with SELECT DISTINCT",
+      "estimated_minutes": 45,
+      "priority": 0,
+      "dependencies": [
+        "Get to Know Our Data"
+      ],
+      "learning_objectives": [
+        {
+          "level": "apply",
+          "description": "Apply SELECT DISTINCT to find unique values in a column"
+        },
+        {
+          "level": "understand",
+          "description": "Understand the different types of water sources and their implications for communities"
+        }
+      ],
+      "content": "Now that you're familiar with the structure of the tables, let's dive deeper. We need to understand the types of water sources we're dealing with. Can you figure out which table contains this information?",
+      "tasks": [
+        {
+          "title": "Find unique water source types",
+          "description": "Use SELECT DISTINCT to identify all types of water sources in the database",
+          "estimated_minutes": 15,
+          "priority": 0,
+          "learning_objectives": [
+            {
+              "level": "apply",
+              "description": "Apply SELECT DISTINCT to retrieve unique values"
+            }
+          ],
+          "content": "We've got a whole table dedicated to the types of water sources in our database. Let's dig into it and figure out all the unique types of water sources we're dealing with.",
+          "subtasks": [
+            {
+              "title": "Write SELECT DISTINCT query",
+              "subtask_type": "exercise",
+              "description": "Write a query to find all unique types of water sources",
+              "estimated_minutes": 10,
+              "acceptance_criteria": "- Query uses SELECT DISTINCT type_of_water_source FROM water_source\n- Student can list the 5 water source types discovered\n- Student understands why DISTINCT is needed",
+              "content": "Once you've identified the right table, write a SQL query to find all the **unique** types of water sources.\n\n**Expected query:**\n```sql\nSELECT DISTINCT type_of_water_source\nFROM water_source\n```\n\nSo I get this when I run it:\n\n| type_of_water_source |\n|----------------------|\n| tap_in_home |\n| tap_in_home_broken |\n| well |\n| shared_tap |\n| river |\n\nLet me quickly bring you up to speed on these water source types...",
+              "learning_objectives": [
+                {
+                  "level": "apply",
+                  "description": "Apply SELECT DISTINCT to find unique values"
+                }
+              ],
+              "tutor_guidance": {
+                "answer_rationale": "SELECT DISTINCT removes duplicate rows, giving us one row per unique water source type",
+                "common_mistakes": [
+                  "Using SELECT without DISTINCT (returns all rows with duplicates)",
+                  "Forgetting to specify the column name"
+                ],
+                "hints_to_give": [
+                  "We want unique values, not all values",
+                  "DISTINCT eliminates duplicate rows"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "title": "Understand water source types",
+          "description": "Learn about each type of water source and what it means for communities",
+          "estimated_minutes": 30,
+          "priority": 0,
+          "dependencies": [
+            "Find unique water source types"
+          ],
+          "learning_objectives": [
+            {
+              "level": "understand",
+              "description": "Understand the real-world implications of different water source types"
+            }
+          ],
+          "content": "Each water source type has different implications for the communities that rely on them. Let's understand what each type means.",
+          "subtasks": [
+            {
+              "title": "Learn about rivers as water sources",
+              "subtask_type": "conversational",
+              "description": "Understand why rivers are the most problematic water source",
+              "estimated_minutes": 5,
+              "content": "**1. River** - People collect drinking water along a river. This is an open water source that millions of people use in Maji Ndogo. Water from a river has a high risk of being contaminated with biological and other pollutants, so it is the worst source of water possible.",
+              "learning_objectives": [
+                {
+                  "level": "understand",
+                  "description": "Understand the risks of river water sources"
+                }
+              ]
+            },
+            {
+              "title": "Learn about wells as water sources",
+              "subtask_type": "conversational",
+              "description": "Understand wells and their contamination risks",
+              "estimated_minutes": 5,
+              "dependencies": [
+                "Learn about rivers as water sources"
+              ],
+              "content": "**2. Well** - These sources draw water from underground sources, and are commonly shared by communities. Since these are closed water sources, contamination is much less likely compared to a river. Unfortunately, due to the aging infrastructure and the corruption of officials in the past, many of our wells are not clean.",
+              "learning_objectives": [
+                {
+                  "level": "understand",
+                  "description": "Understand wells and potential contamination issues"
+                }
+              ]
+            },
+            {
+              "title": "Learn about shared taps",
+              "subtask_type": "conversational",
+              "description": "Understand shared taps and their community impact",
+              "estimated_minutes": 5,
+              "dependencies": [
+                "Learn about wells as water sources"
+              ],
+              "content": "**3. Shared tap** - This is a tap in a public area shared by communities. This shared tap from 18 Twiga Lane serves about 2700 people.",
+              "learning_objectives": [
+                {
+                  "level": "understand",
+                  "description": "Understand shared taps and queue time implications"
+                }
+              ]
+            },
+            {
+              "title": "Learn about home taps",
+              "subtask_type": "conversational",
+              "description": "Understand taps in homes - the best water source type",
+              "estimated_minutes": 5,
+              "dependencies": [
+                "Learn about shared taps"
+              ],
+              "content": "**4. Tap in home** - These are taps that are inside the homes of our citizens. On average about 6 people live together in Maji Ndogo, so each of these taps serves about 6 people.",
+              "learning_objectives": [
+                {
+                  "level": "understand",
+                  "description": "Understand home taps as the ideal water source"
+                }
+              ]
+            },
+            {
+              "title": "Learn about broken home taps",
+              "subtask_type": "conversational",
+              "description": "Understand broken taps and infrastructure failures",
+              "estimated_minutes": 5,
+              "dependencies": [
+                "Learn about home taps"
+              ],
+              "content": "**5. Broken tap in home** - These are taps that have been installed in a citizen's home, but the infrastructure connected to that tap is not functional. This can be due to burst pipes, broken pumps or water treatment plants that are not working.",
+              "learning_objectives": [
+                {
+                  "level": "understand",
+                  "description": "Understand infrastructure failure impacts"
+                }
+              ]
+            },
+            {
+              "title": "Understand aggregated home tap records",
+              "subtask_type": "conversational",
+              "description": "Understand why home tap records are aggregated in the database",
+              "estimated_minutes": 5,
+              "dependencies": [
+                "Learn about broken home taps"
+              ],
+              "content": "**An important note on the home taps:** About 6-10 million people have running water installed in their homes in Maji Ndogo, including broken taps. If we were to document this, we would have a row of data for each home, so that one record is one tap. That means our database would contain about 1 million rows of data, which may slow our systems down. For now, the surveyors combined the data of many households together into a single record.\n\nFor example, the first record, AkHa00000224 is for a tap_in_home that serves 956 people. What this means is that the records of about 160 homes nearby were combined into one record, with an average of 6 people living in each house (160 x 6 ≈ 956). So 1 tap_in_home or tap_in_home_broken record actually refers to multiple households, with the sum of the people living in these homes equal to number_of_people_served.",
+              "learning_objectives": [
+                {
+                  "level": "understand",
+                  "description": "Understand data aggregation decisions and their implications"
+                }
+              ],
+              "tutor_guidance": {
+                "teaching_approach": "This is important context for interpreting the data correctly",
+                "discussion_prompts": [
+                  "Why might aggregating records be necessary for large databases?",
+                  "How does this affect how we interpret number_of_people_served?"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Unpack the Visits",
+      "description": "Discovering visit patterns with WHERE and IN clauses",
+      "estimated_minutes": 45,
+      "priority": 0,
+      "dependencies": [
+        "Dive into Water Sources"
+      ],
+      "learning_objectives": [
+        {
+          "level": "apply",
+          "description": "Apply WHERE clauses to filter data based on conditions"
+        },
+        {
+          "level": "apply",
+          "description": "Apply the IN operator to check multiple values"
+        },
+        {
+          "level": "evaluate",
+          "description": "Evaluate the real-world impact of long queue times"
+        }
+      ],
+      "content": "We have a table in our database that logs the visits made to different water sources. Can you identify this table? The 'visits' table in our database is like a logbook of all the trips made to different water sources. We need to unravel this logbook to understand the frequency and distribution of these visits.",
+      "tasks": [
+        {
+          "title": "Find locations with long queue times",
+          "description": "Use WHERE to filter visits where people queue for extremely long times",
+          "estimated_minutes": 20,
+          "priority": 0,
+          "learning_objectives": [
+            {
+              "level": "apply",
+              "description": "Apply WHERE with comparison operators"
+            },
+            {
+              "level": "evaluate",
+              "description": "Evaluate what extreme queue times mean for communities"
+            }
+          ],
+          "content": "Write an SQL query that retrieves all records from this table where the time_in_queue is more than some crazy time, say 500 min. How would it feel to queue 8 hours for water?",
+          "subtasks": [
+            {
+              "title": "Consider the human impact of long queues",
+              "subtask_type": "conversational",
+              "description": "Reflect on what 500+ minutes of queue time means for real people",
+              "estimated_minutes": 5,
+              "content": "Before we write the query, think about this: 500 minutes is over 8 hours. Imagine queueing 8 hours for water. What would that mean for:\n- A parent trying to feed their family?\n- Children who should be in school?\n- Workers who need to earn a living?\n\nThis data isn't just numbers - it represents real hardship.",
+              "learning_objectives": [
+                {
+                  "level": "evaluate",
+                  "description": "Evaluate the real-world significance of queue time data"
+                }
+              ],
+              "tutor_guidance": {
+                "teaching_approach": "Connect the technical query to human impact before writing code",
+                "discussion_prompts": [
+                  "How is this possible? Can you imagine queueing 8 hours for water?",
+                  "What activities would you miss if you had to queue this long?",
+                  "Who in a family typically has to do this waiting?"
+                ]
+              }
+            },
+            {
+              "title": "Write WHERE query for long queues",
+              "subtask_type": "exercise",
+              "description": "Filter visits where time_in_queue exceeds 500 minutes",
+              "estimated_minutes": 10,
+              "dependencies": [
+                "Consider the human impact of long queues"
+              ],
+              "acceptance_criteria": "- Query uses SELECT * FROM visits WHERE time_in_queue > 500\n- Student can see the results showing extreme queue times\n- Student notices the visit_count column shows multiple visits",
+              "content": "Write a query to find all visits where people queued more than 500 minutes:\n\n**Expected query:**\n```sql\nSELECT *\nFROM visits\nWHERE time_in_queue > 500\n```\n\nThis is the table I get:\n\n| record_id | location_id | source_id | time_of_record | visit_count | time_in_queue | assigned_employee_id |\n|-----------|-------------|-----------|----------------|-------------|---------------|----------------------|\n| 899 | SoRu35083 | SoRu35083224 | 2021-01-16 10:14:00 | 6 | 515 | 28 |\n| 2304 | SoKo33124 | SoKo33124224 | 2021-02-06 07:53:00 | 5 | 512 | 16 |\n| 2315 | KiRu26095 | KiRu26095224 | 2021-02-06 14:32:00 | 3 | 529 | 8 |\n\nHow is this possible? Can you imagine queueing 8 hours for water?",
+              "learning_objectives": [
+                {
+                  "level": "apply",
+                  "description": "Apply WHERE with greater-than comparison"
+                }
+              ],
+              "tutor_guidance": {
+                "answer_rationale": "WHERE time_in_queue > 500 filters to only rows where the queue time exceeds 500 minutes",
+                "hints_to_give": [
+                  "Use > for 'greater than' comparison",
+                  "time_in_queue is measured in minutes"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "title": "Investigate which source types have long queues",
+          "description": "Use IN to look up source types for locations with extreme queue times",
+          "estimated_minutes": 25,
+          "priority": 0,
+          "dependencies": [
+            "Find locations with long queue times"
+          ],
+          "learning_objectives": [
+            {
+              "level": "apply",
+              "description": "Apply the IN operator to check multiple values"
+            },
+            {
+              "level": "analyze",
+              "description": "Analyze patterns between source types and queue times"
+            }
+          ],
+          "content": "I am wondering what type of water sources take this long to queue for. We will have to find that information in another table that lists the types of water sources. If I remember correctly, the table has type_of_water_source, and a source_id column. So let's write down a couple of these source_id values from our results, and search for them in the other table.",
+          "subtasks": [
+            {
+              "title": "Note source IDs to investigate",
+              "subtask_type": "conversational",
+              "description": "Identify source_id values from the long queue results to look up",
+              "estimated_minutes": 5,
+              "content": "From our results, let's note some source_id values to investigate:\n\nFrom the long queue results:\n- AkKi00881224\n- SoRu37635224\n- SoRu36096224\n\nIf we just select the first couple of records of the visits table without a WHERE filter, we can see that some of these rows also have 0 mins queue time. So let's write down one or two of these too:\n- AkRu05234224\n- HaZa21742224",
+              "learning_objectives": [
+                {
+                  "level": "understand",
+                  "description": "Understand how to cross-reference data between tables"
+                }
+              ]
+            },
+            {
+              "title": "Use IN to look up multiple source IDs",
+              "subtask_type": "exercise",
+              "description": "Write a query using IN to check multiple source_ids in the water_source table",
+              "estimated_minutes": 15,
+              "dependencies": [
+                "Note source IDs to investigate"
+              ],
+              "acceptance_criteria": "- Query uses WHERE source_id IN(...) with multiple values\n- Student can see that shared_tap sources have the long queues\n- Student understands IN as an alternative to multiple OR conditions",
+              "content": "Ok, so now back to the water_source table. Let's check the records for those source_ids. You can probably remember there is a cool and a \"not so cool\" way to do it.\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_source\nWHERE source_id IN(\n    'AkRu05234224',\n    'AkKi00881224',\n    'SoRu37635224',\n    'SoRu36096224',\n    'HaZa21742224',\n    'AkLu01628224',\n    'SoRu38776224'\n)\n```\n\nThis is what I get:\n\n| source_id | type_of_water_source | number_of_people_served |\n|-----------|----------------------|-------------------------|\n| AkKi00881224 | shared_tap | 3398 |\n| AkLu01628224 | bio_dirty_well | 210 |\n| AkRu05234224 | tap_in_home_broken | 496 |\n| HaRu19601224 | shared_tap | 3322 |\n| HaZa21742224 | pol_dirty_well | 308 |\n| SoRu36096224 | shared_tap | 3786 |\n| SoRu37635224 | shared_tap | 3920 |\n\nI added a couple of others... Sorry! Well, if you check them you will see which sources have people queueing. The field surveyors also let us know that they measured sources that had queues a few times to see if the queue time changed.",
+              "learning_objectives": [
+                {
+                  "level": "apply",
+                  "description": "Apply IN operator for multiple value matching"
+                },
+                {
+                  "level": "analyze",
+                  "description": "Analyze patterns between source types and queue times"
+                }
+              ],
+              "tutor_guidance": {
+                "answer_rationale": "Using IN is more elegant than multiple OR conditions. The results show that shared_tap sources are the ones with extreme queue times - they serve thousands of people!",
+                "common_mistakes": [
+                  "Forgetting quotes around string values",
+                  "Using = instead of IN for multiple values"
+                ],
+                "hints_to_give": [
+                  "IN lets you check if a value matches any in a list",
+                  "It's cleaner than writing source_id = 'x' OR source_id = 'y' OR..."
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Water Source Quality Assessment",
+      "description": "Understanding water quality scores and identifying data anomalies",
+      "estimated_minutes": 30,
+      "priority": 0,
+      "dependencies": [
+        "Unpack the Visits"
+      ],
+      "learning_objectives": [
+        {
+          "level": "apply",
+          "description": "Apply multiple conditions in WHERE clauses using AND"
+        },
+        {
+          "level": "analyze",
+          "description": "Analyze data for logical inconsistencies and potential errors"
+        }
+      ],
+      "content": "The quality of our water sources is the whole point of this survey. We have a table that contains a quality score for each visit made about a water source that was assigned by a Field surveyor. They assigned a score to each source from 1, being terrible, to 10 for a good, clean water source in a home. Shared taps are not rated as high, and the score also depends on how long the queue times are.",
+      "tasks": [
+        {
+          "title": "Explore the water_quality table",
+          "description": "Examine the water_quality table structure and understand scoring",
+          "estimated_minutes": 10,
+          "priority": 0,
+          "learning_objectives": [
+            {
+              "level": "understand",
+              "description": "Understand how water quality is scored and recorded"
+            }
+          ],
+          "content": "The quality of water sources is a pretty big deal. We'll turn to the water_quality table to find records where the subjective_quality_score is within a certain range and the visit_count is above a certain threshold.",
+          "subtasks": [
+            {
+              "title": "Query the water_quality table",
+              "subtask_type": "exercise",
+              "description": "Explore the water_quality table to see its structure",
+              "estimated_minutes": 5,
+              "acceptance_criteria": "- Query uses SELECT * FROM water_quality\n- Student can identify columns: record_id, subjective_quality_score, visit_count\n- Student understands the scoring system (1-10)",
+              "content": "Look through the table records to find the water quality table.\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_quality\n```",
+              "learning_objectives": [
+                {
+                  "level": "understand",
+                  "description": "Understand the water_quality table structure"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Find quality score anomalies",
+          "description": "Identify records where perfect scores appear for sources that were visited multiple times",
+          "estimated_minutes": 20,
+          "priority": 0,
+          "dependencies": [
+            "Explore the water_quality table"
+          ],
+          "learning_objectives": [
+            {
+              "level": "apply",
+              "description": "Apply AND to combine multiple WHERE conditions"
+            },
+            {
+              "level": "analyze",
+              "description": "Analyze data for logical inconsistencies"
+            }
+          ],
+          "content": "Let's check if this is true. The surveyors only made multiple visits to shared taps and did not revisit other types of water sources. So there should be no records of second visits to locations where there are good water sources, like taps in homes.",
+          "subtasks": [
+            {
+              "title": "Discuss why this query matters",
+              "subtask_type": "conversational",
+              "description": "Understand the logic behind looking for score 10 with visit_count 2",
+              "estimated_minutes": 5,
+              "content": "Think about this logic:\n- Only shared taps were visited multiple times (visit_count > 1)\n- Home taps (the best sources) should have score 10\n- But home taps were only visited once\n\nSo if we find records with score 10 AND visit_count = 2, something is wrong - either the score or the classification.",
+              "learning_objectives": [
+                {
+                  "level": "analyze",
+                  "description": "Analyze the logic of data validation queries"
+                }
+              ]
+            },
+            {
+              "title": "Write query to find anomalies",
+              "subtask_type": "exercise",
+              "description": "Find records where subjective_quality_score = 10 AND visit_count = 2",
+              "estimated_minutes": 10,
+              "dependencies": [
+                "Discuss why this query matters"
+              ],
+              "acceptance_criteria": "- Query uses WHERE with AND to combine both conditions\n- Query returns 218 suspicious rows\n- Student understands why these records indicate errors",
+              "content": "So please write a query to find records where the subjective_quality_score is 10 -- only looking for home taps -- and where the source was visited a second time. What will this tell us?\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_quality\nWHERE visit_count = 2\nAND subjective_quality_score = 10\n```\n\nI get 218 rows of data. But this should not be happening! I think some of our employees may have made mistakes. To be honest, I'll be surprised if there are no errors in our data at this scale! I'm going to send Pres. Naledi a message that we have to recheck some of these sources. We can appoint an Auditor to check some of the data independently, and make sure we have the right information!",
+              "learning_objectives": [
+                {
+                  "level": "apply",
+                  "description": "Apply AND operator to combine multiple conditions"
+                },
+                {
+                  "level": "analyze",
+                  "description": "Analyze data for logical inconsistencies"
+                }
+              ],
+              "tutor_guidance": {
+                "answer_rationale": "Visit count = 2 is a crude filter to limit the results to shared_tap, since they were the only type visited more than once. These taps should not have a perfect 10 score, because they are not tap_in_home. Both conditions must be true for the results. This fetches all of the records where employees made errors.",
+                "common_mistakes": [
+                  "Using OR instead of AND",
+                  "Forgetting that both conditions must be true"
+                ],
+                "discussion_prompts": [
+                  "Why would shared taps never deserve a score of 10?",
+                  "What should we do about these 218 suspicious records?"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Pollution Issues Investigation",
+      "description": "Correcting pollution data with LIKE, UPDATE, and safe modification practices",
+      "estimated_minutes": 90,
+      "priority": 0,
+      "dependencies": [
+        "Water Source Quality Assessment"
+      ],
+      "learning_objectives": [
+        {
+          "level": "apply",
+          "description": "Apply LIKE operator for pattern matching in text data"
+        },
+        {
+          "level": "apply",
+          "description": "Apply UPDATE statements to correct data errors"
+        },
+        {
+          "level": "create",
+          "description": "Create safe data modification workflows using backup tables"
+        },
+        {
+          "level": "evaluate",
+          "description": "Evaluate data integrity by finding contradictory records"
+        }
+      ],
+      "content": "Did you notice that we recorded contamination/pollution data for all of the well sources? Find the right table and print the first few rows.",
+      "tasks": [
+        {
+          "title": "Explore the well_pollution table",
+          "description": "Examine contamination data for wells",
+          "estimated_minutes": 15,
+          "priority": 0,
+          "learning_objectives": [
+            {
+              "level": "understand",
+              "description": "Understand the well_pollution table and contamination measurements"
+            }
+          ],
+          "content": "Let's find and explore the well pollution data.",
+          "subtasks": [
+            {
+              "title": "Query the well_pollution table",
+              "subtask_type": "exercise",
+              "description": "View the structure and sample data from well_pollution",
+              "estimated_minutes": 10,
+              "acceptance_criteria": "- Query retrieves first few rows from well_pollution\n- Student can identify columns: source_id, date, description, pollutant_ppm, biological, results\n- Student understands that biological > 0.01 means contaminated",
+              "content": "Find the right table and print the first few rows.\n\n**Expected query:**\n```sql\nSELECT *\nFROM well_pollution\n```\n\nI get this:\n\n| source_id | date | description | pollutant_ppm | biological | results |\n|-----------|------|-------------|---------------|------------|--------|\n| KiRu28935224 | 2021-01-04 09:17:00 | Bacteria: Giardia Lamblia | 0.0 | 495.898 | Contaminated: Biological |\n| AkLu01628224 | 2021-01-04 09:53:00 | Bacteria: Salmonella Typhi | 0.0 | 376.572 | Contaminated: Biological |\n| HaZa21742224 | 2021-01-04 10:37:00 | Inorganic contaminants: Zinc... | 2.715 | 0.0 | Contaminated: Chemical |\n| HaRu19725224 | 2021-01-04 11:04:00 | Clean | 0.0288593 | 0.0 | Clean |\n| SoRu35703224 | 2021-01-04 11:29:00 | Bacteria: E. coli | 0.0 | 296.437 | Contaminated: Biological |\n\nIt looks like our scientists diligently recorded the water quality of all the wells. Some are contaminated with biological contaminants, while others are polluted with an excess of heavy metals and other pollutants. Based on the results, each well was classified as Clean, Contaminated: Biological or Contaminated: Chemical. It is important to know this because wells that are polluted with bio- or other contaminants are not safe to drink. It looks like they recorded the source_id of each test, so we can link it to a source, at some place in Maji Ndogo.",
+              "learning_objectives": [
+                {
+                  "level": "understand",
+                  "description": "Understand pollution data structure and contamination thresholds"
+                }
+              ],
+              "tutor_guidance": {
+                "teaching_approach": "Emphasize the health implications - this data determines if water is safe to drink",
+                "hints_to_give": [
+                  "biological column is in CFU/mL - 0 is clean, > 0.01 is contaminated",
+                  "The results column should match the biological readings"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "title": "Find data contradictions",
+          "description": "Identify wells marked as Clean but with biological contamination",
+          "estimated_minutes": 20,
+          "priority": 0,
+          "dependencies": [
+            "Explore the well_pollution table"
+          ],
+          "learning_objectives": [
+            {
+              "level": "analyze",
+              "description": "Analyze data for dangerous contradictions"
+            }
+          ],
+          "content": "In the well pollution table, the descriptions are notes taken by our scientists as text, so it will be challenging to process it. The biological column is in units of CFU/mL, so it measures how much contamination is in the water. 0 is clean, and anything more than 0.01 is contaminated.\n\nLet's check the integrity of the data. The worst case is if we have contamination, but we think we don't. People can get sick, so we need to make sure there are no errors here.",
+          "subtasks": [
+            {
+              "title": "Discuss the health implications of mislabeled wells",
+              "subtask_type": "conversational",
+              "description": "Understand why finding 'Clean' wells with contamination is dangerous",
+              "estimated_minutes": 5,
+              "content": "Think about the danger here: if a well is marked as 'Clean' in the results column, but actually has biological contamination (biological > 0.01), people will drink contaminated water thinking it's safe.\n\nThis is potentially a life-threatening data error. We MUST find and fix these records.",
+              "learning_objectives": [
+                {
+                  "level": "evaluate",
+                  "description": "Evaluate the real-world danger of data errors"
+                }
+              ]
+            },
+            {
+              "title": "Query for contradictory records",
+              "subtask_type": "exercise",
+              "description": "Find wells where results='Clean' but biological > 0.01",
+              "estimated_minutes": 10,
+              "dependencies": [
+                "Discuss the health implications of mislabeled wells"
+              ],
+              "acceptance_criteria": "- Query returns rows where results='Clean' AND biological > 0.01\n- Uses WHERE with AND to combine both conditions\n- Student understands why these records are dangerous",
+              "content": "So, write a query that checks if the results is Clean but the biological column is > 0.01.\n\n**Expected query:**\n```sql\nSELECT *\nFROM well_pollution\nWHERE results = 'Clean'\nAND biological > 0.01\n```\n\nI got this:\n\n| source_id | date | description | pollutant_ppm | biological | results |\n|-----------|------|-------------|---------------|------------|--------|\n| AkRu08936224 | 2021-01-08 09:22:00 | Bacteria: E. coli | 0.0406458 | 35.0068 | Clean |\n| AkRu06489224 | 2021-01-10 09:44:00 | Clean Bacteria: Giardia Lamblia | 0.0897904 | 38.467 | Clean |\n| SoRu38011224 | 2021-01-14 15:35:00 | Bacteria: E. coli | 0.0425095 | 19.2897 | Clean |\n\nIf we compare the results of this query to the entire table it seems like we have some inconsistencies in how the well statuses are recorded. Specifically, it seems that some data input personnel might have mistaken the description field for determining the cleanliness of the water.",
+              "learning_objectives": [
+                {
+                  "level": "analyze",
+                  "description": "Analyze data for contradictory values"
+                }
+              ],
+              "tutor_guidance": {
+                "answer_rationale": "If results = 'Clean' the description is saying the well is clean, but AND biological > 0.01 says it is polluted. So this query finds the records that say clean, but are actually dirty."
+              }
+            }
+          ]
+        },
+        {
+          "title": "Use LIKE for pattern matching",
+          "description": "Find descriptions with extra 'Clean' prefix using wildcards",
+          "estimated_minutes": 15,
+          "priority": 0,
+          "dependencies": [
+            "Find data contradictions"
+          ],
+          "learning_objectives": [
+            {
+              "level": "apply",
+              "description": "Apply LIKE operator with wildcards for pattern matching"
+            }
+          ],
+          "content": "It seems like, in some cases, if the description field begins with the word 'Clean', the results have been classified as 'Clean' in the results column, even though the biological column is > 0.01.\n\nWe need to find and remove the 'Clean' part from all the descriptions that do have a biological contamination so this mistake is not made again.",
+          "subtasks": [
+            {
+              "title": "Understand the error pattern",
+              "subtask_type": "conversational",
+              "description": "Understand why some descriptions have 'Clean' prefix incorrectly",
+              "estimated_minutes": 5,
+              "content": "Vuyisile has told me that the descriptions should only have the word 'Clean' if there is no biological contamination (and no chemical pollutants). Some data personnel must have copied the data from the scientist's notes into our database incorrectly. We need to find and remove the 'Clean' part from all the descriptions that do have a biological contamination so this mistake is not made again.\n\nFirst, let's look at the descriptions. We need to identify the records that mistakenly have the word Clean in the description. However, it is important to remember that not all of our field surveyors used the description to set the results - some checked the actual data.",
+              "learning_objectives": [
+                {
+                  "level": "understand",
+                  "description": "Understand the root cause of data entry errors"
+                }
+              ]
+            },
+            {
+              "title": "Write LIKE query for wrong descriptions",
+              "subtask_type": "exercise",
+              "description": "Use LIKE with wildcards to find descriptions starting with 'Clean' followed by other text",
+              "estimated_minutes": 10,
+              "dependencies": [
+                "Understand the error pattern"
+              ],
+              "acceptance_criteria": "- Query uses LIKE 'Clean_%' pattern\n- Returns 38 wrong descriptions\n- Student understands _ matches one character and % matches any characters",
+              "content": "**Hint:** To find these descriptions, search for the word Clean with additional characters after it. As this is what separates incorrect descriptions from the records that should have 'Clean'.\n\n**Expected query:**\n```sql\nSELECT *\nFROM well_pollution\nWHERE description LIKE 'Clean_%'\n```\n\nThe query should return 38 wrong descriptions.\n\nLooking at the results we can see two different descriptions that we need to fix:\n1. All records that mistakenly have 'Clean Bacteria: E. coli' should be updated to 'Bacteria: E. coli'\n2. All records that mistakenly have 'Clean Bacteria: Giardia Lamblia' should be updated to 'Bacteria: Giardia Lamblia'\n\nThe second issue we need to fix is in our results column. We need to update the results column from 'Clean' to 'Contaminated: Biological' where the biological column has a value greater than 0.01.",
+              "learning_objectives": [
+                {
+                  "level": "apply",
+                  "description": "Apply LIKE with wildcard patterns"
+                }
+              ],
+              "tutor_guidance": {
+                "answer_rationale": "'Clean_%' means it starts with 'Clean', (_) have at least one character after 'Clean' and (%) can have any other characters after that.",
+                "common_mistakes": [
+                  "Forgetting the quotes around the pattern",
+                  "Using * instead of %",
+                  "Using LIKE = instead of just LIKE"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "title": "Safely update the data",
+          "description": "Use a copy table to safely test and apply UPDATE statements",
+          "estimated_minutes": 40,
+          "priority": 0,
+          "dependencies": [
+            "Use LIKE for pattern matching"
+          ],
+          "learning_objectives": [
+            {
+              "level": "create",
+              "description": "Create safe data modification workflows"
+            },
+            {
+              "level": "apply",
+              "description": "Apply UPDATE statements to correct data"
+            }
+          ],
+          "content": "Now we need to fix these descriptions so that we don't encounter this issue again in the future. But when we change any data on the database, we need to be SURE there are no errors, as this could fill the database with incorrect values.",
+          "subtasks": [
+            {
+              "title": "Discuss the responsibility of modifying data",
+              "subtask_type": "conversational",
+              "description": "Understand the risks and best practices for UPDATE statements",
+              "estimated_minutes": 5,
+              "content": "Before we make any changes, here is another nugget of advice: Begin complex queries by commenting on what you will do. This helps us to think through the problem before we write code to solve it, and once we're done, we have a well-documented code.\n\nNow, when we change any data on the database, we need to be SURE there are no errors, as this could fill the database with incorrect values. A safer way to do the UPDATE is by testing the changes on a copy of the table first.",
+              "learning_objectives": [
+                {
+                  "level": "understand",
+                  "description": "Understand the importance of safe data modification practices"
+                }
+              ],
+              "tutor_guidance": {
+                "teaching_approach": "Emphasize this as a professional best practice that prevents disasters",
+                "discussion_prompts": [
+                  "What if your WHERE clause accidentally matched more rows than intended?",
+                  "How would you undo an UPDATE if you made a mistake?",
+                  "Why might companies have 'read-only' vs 'read-write' database permissions?"
+                ]
+              }
+            },
+            {
+              "title": "Create a copy table for safe testing",
+              "subtask_type": "exercise",
+              "description": "Create well_pollution_copy to test UPDATE queries",
+              "estimated_minutes": 5,
+              "dependencies": [
+                "Discuss the responsibility of modifying data"
+              ],
+              "acceptance_criteria": "- Copy table well_pollution_copy created successfully\n- Contains same data as original well_pollution table\n- Student understands why testing on a copy is essential",
+              "content": "The CREATE TABLE new_table AS (query) approach is a neat trick that allows you to create a new table from the results set of a query. This method is especially useful for creating backup tables or subsets without the need for a separate CREATE TABLE and INSERT INTO statement.\n\nSo if we run:\n\n**Expected query:**\n```sql\nCREATE TABLE well_pollution_copy AS (\n    SELECT *\n    FROM well_pollution\n)\n```\n\nWe will get a copy of well_pollution called well_pollution_copy. Now we can make the changes, and if we discover there is a mistake in our code, we can just delete this table, and run it again.",
+              "learning_objectives": [
+                {
+                  "level": "apply",
+                  "description": "Apply CREATE TABLE AS SELECT to create backup copies"
+                }
+              ],
+              "tutor_guidance": {
+                "teaching_approach": "Emphasize this as a professional best practice",
+                "hints_to_give": [
+                  "Always make a copy before modifying production data",
+                  "Test your UPDATE on the copy first"
+                ]
+              }
+            },
+            {
+              "title": "Write UPDATE queries for the copy table",
+              "subtask_type": "exercise",
+              "description": "Write and test UPDATE queries on the copy table",
+              "estimated_minutes": 15,
+              "dependencies": [
+                "Create a copy table for safe testing"
+              ],
+              "acceptance_criteria": "- All three UPDATE queries written correctly\n- Updates tested on well_pollution_copy first\n- Student can explain what each UPDATE does",
+              "content": "So if we now run our query on the copy table:\n\n**Case 1a - Fix E. coli descriptions:**\n```sql\nUPDATE well_pollution_copy\nSET description = 'Bacteria: E. coli'\nWHERE description = 'Clean Bacteria: E. coli'\n```\n\n**Case 1b - Fix Giardia descriptions:**\n```sql\nUPDATE well_pollution_copy\nSET description = 'Bacteria: Giardia Lamblia'\nWHERE description = 'Clean Bacteria: Giardia Lamblia'\n```\n\n**Case 2 - Fix results column:**\n```sql\nUPDATE well_pollution_copy\nSET results = 'Contaminated: Biological'\nWHERE biological > 0.01 AND results = 'Clean'\n```",
+              "learning_objectives": [
+                {
+                  "level": "create",
+                  "description": "Create UPDATE statements with WHERE conditions"
+                }
+              ],
+              "tutor_guidance": {
+                "answer_rationale": "Case 1a and 1b fix the description field by removing the erroneous 'Clean ' prefix. Case 2 fixes the results column by setting it to 'Contaminated: Biological' where the data shows contamination but was incorrectly marked as Clean."
+              }
+            },
+            {
+              "title": "Verify the fixes worked",
+              "subtask_type": "exercise",
+              "description": "Run a verification query to confirm all errors are fixed",
+              "estimated_minutes": 5,
+              "dependencies": [
+                "Write UPDATE queries for the copy table"
+              ],
+              "acceptance_criteria": "- Verification query returns 0 rows\n- Student understands how to verify data corrections",
+              "content": "We can then check if our errors are fixed using a SELECT query on the well_pollution_copy table:\n\n**Expected query:**\n```sql\nSELECT *\nFROM well_pollution_copy\nWHERE description LIKE 'Clean_%'\nOR (results = 'Clean' AND biological > 0.01)\n```\n\nThis should return 0 rows if all our fixes worked correctly.",
+              "learning_objectives": [
+                {
+                  "level": "evaluate",
+                  "description": "Evaluate the success of data corrections"
+                }
+              ]
+            },
+            {
+              "title": "Apply updates to production and cleanup",
+              "subtask_type": "exercise",
+              "description": "Apply the verified updates to the real table and drop the copy",
+              "estimated_minutes": 10,
+              "dependencies": [
+                "Verify the fixes worked"
+              ],
+              "acceptance_criteria": "- Updates applied to well_pollution table\n- Copy table dropped with DROP TABLE\n- Student understands the complete safe modification workflow",
+              "content": "Then if we're sure it works as intended, we can change the table back to the well_pollution and delete the well_pollution_copy table.\n\n```sql\nUPDATE well_pollution\nSET description = 'Bacteria: E. coli'\nWHERE description = 'Clean Bacteria: E. coli';\n\nUPDATE well_pollution\nSET description = 'Bacteria: Giardia Lamblia'\nWHERE description = 'Clean Bacteria: Giardia Lamblia';\n\nUPDATE well_pollution\nSET results = 'Contaminated: Biological'\nWHERE biological > 0.01 AND results = 'Clean';\n\nDROP TABLE well_pollution_copy;\n```\n\nSo I hope that today helped you to see what the survey data is all about. I hope that you are as excited as I am to get stuck in! Until then, keep well!",
+              "learning_objectives": [
+                {
+                  "level": "apply",
+                  "description": "Apply DROP TABLE to clean up temporary tables"
+                }
+              ],
+              "tutor_guidance": {
+                "teaching_approach": "End on a high note - connect their work to meaningful outcomes",
+                "discussion_prompts": [
+                  "How has your view of 'data analysis' changed?",
+                  "What would you do differently if you encountered messy data again?",
+                  "Why does careful, verified work matter more than fast work?"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

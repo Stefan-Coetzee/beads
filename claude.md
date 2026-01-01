@@ -1,0 +1,1062 @@
+# Learning Task Tracker (LTT) - Developer Reference
+
+> Quick reference for developers and LLMs working with the LTT codebase.
+
+---
+
+## Architecture Overview
+
+### Two-Layer Architecture (ADR-001)
+
+LTT separates **curriculum** (what to learn) from **progress** (learner-specific state):
+
+**Template Layer** (shared across all learners):
+- `tasks` table - Project structure, descriptions, acceptance criteria
+- `learning_objectives` - Bloom's taxonomy objectives
+- `dependencies` - Task relationships and blocking
+- `content` - Learning materials
+
+**Instance Layer** (per-learner):
+- `learner_task_progress` - Status (open/in_progress/blocked/closed)
+- `submissions` - Learner's work submissions
+- `validations` - Pass/fail results
+- `status_summaries` - Progress notes
+
+**Key Insight**: 1,000 learners can work on the same project with independent progress tracking.
+
+### Status State Machine
+
+```
+     ┌──────────┐
+     │ blocked  │←────┐
+     └────┬─────┘     │
+          ▼           │
+  ┌──────────┐  ┌──────────┐  ┌──────────┐
+  │   open   │─→│in_progress│─→│ closed   │
+  └──────────┘  └──────────┘  └────┬─────┘
+       ▲                           │
+       └───────────────────────────┘
+              go_back (reopen)
+```
+
+---
+
+## Repository Structure
+
+```
+src/ltt/
+├── models/              # Pydantic + SQLAlchemy models
+│   ├── task.py          # Core task model (template layer)
+│   ├── progress.py      # Learner progress (instance layer)
+│   ├── submission.py    # Submissions & validations
+│   ├── dependency.py    # Task relationships
+│   └── objective.py     # Learning objectives (Bloom's taxonomy)
+│
+├── services/            # Business logic layer
+│   ├── task_service.py      # Task CRUD, hierarchy traversal
+│   ├── progress_service.py  # Status transitions, validation
+│   ├── dependency_service.py # Dependencies, ready work calculation
+│   ├── submission_service.py # Submission management
+│   ├── validation_service.py # Validation logic
+│   ├── learning/            # Learning-specific services
+│   │   ├── objectives.py    # Learning objectives
+│   │   ├── progress.py      # Progress tracking
+│   │   ├── summarization.py # Hierarchical summaries
+│   │   └── content.py       # Content management
+│   ├── ingest.py            # JSON project import
+│   └── export.py            # Project export (JSON/JSONL)
+│
+├── tools/               # Agent runtime interface (for LLM agents)
+│   ├── navigation.py    # get_ready, show_task, get_context
+│   ├── progress.py      # start_task, submit
+│   ├── feedback.py      # add_comment, get_comments
+│   ├── control.py       # go_back, request_help
+│   └── schemas.py       # Pydantic I/O models
+│
+├── cli/                 # Admin CLI (Typer)
+│   └── main.py          # Project management commands
+│
+├── db/                  # Database
+│   ├── session.py       # Async session management
+│   └── migrations/      # Alembic migrations
+│
+└── utils/               # Utilities
+    └── ids.py           # Hierarchical ID generation
+
+tests/                   # 167 tests, all passing
+├── services/            # Service layer tests
+├── tools/               # Agent tools tests
+└── conftest.py          # Pytest fixtures (async_session, etc.)
+
+docs/
+├── SCHEMA-FOR-LLM-INGESTION.md  # Complete schema guide for LLM-based project creation
+├── CLI-USAGE-GUIDE.md           # Full CLI reference
+└── BUILD-STATUS.md              # Implementation status (167 tests)
+
+python-port/docs/        # Technical specifications
+├── PRD.md               # Product requirements
+├── 01-data-models.md    # Complete data model specs
+├── 02-task-management.md
+├── 03-dependencies.md
+├── 04-submissions-validation.md
+├── 05-learning-progress.md
+├── 07-agent-tools.md
+├── 08-admin-cli.md
+└── adr/
+    └── 001-learner-scoped-task-progress.md
+```
+
+---
+
+## CLI Commands
+
+**Note**: Run as `python -m ltt.cli.main <command>` or install as package for `ltt <command>`.
+
+### Project Management
+
+```bash
+# Create new project
+python -m ltt.cli.main project create "My Project" --description "Description"
+
+# List all projects
+python -m ltt.cli.main project list --limit 20
+
+# Show project details
+python -m ltt.cli.main project show proj-abc123
+
+# Export project to JSON
+python -m ltt.cli.main project export proj-abc123 --output backup.json --format json
+```
+
+### Project Ingestion
+
+```bash
+# Validate JSON structure (dry run - no changes)
+python -m ltt.cli.main ingest project my_project.json --dry-run
+
+# Import project from JSON
+python -m ltt.cli.main ingest project my_project.json
+```
+
+**Input Format**: See [docs/SCHEMA-FOR-LLM-INGESTION.md](docs/SCHEMA-FOR-LLM-INGESTION.md)
+
+### Task Management
+
+```bash
+# Create task under parent
+python -m ltt.cli.main task create "Task Title" \
+  --parent proj-abc123.1 \
+  --description "Task description" \
+  --ac "- Criterion 1\n- Criterion 2" \
+  --type task \
+  --priority 2
+
+# Add learning objective to task
+python -m ltt.cli.main task add-objective proj-abc123.1 \
+  "Implement REST endpoints in FastAPI" \
+  --level apply
+```
+
+**Task Types**: `project`, `epic`, `task`, `subtask`
+**Bloom Levels**: `remember`, `understand`, `apply`, `analyze`, `evaluate`, `create`
+
+### Content Management
+
+```bash
+# Create content from string
+python -m ltt.cli.main content create \
+  --type markdown \
+  --body "# Tutorial Content"
+
+# Create content from file
+python -m ltt.cli.main content create \
+  --type markdown \
+  --file path/to/tutorial.md
+
+# Attach content to task
+python -m ltt.cli.main content attach cnt-xyz123 proj-abc123.1
+```
+
+**Content Types**: `markdown`, `code`, `video_ref`, `external_link`
+
+### Learner Management
+
+```bash
+# Create learner
+python -m ltt.cli.main learner create --metadata '{"name": "Alice"}'
+
+# List learners
+python -m ltt.cli.main learner list --limit 50
+
+# Show learner progress in project
+python -m ltt.cli.main learner progress learner-abc123 proj-xyz789
+```
+
+**Progress Output**:
+```
+Completed: 15/42
+Percentage: 35.7%
+In Progress: 3
+Blocked: 2
+Objectives: 8/18
+```
+
+### Database Operations
+
+```bash
+# Initialize database (run migrations)
+python -m ltt.cli.main db init
+```
+
+**Direct Alembic** (alternative):
+```bash
+# Run migrations
+PYTHONPATH=src uv run alembic upgrade head
+
+# Create new migration
+PYTHONPATH=src uv run alembic revision --autogenerate -m "Description"
+
+# Rollback
+PYTHONPATH=src uv run alembic downgrade -1
+```
+
+---
+
+## Development Workflows
+
+### Running Tests
+
+```bash
+# All tests (167 tests)
+uv run pytest tests/ -v
+
+# Specific module
+uv run pytest tests/services/test_task_service.py -v
+uv run pytest tests/tools/ -v
+
+# With coverage
+uv run pytest tests/ --cov=src/ltt --cov-report=term-missing
+
+# Fast (quiet mode)
+uv run pytest tests/ -q
+```
+
+### Code Quality
+
+```bash
+# Lint and format
+uv run ruff check src/ tests/
+uv run ruff format src/ tests/
+
+# Auto-fix issues
+uv run ruff check --fix src/ tests/
+```
+
+### Database Management
+
+```bash
+# Start PostgreSQL (Docker)
+docker-compose up -d
+
+# Check status
+docker-compose ps
+
+# Stop
+docker-compose down
+
+# View logs
+docker-compose logs -f postgres
+```
+
+---
+
+## Key Concepts
+
+### Hierarchical Task Structure
+
+```
+Project (proj-a1b2)
+  ├── Epic (proj-a1b2.1)
+  │   ├── Task (proj-a1b2.1.1)
+  │   │   ├── Subtask (proj-a1b2.1.1.1)
+  │   │   └── Subtask (proj-a1b2.1.1.2)
+  │   └── Task (proj-a1b2.1.2)
+  └── Epic (proj-a1b2.2)
+```
+
+- **Unlimited nesting** via `parent_id`
+- **Hierarchical IDs** auto-generated
+- **Context distribution**: Broad (project) → Specific (subtask)
+
+### Dependency Types
+
+**BLOCKS**: Hard dependency (Task B waits for Task A to close)
+```python
+await add_dependency(session, task_b.id, task_a.id, DependencyType.BLOCKS)
+```
+
+**PARENT_CHILD**: Implicit hierarchy (parent can't close until children close)
+- Created automatically via `parent_id`
+
+**RELATED**: Informational link (no blocking)
+
+**Dependencies are unconstrained**: Can cross epics, can be between any task types.
+
+### Learning Objectives (Bloom's Taxonomy)
+
+```json
+{
+  "level": "apply",
+  "description": "Implement JWT authentication in FastAPI"
+}
+```
+
+**Levels** (low → high cognitive complexity):
+1. `remember` - Recall facts, syntax
+2. `understand` - Explain concepts
+3. `apply` - Use knowledge (most common for implementation)
+4. `analyze` - Break down, examine
+5. `evaluate` - Judge, critique, compare
+6. `create` - Build something new
+
+**Achievement**: Derived from passing validations (not stored separately).
+
+### Pedagogical Guidance Fields
+
+**`tutor_guidance`** (Task/Subtask level):
+```json
+{
+  "teaching_approach": "Start with real-world context before SQL",
+  "discussion_prompts": ["What does 500 minutes mean in real life?"],
+  "common_mistakes": ["Using = instead of >"],
+  "hints_to_give": ["Try SHOW TABLES first", "Check column names"],
+  "answer_rationale": "Explains WHY the answer works"
+}
+```
+
+**`narrative_context`** (Project level):
+```
+"This data comes from President Naledi's water quality initiative.
+You are helping analyze survey data that will impact real communities..."
+```
+
+These guide **HOW** LLM tutors teach, not just **WHAT**.
+
+### Validation & Submissions
+
+**Submission Types**: `code`, `sql`, `text`, `jupyter_cell`, `result_set`
+
+**Validation Rules**:
+- **Subtasks**: MUST have passing validation to close
+- **Tasks/Epics**: Can close without validation (optional feedback)
+
+**Current Validator**: SimpleValidator (non-empty check only)
+
+---
+
+## Agent Tools (Python API)
+
+Stateless interface for LLM agents:
+
+### Navigation Tools
+
+```python
+from ltt.tools import get_ready, show_task, get_context
+
+# Get unblocked tasks (in_progress first, then open)
+result = await get_ready(
+    GetReadyInput(project_id="proj-123", task_type="task", limit=5),
+    learner_id="learner-456",
+    session
+)
+
+# Show detailed task info
+result = await show_task(
+    ShowTaskInput(task_id="proj-123.1.1"),
+    learner_id="learner-456",
+    session
+)
+
+# Get full context for task
+result = await get_context(
+    GetContextInput(task_id="proj-123.1.1"),
+    learner_id="learner-456",
+    session
+)
+```
+
+### Progress Tools
+
+```python
+from ltt.tools import start_task, submit
+
+# Start working on task (sets status to in_progress)
+result = await start_task(
+    StartTaskInput(task_id="proj-123.1.1"),
+    learner_id="learner-456",
+    session
+)
+
+# Submit work and trigger validation
+result = await submit(
+    SubmitInput(
+        task_id="proj-123.1.1",
+        content="def hello(): return 'world'",
+        submission_type="code"
+    ),
+    learner_id="learner-456",
+    session
+)
+```
+
+### Feedback & Control Tools
+
+```python
+from ltt.tools import add_comment, get_comments, go_back, request_help
+
+# Add comment
+result = await add_comment(
+    AddCommentInput(task_id="proj-123.1", comment="Question about this task"),
+    learner_id="learner-456",
+    session
+)
+
+# Get comments (shared + learner's private)
+result = await get_comments(
+    GetCommentsInput(task_id="proj-123.1", limit=10),
+    learner_id="learner-456",
+    session
+)
+
+# Reopen closed task
+result = await go_back(
+    GoBackInput(task_id="proj-123.1", reason="Need to revise approach"),
+    learner_id="learner-456",
+    session
+)
+
+# Request help
+result = await request_help(
+    RequestHelpInput(task_id="proj-123.1", message="Stuck on validation error"),
+    learner_id="learner-456",
+    session
+)
+```
+
+### Tool Registry (for MCP/function calling)
+
+```python
+from ltt.tools import get_tool_schemas, execute_tool
+
+# Get OpenAI-compatible schemas
+schemas = get_tool_schemas()
+
+# Execute tool by name
+result = await execute_tool(
+    "get_ready",
+    {"project_id": "proj-123", "limit": 5},
+    learner_id="learner-456",
+    session
+)
+```
+
+---
+
+## Service Layer (Direct Access)
+
+### Task Service
+
+```python
+from ltt.services.task_service import (
+    create_task, get_task, update_task, delete_task,
+    get_children, get_ancestors, add_comment, get_comments
+)
+
+# Create task
+task = await create_task(session, TaskCreate(
+    title="My Task",
+    parent_id="proj-123.1",
+    project_id="proj-123",
+    task_type=TaskType.TASK,
+    description="Task description",
+    acceptance_criteria="- Criterion 1\n- Criterion 2"
+))
+
+# Get task
+task = await get_task(session, "proj-123.1.1")
+
+# Get children (direct or recursive)
+children = await get_children(session, "proj-123.1", recursive=True)
+
+# Get ancestors (parent → grandparent → project)
+ancestors = await get_ancestors(session, "proj-123.1.1")
+```
+
+### Progress Service
+
+```python
+from ltt.services.progress_service import (
+    get_or_create_progress, update_status,
+    start_task, close_task, reopen_task
+)
+
+# Get/create progress record (lazy initialization)
+progress = await get_or_create_progress(session, "proj-123.1", "learner-456")
+
+# Update status
+progress = await update_status(session, "proj-123.1", "learner-456", TaskStatus.IN_PROGRESS)
+
+# Close task (validates children, validation requirements)
+progress = await close_task(session, "proj-123.1", "learner-456")
+
+# Reopen task
+progress = await reopen_task(session, "proj-123.1", "learner-456")
+```
+
+### Dependency Service
+
+```python
+from ltt.services.dependency_service import (
+    add_dependency, get_ready_work, get_blocking_tasks,
+    is_task_blocked, detect_cycles
+)
+
+# Add dependency (task_id depends on depends_on_id)
+dep = await add_dependency(session, task_id, depends_on_id, DependencyType.BLOCKS)
+
+# Get ready work for learner (unblocked tasks)
+ready = await get_ready_work(session, project_id, learner_id, task_type="task", limit=10)
+
+# Check if task is blocked
+is_blocked, blockers = await is_task_blocked(session, task_id, learner_id)
+
+# Get blocking tasks
+blockers = await get_blocking_tasks(session, task_id, learner_id)
+
+# Detect cycles (returns list of cycles)
+cycles = await detect_cycles(session, project_id)
+```
+
+### Submission & Validation Service
+
+```python
+from ltt.services.submission_service import create_submission, get_submissions
+from ltt.services.validation_service import validate_submission, can_close_task
+
+# Create submission
+submission = await create_submission(
+    session, task_id, learner_id,
+    content="my code",
+    submission_type=SubmissionType.CODE
+)
+
+# Validate submission (automatic)
+validation = await validate_submission(session, submission.id)
+
+# Check if task can be closed
+can_close, message = await can_close_task(session, task_id, learner_id)
+```
+
+### Learning Services
+
+```python
+from ltt.services.learning import (
+    attach_objective, get_objectives,
+    get_progress, get_bloom_distribution,
+    summarize_completed,
+    create_content, attach_content_to_task
+)
+
+# Attach learning objective
+obj = await attach_objective(
+    session, task_id,
+    description="Implement REST APIs",
+    level=BloomLevel.APPLY
+)
+
+# Get progress for learner in project
+progress = await get_progress(session, learner_id, project_id)
+# Returns: total_tasks, completed_tasks, in_progress, blocked, objectives_achieved, etc.
+
+# Get Bloom level distribution
+distribution = await get_bloom_distribution(session, learner_id, project_id)
+# Returns: {BloomLevel.APPLY: {"total": 5, "achieved": 3}, ...}
+
+# Generate summary for completed task
+summary = await summarize_completed(session, task_id, learner_id)
+
+# Create and attach content
+content = await create_content(session, ContentType.MARKDOWN, "# Tutorial...")
+await attach_content_to_task(session, content.id, task_id)
+```
+
+### Ingestion & Export
+
+```python
+from ltt.services.ingest import ingest_project_file
+from ltt.services.export import export_project
+
+# Ingest from JSON file
+result = await ingest_project_file(session, Path("project.json"), dry_run=False)
+# Returns: IngestResult(project_id, task_count, objective_count, errors)
+
+# Export to JSON
+json_str = await export_project(session, project_id, format="json")
+
+# Export to JSONL (one JSON per line)
+jsonl_str = await export_project(session, project_id, format="jsonl")
+```
+
+---
+
+## Database Connection
+
+```python
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
+import os
+
+# Get database URL
+db_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://ltt:ltt@localhost:5432/ltt")
+
+# Create engine
+engine = create_async_engine(db_url, echo=False)
+async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+# Use session
+async with async_session() as session:
+    task = await get_task(session, "proj-123.1")
+```
+
+**Or use the helper**:
+```python
+from ltt.cli.main import get_async_session
+
+async with get_async_session() as session:
+    # Your code here
+    pass
+```
+
+---
+
+## Important Patterns
+
+### ADR-001 Compliance
+
+All status queries MUST join with `learner_task_progress`:
+
+```python
+# ❌ WRONG - queries task.status (doesn't exist)
+task = await get_task(session, task_id)
+if task.status == "closed":  # ERROR: Task has no status field
+
+# ✅ CORRECT - queries learner_task_progress
+progress = await get_or_create_progress(session, task_id, learner_id)
+if progress.status == "closed":  # Correct: per-learner status
+```
+
+**Why**: Tasks are templates (shared). Status is per-learner (instance layer).
+
+### Lazy Initialization
+
+Progress records are created on first access:
+
+```python
+# First time accessing task for learner
+progress = await get_or_create_progress(session, task_id, learner_id)
+# Creates record with status='open' if doesn't exist
+
+# SQL queries use COALESCE for same behavior
+COALESCE(ltp.status, 'open')  # No record = open status
+```
+
+### PostgreSQL ARRAY Mutation
+
+PostgreSQL ARRAYs require new list for SQLAlchemy change detection:
+
+```python
+# ❌ WRONG - mutation not detected
+task.content_refs.append(content_id)
+await session.commit()  # No update
+
+# ✅ CORRECT - create new list
+content_refs = list(task.content_refs) if task.content_refs else []
+content_refs.append(content_id)
+task.content_refs = content_refs  # Assign new list
+await session.commit()  # Update detected
+```
+
+### Hierarchical ID Generation
+
+```python
+from ltt.utils.ids import generate_task_id, generate_entity_id
+
+# Task IDs (hierarchical)
+project_id = generate_task_id(None, "proj", lambda _: 0)  # proj-a1b2
+child_id = generate_task_id("proj-a1b2", "proj", lambda _: 1)  # proj-a1b2.1
+
+# Entity IDs (non-hierarchical)
+learner_id = generate_entity_id("learner")  # learner-abc123def
+content_id = generate_entity_id("cnt")      # cnt-xyz789
+```
+
+---
+
+## JSON Schema Reference
+
+### Project Structure
+
+```json
+{
+  "title": "Project Title",
+  "description": "What you're building and why",
+  "narrative_context": "Real-world motivation (optional)",
+  "learning_objectives": [
+    {"level": "create", "description": "Build a full-stack app"}
+  ],
+  "content": "## Architecture\n\n...",
+  "epics": [
+    {
+      "title": "Epic Title",
+      "description": "Feature area description",
+      "learning_objectives": [...],
+      "content": "...",
+      "tutor_guidance": {
+        "teaching_approach": "Start with examples",
+        "discussion_prompts": ["Why is this important?"],
+        "common_mistakes": ["Off-by-one errors"],
+        "hints_to_give": ["Check the bounds", "Use a debugger"]
+      },
+      "tasks": [
+        {
+          "title": "Task Title",
+          "description": "Specific component to build",
+          "acceptance_criteria": "- Criterion 1\n- Criterion 2",
+          "learning_objectives": [...],
+          "priority": 0,
+          "content": "...",
+          "tutor_guidance": {...},
+          "dependencies": ["Other Task Title"],
+          "subtasks": [
+            {
+              "title": "Subtask Title",
+              "description": "Atomic piece of work",
+              "acceptance_criteria": "...",
+              "learning_objectives": [...],
+              "content": "...",
+              "tutor_guidance": {...},
+              "priority": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**See [docs/SCHEMA-FOR-LLM-INGESTION.md](docs/SCHEMA-FOR-LLM-INGESTION.md) for complete field-by-field guide.**
+
+---
+
+## Common Tasks
+
+### Creating a Project from JSON
+
+```bash
+# 1. Create or generate project.json
+#    (Use LLM with docs/SCHEMA-FOR-LLM-INGESTION.md for conversion)
+
+# 2. Validate structure
+python -m ltt.cli.main ingest project project.json --dry-run
+
+# 3. Import
+python -m ltt.cli.main ingest project project.json
+```
+
+### Checking Learner Progress
+
+```python
+from ltt.services.learning import get_progress
+
+progress = await get_progress(session, learner_id, project_id)
+
+print(f"Completed: {progress.completed_tasks}/{progress.total_tasks}")
+print(f"Percentage: {progress.completion_percentage}%")
+print(f"Objectives: {progress.objectives_achieved}/{progress.total_objectives}")
+```
+
+### Finding Ready Work
+
+```python
+from ltt.services.dependency_service import get_ready_work
+
+# Get tasks learner can work on (unblocked, not closed)
+ready = await get_ready_work(
+    session,
+    project_id="proj-123",
+    learner_id="learner-456",
+    task_type="task",  # Optional filter
+    limit=10
+)
+
+# Returns list of Task objects, ordered by:
+# 1. Status (in_progress first, then open)
+# 2. Priority (P0 first)
+# 3. Hierarchy depth (parents before children)
+# 4. Age (oldest first)
+```
+
+### Submitting Work
+
+```python
+from ltt.services.submission_service import create_submission
+from ltt.services.validation_service import validate_submission
+
+# Create submission
+submission = await create_submission(
+    session,
+    task_id="proj-123.1.1",
+    learner_id="learner-456",
+    content="SELECT * FROM surveys WHERE queue_time > 500",
+    submission_type=SubmissionType.SQL
+)
+
+# Validate (automatic)
+validation = await validate_submission(session, submission.id)
+
+if validation.passed:
+    # Can close task (if it's a subtask)
+    await close_task(session, task_id, learner_id)
+else:
+    print(f"Failed: {validation.error_message}")
+```
+
+---
+
+## Environment Variables
+
+```bash
+# Database URL
+DATABASE_URL=postgresql+asyncpg://ltt:ltt@localhost:5432/ltt
+
+# Required for Alembic migrations
+PYTHONPATH=src
+```
+
+**Default database** (docker-compose):
+- Host: localhost:5432
+- Database: ltt
+- User: ltt
+- Password: ltt
+
+---
+
+## Testing Fixtures
+
+Available in tests via `conftest.py`:
+
+```python
+@pytest.mark.asyncio
+async def test_my_feature(async_session):
+    """Test with async database session."""
+    # async_session is a fresh database session for this test
+    task = await create_task(async_session, TaskCreate(...))
+    assert task.id is not None
+```
+
+**Fixtures**:
+- `async_session` - Fresh async database session (rolled back after test)
+- `tmp_path` - Temporary directory (pytest built-in)
+
+---
+
+## Key Files to Know
+
+### Configuration
+- `pyproject.toml` - Dependencies, pytest config, ruff settings
+- `docker-compose.yml` - PostgreSQL 17 setup
+- `.env` - Environment variables (create from `.env.example`)
+
+### Models
+- `src/ltt/models/__init__.py` - All models exported
+- `src/ltt/models/task.py` - Task, TaskCreate, TaskUpdate, TaskModel
+- `src/ltt/models/progress.py` - LearnerTaskProgress
+- `src/ltt/models/submission.py` - Submission, Validation
+
+### Services
+- `src/ltt/services/task_service.py` - Most commonly used
+- `src/ltt/services/dependency_service.py` - Ready work, blocking
+- `src/ltt/services/learning/objectives.py` - Learning objectives
+
+### Documentation
+- `docs/SCHEMA-FOR-LLM-INGESTION.md` - **Critical** - Complete schema guide
+- `docs/CLI-USAGE-GUIDE.md` - Full CLI reference
+- `python-port/docs/PRD.md` - System overview
+- `BUILD-STATUS.md` - Implementation status (167 tests)
+
+---
+
+## Quick Reference
+
+### Status Transitions
+
+```
+open → in_progress  ✅ Always allowed
+open → blocked      ✅ When dependency incomplete
+
+in_progress → open      ✅ Allowed
+in_progress → blocked   ✅ When dependency incomplete
+in_progress → closed    ✅ If validation passes (for subtasks)
+
+blocked → open          ✅ Allowed
+blocked → in_progress   ✅ When dependencies complete
+
+closed → open           ✅ Only via go_back (requires reason)
+```
+
+### Task Types
+
+- `project` - Root container
+- `epic` - Major feature area
+- `task` - Cohesive work unit (can have subtasks)
+- `subtask` - Atomic work item (requires validation to close)
+
+### Priority Levels
+
+- `0` - Critical (foundational, blocks everything)
+- `1` - High
+- `2` - Medium (default)
+- `3` - Low
+- `4` - Nice-to-have
+
+---
+
+## Troubleshooting
+
+### "Task has no status"
+**Cause**: Trying to access `task.status` (doesn't exist in template layer)
+**Fix**: Use `learner_task_progress` table via `get_or_create_progress()`
+
+### "Validation failed: cannot close task"
+**Cause**: Subtask requires passing validation
+**Fix**: Submit work that passes acceptance criteria
+
+### "Task is blocked"
+**Cause**: Dependencies not complete
+**Fix**: Check `get_blocking_tasks()`, complete dependencies first
+
+### "Foreign key violation: learner not found"
+**Cause**: Using non-existent learner_id
+**Fix**: Create learner first with `LearnerModel` or CLI
+
+### Tests failing after model changes
+**Cause**: Migration not run
+**Fix**: `PYTHONPATH=src uv run alembic upgrade head`
+
+---
+
+## Performance Notes
+
+### Recursive CTEs Used For:
+- Ready work calculation (transitive blocking)
+- Cycle detection (graph traversal)
+- Hierarchical queries
+
+### Indexes Created For:
+- `tasks.parent_id`, `tasks.project_id`
+- `learner_task_progress(task_id, learner_id)`
+- `dependencies.task_id`, `dependencies.depends_on_id`
+- `submissions(task_id, learner_id)`
+
+### Query Patterns
+
+**Always use COALESCE for learner status**:
+```sql
+COALESCE(ltp.status, 'open')
+-- No progress record = open status (lazy initialization)
+```
+
+**Always join learner_task_progress for status**:
+```sql
+FROM tasks t
+LEFT JOIN learner_task_progress ltp
+  ON ltp.task_id = t.id AND ltp.learner_id = :learner_id
+```
+
+---
+
+## Test Coverage
+
+- **Total Tests**: 167 (all passing)
+- **Coverage**: 98% overall
+  - Models: 99%
+  - Services: 95%
+  - Utils: 100%
+
+### Run Specific Test Suites
+
+```bash
+# Data layer
+uv run pytest tests/test_basic.py -v
+
+# Task management
+uv run pytest tests/services/test_task_service.py -v
+
+# Dependencies
+uv run pytest tests/services/test_dependency_service.py -v
+
+# Learning
+uv run pytest tests/services/test_learning_*.py -v
+
+# Agent tools
+uv run pytest tests/tools/ -v
+
+# Ingestion/Export
+uv run pytest tests/services/test_ingest.py tests/services/test_export.py -v
+```
+
+---
+
+## Implementation Status
+
+**All Core Phases Complete** ✅
+
+| Phase | Status | Tests |
+|-------|--------|-------|
+| 1. Data Layer | ✅ | 3 |
+| 2. Task Management | ✅ | 36 |
+| 3. Dependencies | ✅ | 23 |
+| 4. Submissions & Validation | ✅ | 22 |
+| 5. Learning & Progress | ✅ | 34 |
+| 7. Agent Tools | ✅ | 26 |
+| 8. Admin CLI & Ingestion | ✅ | 23 |
+| **Total** | **167** | **All Passing** |
+
+See [BUILD-STATUS.md](BUILD-STATUS.md) for detailed phase reports.
+
+---
+
+## Future Development
+
+### Ready for Implementation
+- FastAPI REST endpoints (Phase 9)
+- MCP server integration (expose agent tools)
+- Custom validation rules (code execution, SQL checks)
+- Project versioning
+
+### Technical Debt
+- Fix 162 datetime.utcnow() deprecation warnings
+- Add CLI command tests (services tested, not Typer commands)
+- JSON Schema validation for ingestion
+
+---
+
+## Links
+
+- **Product Requirements**: [python-port/docs/PRD.md](python-port/docs/PRD.md)
+- **Schema Guide**: [docs/SCHEMA-FOR-LLM-INGESTION.md](docs/SCHEMA-FOR-LLM-INGESTION.md)
+- **CLI Reference**: [docs/CLI-USAGE-GUIDE.md](docs/CLI-USAGE-GUIDE.md)
+- **Build Status**: [BUILD-STATUS.md](BUILD-STATUS.md)
+- **Architecture Decision**: [python-port/docs/adr/001-learner-scoped-task-progress.md](python-port/docs/adr/001-learner-scoped-task-progress.md)
+- **Beads (Original)**: https://github.com/steveyegge/beads
