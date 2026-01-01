@@ -92,7 +92,9 @@ async def add_dependency(
     task_result = await session.execute(select(TaskModel).where(TaskModel.id == task_id))
     task = task_result.scalar_one_or_none()
 
-    depends_on_result = await session.execute(select(TaskModel).where(TaskModel.id == depends_on_id))
+    depends_on_result = await session.execute(
+        select(TaskModel).where(TaskModel.id == depends_on_id)
+    )
     depends_on = depends_on_result.scalar_one_or_none()
 
     if not task:
@@ -572,7 +574,9 @@ async def detect_cycles(
         List of cycles, each a list of task IDs in the cycle
     """
     # Get all tasks in project
-    tasks_result = await session.execute(select(TaskModel.id).where(TaskModel.project_id == project_id))
+    tasks_result = await session.execute(
+        select(TaskModel.id).where(TaskModel.project_id == project_id)
+    )
     all_tasks = {row[0] for row in tasks_result.fetchall()}
 
     # Get all dependencies (blocking types only)

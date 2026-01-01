@@ -60,7 +60,11 @@ async def test_ingest_project_with_hierarchy(async_session, tmp_path):
                 "title": "Epic 1",
                 "description": "First epic",
                 "tasks": [
-                    {"title": "Task 1-1", "description": "First task", "subtasks": [{"title": "Subtask 1-1-1"}]}
+                    {
+                        "title": "Task 1-1",
+                        "description": "First task",
+                        "subtasks": [{"title": "Subtask 1-1-1"}],
+                    }
                 ],
             }
         ],
@@ -102,11 +106,15 @@ async def test_ingest_with_learning_objectives(async_session, tmp_path):
                 "tasks": [
                     {
                         "title": "Task",
-                        "learning_objectives": [{"level": "understand", "description": "Understand basics"}],
+                        "learning_objectives": [
+                            {"level": "understand", "description": "Understand basics"}
+                        ],
                         "subtasks": [
                             {
                                 "title": "Subtask",
-                                "learning_objectives": [{"level": "remember", "description": "Remember syntax"}],
+                                "learning_objectives": [
+                                    {"level": "remember", "description": "Remember syntax"}
+                                ],
                             }
                         ],
                     }
@@ -169,7 +177,10 @@ async def test_ingest_with_dependencies(async_session, tmp_path):
 @pytest.mark.asyncio
 async def test_ingest_dry_run(async_session, tmp_path):
     """Test dry run doesn't create anything."""
-    project_data = {"title": "Test Project", "epics": [{"title": "Epic", "tasks": [{"title": "Task"}]}]}
+    project_data = {
+        "title": "Test Project",
+        "epics": [{"title": "Epic", "tasks": [{"title": "Task"}]}],
+    }
 
     file_path = tmp_path / "project.json"
     file_path.write_text(json.dumps(project_data))
@@ -216,7 +227,9 @@ async def test_count_tasks():
     """Test task counting."""
     data = {
         "title": "Project",
-        "epics": [{"title": "Epic", "tasks": [{"title": "Task", "subtasks": [{"title": "Subtask"}]}]}],
+        "epics": [
+            {"title": "Epic", "tasks": [{"title": "Task", "subtasks": [{"title": "Subtask"}]}]}
+        ],
     }
 
     count = count_tasks(data)
@@ -233,7 +246,12 @@ async def test_count_objectives():
             {
                 "title": "Epic",
                 "learning_objectives": [{"level": "apply", "description": "Obj 2"}],
-                "tasks": [{"title": "Task", "learning_objectives": [{"level": "remember", "description": "Obj 3"}]}],
+                "tasks": [
+                    {
+                        "title": "Task",
+                        "learning_objectives": [{"level": "remember", "description": "Obj 3"}],
+                    }
+                ],
             }
         ],
     }
@@ -251,7 +269,10 @@ async def test_ingest_task_type_detection(async_session, tmp_path):
             {
                 "title": "Epic",
                 "tasks": [
-                    {"title": "Task with subtasks", "subtasks": [{"title": "Subtask"}]},  # Should be TASK
+                    {
+                        "title": "Task with subtasks",
+                        "subtasks": [{"title": "Subtask"}],
+                    },  # Should be TASK
                     {"title": "Task without children"},  # Should be SUBTASK
                 ],
             }
@@ -294,7 +315,10 @@ async def test_ingest_with_narrative_context(async_session, tmp_path):
 
     # Verify narrative_context
     project = await get_task(async_session, result.project_id)
-    assert project.narrative_context == "This data comes from President Naledi's water quality initiative. You are helping analyze survey data that will impact real communities."
+    assert (
+        project.narrative_context
+        == "This data comes from President Naledi's water quality initiative. You are helping analyze survey data that will impact real communities."
+    )
 
 
 @pytest.mark.asyncio
@@ -342,7 +366,10 @@ async def test_ingest_with_tutor_guidance(async_session, tmp_path):
     task = tasks[0]
 
     assert task.tutor_guidance is not None
-    assert task.tutor_guidance["teaching_approach"] == "Start with real-world context before SQL syntax"
+    assert (
+        task.tutor_guidance["teaching_approach"]
+        == "Start with real-world context before SQL syntax"
+    )
     assert "What does 500 minutes mean in real life?" in task.tutor_guidance["discussion_prompts"]
 
     # Verify tutor_guidance at subtask level

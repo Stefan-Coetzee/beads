@@ -186,7 +186,9 @@ async def test_cycle_detection_two_nodes(async_session):
 @pytest.mark.asyncio
 async def test_cycle_detection_three_nodes(async_session):
     """Test detecting A -> B -> C -> A cycle."""
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task_a = await create_task(
         async_session, TaskCreate(title="Task A", task_type=TaskType.TASK, parent_id=project.id)
     )
@@ -209,7 +211,9 @@ async def test_cycle_detection_three_nodes(async_session):
 @pytest.mark.asyncio
 async def test_would_create_cycle_helper(async_session):
     """Test the would_create_cycle helper function."""
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task_a = await create_task(
         async_session, TaskCreate(title="Task A", task_type=TaskType.TASK, parent_id=project.id)
     )
@@ -233,7 +237,9 @@ async def test_would_create_cycle_helper(async_session):
 @pytest.mark.asyncio
 async def test_detect_cycles_finds_all_cycles(async_session):
     """Test detecting all cycles in a dependency graph."""
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task_a = await create_task(
         async_session, TaskCreate(title="Task A", task_type=TaskType.TASK, parent_id=project.id)
     )
@@ -270,7 +276,9 @@ async def test_get_blocking_tasks_per_learner(async_session):
     await async_session.commit()
 
     # Create tasks
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task1 = await create_task(
         async_session, TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=project.id)
     )
@@ -307,7 +315,9 @@ async def test_is_task_blocked_per_learner(async_session):
     await async_session.commit()
 
     # Create tasks
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task1 = await create_task(
         async_session, TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=project.id)
     )
@@ -334,7 +344,9 @@ async def test_is_task_ready_per_learner(async_session):
     await async_session.commit()
 
     # Create tasks
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task1 = await create_task(
         async_session, TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=project.id)
     )
@@ -371,7 +383,9 @@ async def test_get_ready_work_excludes_blocked_per_learner(async_session):
     await async_session.commit()
 
     # Create tasks
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task1 = await create_task(
         async_session, TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=project.id)
     )
@@ -404,7 +418,9 @@ async def test_ready_work_lazy_initialization(async_session):
     await async_session.commit()
 
     # Create tasks
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task1 = await create_task(
         async_session, TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=project.id)
     )
@@ -427,7 +443,9 @@ async def test_transitive_blocking_per_learner(async_session):
     await async_session.commit()
 
     # Create tasks
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task_a = await create_task(
         async_session, TaskCreate(title="Task A", task_type=TaskType.TASK, parent_id=project.id)
     )
@@ -466,7 +484,9 @@ async def test_multi_learner_independence(async_session):
     await async_session.commit()
 
     # Create tasks
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task1 = await create_task(
         async_session, TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=project.id)
     )
@@ -504,7 +524,9 @@ async def test_get_blocked_tasks(async_session):
     await async_session.commit()
 
     # Create tasks
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task1 = await create_task(
         async_session, TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=project.id)
     )
@@ -544,10 +566,14 @@ async def test_ready_work_ordering(async_session):
         async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT, priority=0)
     )
     task_low = await create_task(
-        async_session, TaskCreate(title="Low Priority", task_type=TaskType.TASK, parent_id=project.id, priority=4)
+        async_session,
+        TaskCreate(title="Low Priority", task_type=TaskType.TASK, parent_id=project.id, priority=4),
     )
     task_high = await create_task(
-        async_session, TaskCreate(title="High Priority", task_type=TaskType.TASK, parent_id=project.id, priority=0)
+        async_session,
+        TaskCreate(
+            title="High Priority", task_type=TaskType.TASK, parent_id=project.id, priority=0
+        ),
     )
 
     # Get ready work - high priority should come first
@@ -570,7 +596,9 @@ async def test_ready_work_with_task_type_filter(async_session):
     await async_session.commit()
 
     # Create tasks of different types
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     epic = await create_task(
         async_session, TaskCreate(title="Epic", task_type=TaskType.EPIC, parent_id=project.id)
     )
@@ -596,7 +624,9 @@ async def test_related_dependency_does_not_block(async_session):
     await async_session.commit()
 
     # Create tasks
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task1 = await create_task(
         async_session, TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=project.id)
     )

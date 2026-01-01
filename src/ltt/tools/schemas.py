@@ -245,4 +245,4 @@ class ToolError(BaseModel):
     success: bool = False
     error_code: str
     message: str
-    details: dict | None = None
+    details: dict | list | None = None

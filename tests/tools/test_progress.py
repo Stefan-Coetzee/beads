@@ -29,10 +29,14 @@ async def test_start_task_sets_status(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
-        TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Start task
@@ -56,7 +60,9 @@ async def test_start_task_returns_context(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
         TaskCreate(
@@ -87,14 +93,20 @@ async def test_start_task_fails_if_blocked(async_session):
     await async_session.commit()
 
     # Create project with tasks
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task1 = await create_task(
         async_session,
-        TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task 1", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
     task2 = await create_task(
         async_session,
-        TaskCreate(title="Task 2", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task 2", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # task2 depends on task1
@@ -118,10 +130,14 @@ async def test_start_task_fails_if_closed(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
-        TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Close task
@@ -265,10 +281,14 @@ async def test_submit_invalid_type(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
-        TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Submit with invalid type

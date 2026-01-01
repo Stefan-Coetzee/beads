@@ -26,7 +26,9 @@ class IngestResult:
     errors: list[str]
 
 
-async def ingest_project_file(session: AsyncSession, file_path: Path, dry_run: bool = False) -> IngestResult:
+async def ingest_project_file(
+    session: AsyncSession, file_path: Path, dry_run: bool = False
+) -> IngestResult:
     """
     Ingest a project from a JSON file.
 
@@ -75,7 +77,10 @@ async def ingest_project_file(session: AsyncSession, file_path: Path, dry_run: b
     obj_count = 0
     for obj in data.get("learning_objectives", []):
         await attach_objective(
-            session, task_id=project.id, description=obj["description"], level=BloomLevel(obj.get("level", "apply"))
+            session,
+            task_id=project.id,
+            description=obj["description"],
+            level=BloomLevel(obj.get("level", "apply")),
         )
         obj_count += 1
 
@@ -86,16 +91,26 @@ async def ingest_project_file(session: AsyncSession, file_path: Path, dry_run: b
     task_count = 1  # Count project itself
     for epic_data in data.get("epics", []):
         epic_count, epic_obj_count = await ingest_epic(
-            session, epic_data, parent_id=project.id, project_id=project.id, dependency_map=dependency_map
+            session,
+            epic_data,
+            parent_id=project.id,
+            project_id=project.id,
+            dependency_map=dependency_map,
         )
         task_count += epic_count
         obj_count += epic_obj_count
 
-    return IngestResult(project_id=project.id, task_count=task_count, objective_count=obj_count, errors=[])
+    return IngestResult(
+        project_id=project.id, task_count=task_count, objective_count=obj_count, errors=[]
+    )
 
 
 async def ingest_epic(
-    session: AsyncSession, data: dict, parent_id: str, project_id: str, dependency_map: dict[str, str]
+    session: AsyncSession,
+    data: dict,
+    parent_id: str,
+    project_id: str,
+    dependency_map: dict[str, str],
 ) -> tuple[int, int]:
     """
     Recursively ingest an epic with its tasks.
@@ -131,7 +146,10 @@ async def ingest_epic(
     obj_count = 0
     for obj in data.get("learning_objectives", []):
         await attach_objective(
-            session, task_id=epic.id, description=obj["description"], level=BloomLevel(obj.get("level", "apply"))
+            session,
+            task_id=epic.id,
+            description=obj["description"],
+            level=BloomLevel(obj.get("level", "apply")),
         )
         obj_count += 1
 
@@ -139,7 +157,11 @@ async def ingest_epic(
     task_count = 1  # Count the epic
     for task_data in data.get("tasks", []):
         count, obj_count_child = await ingest_task(
-            session, task_data, parent_id=epic.id, project_id=project_id, dependency_map=dependency_map
+            session,
+            task_data,
+            parent_id=epic.id,
+            project_id=project_id,
+            dependency_map=dependency_map,
         )
         task_count += count
         obj_count += obj_count_child
@@ -148,7 +170,11 @@ async def ingest_epic(
 
 
 async def ingest_task(
-    session: AsyncSession, data: dict, parent_id: str, project_id: str, dependency_map: dict[str, str]
+    session: AsyncSession,
+    data: dict,
+    parent_id: str,
+    project_id: str,
+    dependency_map: dict[str, str],
 ) -> tuple[int, int]:
     """
     Recursively ingest a task with its subtasks.
@@ -190,7 +216,10 @@ async def ingest_task(
     obj_count = 0
     for obj in data.get("learning_objectives", []):
         await attach_objective(
-            session, task_id=task.id, description=obj["description"], level=BloomLevel(obj.get("level", "apply"))
+            session,
+            task_id=task.id,
+            description=obj["description"],
+            level=BloomLevel(obj.get("level", "apply")),
         )
         obj_count += 1
 
@@ -203,7 +232,11 @@ async def ingest_task(
     task_count = 1
     for subtask_data in data.get("subtasks", []):
         count, obj_count_child = await ingest_task(
-            session, subtask_data, parent_id=task.id, project_id=project_id, dependency_map=dependency_map
+            session,
+            subtask_data,
+            parent_id=task.id,
+            project_id=project_id,
+            dependency_map=dependency_map,
         )
         task_count += count
         obj_count += obj_count_child

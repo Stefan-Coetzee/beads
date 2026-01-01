@@ -63,7 +63,9 @@ async def test_summarize_completed_subtask(async_session):
 
     # Complete subtask
     await update_status(async_session, subtask.id, learner_id, TaskStatus.IN_PROGRESS)
-    submission = await create_submission(async_session, subtask.id, learner_id, "my_code.py", SubmissionType.CODE)
+    submission = await create_submission(
+        async_session, subtask.id, learner_id, "my_code.py", SubmissionType.CODE
+    )
     await validate_submission(async_session, submission.id)
     await update_status(async_session, subtask.id, learner_id, TaskStatus.CLOSED)
 
@@ -81,10 +83,14 @@ async def test_summarize_completed_subtask(async_session):
 async def test_summarize_task_not_closed(async_session):
     """Test that summarizing unclosed task fails."""
     # Create task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
-        TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
     learner_id = "test-learner"
 
@@ -103,7 +109,9 @@ async def test_summarize_with_multiple_attempts(async_session):
     await async_session.commit()
 
     # Create subtask
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     subtask = await create_task(
         async_session,
         TaskCreate(
@@ -117,9 +125,13 @@ async def test_summarize_with_multiple_attempts(async_session):
 
     # Make multiple attempts
     await update_status(async_session, subtask.id, learner_id, TaskStatus.IN_PROGRESS)
-    sub1 = await create_submission(async_session, subtask.id, learner_id, "attempt 1", SubmissionType.TEXT)
+    sub1 = await create_submission(
+        async_session, subtask.id, learner_id, "attempt 1", SubmissionType.TEXT
+    )
     await validate_submission(async_session, sub1.id)
-    sub2 = await create_submission(async_session, subtask.id, learner_id, "attempt 2", SubmissionType.TEXT)
+    sub2 = await create_submission(
+        async_session, subtask.id, learner_id, "attempt 2", SubmissionType.TEXT
+    )
     await validate_submission(async_session, sub2.id)
     await update_status(async_session, subtask.id, learner_id, TaskStatus.CLOSED)
 
@@ -140,7 +152,9 @@ async def test_summarize_hierarchical_task(async_session):
     await async_session.commit()
 
     # Create hierarchy
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
         TaskCreate(
@@ -180,7 +194,9 @@ async def test_summarize_hierarchical_task(async_session):
     # Complete subtasks
     for subtask in [subtask1, subtask2]:
         await update_status(async_session, subtask.id, learner_id, TaskStatus.IN_PROGRESS)
-        sub = await create_submission(async_session, subtask.id, learner_id, "work", SubmissionType.TEXT)
+        sub = await create_submission(
+            async_session, subtask.id, learner_id, "work", SubmissionType.TEXT
+        )
         await validate_submission(async_session, sub.id)
         await update_status(async_session, subtask.id, learner_id, TaskStatus.CLOSED)
 
@@ -206,7 +222,9 @@ async def test_get_summaries_ordered_by_version(async_session):
     await async_session.commit()
 
     # Create and complete a task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
         TaskCreate(
@@ -247,7 +265,9 @@ async def test_get_latest_summary(async_session):
     await async_session.commit()
 
     # Create and complete task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
         TaskCreate(
@@ -287,7 +307,9 @@ async def test_summarize_includes_bloom_levels(async_session):
     await async_session.commit()
 
     # Create task with objectives at different levels
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
         TaskCreate(

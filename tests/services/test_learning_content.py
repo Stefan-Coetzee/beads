@@ -46,7 +46,9 @@ async def test_create_content_without_metadata(async_session):
 @pytest.mark.asyncio
 async def test_get_content(async_session):
     """Test getting content by ID."""
-    created = await create_content(async_session, ContentType.EXTERNAL_LINK, "https://docs.python.org")
+    created = await create_content(
+        async_session, ContentType.EXTERNAL_LINK, "https://docs.python.org"
+    )
 
     retrieved = await get_content(async_session, created.id)
 
@@ -66,9 +68,17 @@ async def test_get_content_not_found(async_session):
 async def test_attach_content_to_task(async_session):
     """Test attaching content to a task."""
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
-        async_session, TaskCreate(title="Learn Python", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id)
+        async_session,
+        TaskCreate(
+            title="Learn Python",
+            task_type=TaskType.TASK,
+            parent_id=project.id,
+            project_id=project.id,
+        ),
     )
 
     # Create content
@@ -87,15 +97,25 @@ async def test_attach_content_to_task(async_session):
 async def test_attach_multiple_content_to_task(async_session):
     """Test attaching multiple content items to a task."""
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
-        async_session, TaskCreate(title="Learn Python", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id)
+        async_session,
+        TaskCreate(
+            title="Learn Python",
+            task_type=TaskType.TASK,
+            parent_id=project.id,
+            project_id=project.id,
+        ),
     )
 
     # Create multiple content items
     content1 = await create_content(async_session, ContentType.MARKDOWN, "Tutorial part 1")
     content2 = await create_content(async_session, ContentType.CODE, "example_code.py")
-    content3 = await create_content(async_session, ContentType.VIDEO_REF, "https://youtube.com/watch?v=...")
+    content3 = await create_content(
+        async_session, ContentType.VIDEO_REF, "https://youtube.com/watch?v=..."
+    )
 
     # Attach all content
     await attach_content_to_task(async_session, content1.id, task.id)
@@ -113,9 +133,14 @@ async def test_attach_multiple_content_to_task(async_session):
 async def test_attach_content_idempotent(async_session):
     """Test that attaching same content twice doesn't duplicate."""
     # Create project, task and content
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
-        async_session, TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id)
+        async_session,
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
     content = await create_content(async_session, ContentType.MARKDOWN, "Content")
 
@@ -131,9 +156,14 @@ async def test_attach_content_idempotent(async_session):
 @pytest.mark.asyncio
 async def test_attach_content_nonexistent_content(async_session):
     """Test attaching nonexistent content fails."""
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
-        async_session, TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id)
+        async_session,
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     with pytest.raises(ContentNotFoundError, match="does not exist"):
@@ -152,9 +182,14 @@ async def test_attach_content_nonexistent_task(async_session):
 @pytest.mark.asyncio
 async def test_get_task_content_empty(async_session):
     """Test getting content for task with no content."""
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
-        async_session, TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id)
+        async_session,
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     task_content = await get_task_content(async_session, task.id)
@@ -166,9 +201,14 @@ async def test_get_task_content_empty(async_session):
 async def test_get_relevant_content(async_session):
     """Test getting relevant content for a learner."""
     # Create project, task and content
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
-        async_session, TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id)
+        async_session,
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
     content = await create_content(async_session, ContentType.MARKDOWN, "Tutorial")
 

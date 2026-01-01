@@ -34,18 +34,26 @@ async def test_get_ready_returns_unblocked_tasks(async_session):
     await async_session.commit()
 
     # Create project with tasks
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task1 = await create_task(
         async_session,
-        TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task 1", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
     task2 = await create_task(
         async_session,
-        TaskCreate(title="Task 2", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task 2", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
     task3 = await create_task(
         async_session,
-        TaskCreate(title="Task 3", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task 3", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Make task3 depend on task2 (task3 blocked)
@@ -56,7 +64,9 @@ async def test_get_ready_returns_unblocked_tasks(async_session):
     await update_status(async_session, task1.id, learner_id, TaskStatus.CLOSED)
 
     # Get ready work
-    result = await get_ready(GetReadyInput(project_id=project.id, task_type="task"), learner_id, async_session)
+    result = await get_ready(
+        GetReadyInput(project_id=project.id, task_type="task"), learner_id, async_session
+    )
 
     # Should only return task2 (task1 closed, task3 blocked)
     assert result.total_ready == 1
@@ -75,21 +85,29 @@ async def test_get_ready_prioritizes_in_progress(async_session):
     await async_session.commit()
 
     # Create project with tasks
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task1 = await create_task(
         async_session,
-        TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task 1", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
     task2 = await create_task(
         async_session,
-        TaskCreate(title="Task 2", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task 2", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Set task2 to in_progress
     await update_status(async_session, task2.id, learner_id, TaskStatus.IN_PROGRESS)
 
     # Get ready work
-    result = await get_ready(GetReadyInput(project_id=project.id, task_type="task", limit=10), learner_id, async_session)
+    result = await get_ready(
+        GetReadyInput(project_id=project.id, task_type="task", limit=10), learner_id, async_session
+    )
 
     # Should return task2 first (in_progress), then task1 (open)
     assert result.total_ready == 2
@@ -109,7 +127,9 @@ async def test_show_task_includes_objectives(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
         TaskCreate(
@@ -147,7 +167,9 @@ async def test_show_task_includes_validation_status(async_session):
     # Create project and task
     project = await create_task(
         async_session,
-        TaskCreate(title="Project", task_type=TaskType.PROJECT, acceptance_criteria="Complete all tasks"),
+        TaskCreate(
+            title="Project", task_type=TaskType.PROJECT, acceptance_criteria="Complete all tasks"
+        ),
     )
     task = await create_task(
         async_session,
@@ -162,7 +184,9 @@ async def test_show_task_includes_validation_status(async_session):
 
     # Submit work
     await update_status(async_session, task.id, learner_id, TaskStatus.IN_PROGRESS)
-    submission = await create_submission(async_session, task.id, learner_id, "my work", SubmissionType.TEXT)
+    submission = await create_submission(
+        async_session, task.id, learner_id, "my work", SubmissionType.TEXT
+    )
     validation = await validate_submission(async_session, submission.id)
 
     # Show task
@@ -182,10 +206,14 @@ async def test_get_context_includes_hierarchy(async_session):
     await async_session.commit()
 
     # Create hierarchy
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     epic = await create_task(
         async_session,
-        TaskCreate(title="Epic", task_type=TaskType.EPIC, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Epic", task_type=TaskType.EPIC, parent_id=project.id, project_id=project.id
+        ),
     )
     task = await create_task(
         async_session,
@@ -213,14 +241,20 @@ async def test_get_context_includes_progress(async_session):
     await async_session.commit()
 
     # Create project with tasks
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task1 = await create_task(
         async_session,
-        TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task 1", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
     task2 = await create_task(
         async_session,
-        TaskCreate(title="Task 2", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task 2", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Complete task1
@@ -246,18 +280,26 @@ async def test_show_task_includes_dependencies(async_session):
     await async_session.commit()
 
     # Create project with tasks
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task1 = await create_task(
         async_session,
-        TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task 1", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
     task2 = await create_task(
         async_session,
-        TaskCreate(title="Task 2", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task 2", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
     task3 = await create_task(
         async_session,
-        TaskCreate(title="Task 3", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task 3", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # task2 depends on task1 (task2 blocked by task1)

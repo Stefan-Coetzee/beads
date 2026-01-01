@@ -20,7 +20,9 @@ from ltt.services.task_service import create_task
 async def test_attach_objective(async_session):
     """Test attaching a learning objective to a task."""
     # Create task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
 
     # Attach objective
     objective = await attach_objective(
@@ -52,7 +54,9 @@ async def test_attach_objective_to_nonexistent_task(async_session):
 async def test_get_objectives(async_session):
     """Test retrieving objectives for a task."""
     # Create task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
 
     # Attach multiple objectives
     await attach_objective(async_session, project.id, "Objective 1", BloomLevel.REMEMBER)
@@ -71,11 +75,15 @@ async def test_get_objectives(async_session):
 async def test_get_objectives_for_hierarchy_includes_ancestors(async_session):
     """Test getting objectives from task and ancestors."""
     # Create hierarchy
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     epic = await create_task(
         async_session, TaskCreate(title="Epic", task_type=TaskType.EPIC, parent_id=project.id)
     )
-    task = await create_task(async_session, TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=epic.id))
+    task = await create_task(
+        async_session, TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=epic.id)
+    )
 
     # Attach objectives at different levels
     await attach_objective(async_session, project.id, "Project objective", BloomLevel.CREATE)
@@ -94,11 +102,15 @@ async def test_get_objectives_for_hierarchy_includes_ancestors(async_session):
 async def test_get_objectives_for_hierarchy_includes_descendants(async_session):
     """Test getting objectives from task and descendants."""
     # Create hierarchy
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     epic = await create_task(
         async_session, TaskCreate(title="Epic", task_type=TaskType.EPIC, parent_id=project.id)
     )
-    task = await create_task(async_session, TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=epic.id))
+    task = await create_task(
+        async_session, TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=epic.id)
+    )
 
     # Attach objectives
     await attach_objective(async_session, project.id, "Project objective", BloomLevel.CREATE)
@@ -119,8 +131,12 @@ async def test_get_objectives_for_hierarchy_includes_descendants(async_session):
 async def test_remove_objective(async_session):
     """Test removing a learning objective."""
     # Create task and objective
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
-    objective = await attach_objective(async_session, project.id, "To be removed", BloomLevel.REMEMBER)
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
+    objective = await attach_objective(
+        async_session, project.id, "To be removed", BloomLevel.REMEMBER
+    )
 
     # Remove objective
     await remove_objective(async_session, objective.id)

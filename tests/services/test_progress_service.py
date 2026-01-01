@@ -358,7 +358,9 @@ async def test_transition_blocked_to_closed_forbidden(async_session):
     await update_status(async_session, task.id, learner_id, TaskStatus.BLOCKED)
 
     # BLOCKED → CLOSED (invalid)
-    with pytest.raises(InvalidStatusTransitionError, match="Cannot transition from blocked to closed"):
+    with pytest.raises(
+        InvalidStatusTransitionError, match="Cannot transition from blocked to closed"
+    ):
         await update_status(async_session, task.id, learner_id, TaskStatus.CLOSED)
 
 
@@ -400,7 +402,9 @@ async def test_transition_closed_to_blocked_forbidden(async_session):
     await close_task(async_session, task.id, learner_id, "Done")
 
     # CLOSED → BLOCKED (invalid)
-    with pytest.raises(InvalidStatusTransitionError, match="Cannot transition from closed to blocked"):
+    with pytest.raises(
+        InvalidStatusTransitionError, match="Cannot transition from closed to blocked"
+    ):
         await update_status(async_session, task.id, learner_id, TaskStatus.BLOCKED)
 
 
@@ -420,7 +424,9 @@ async def test_start_task_already_in_progress(async_session):
 
     # Start again (IN_PROGRESS → IN_PROGRESS is not in VALID_TRANSITIONS)
     # This should raise an error since the task is already in_progress
-    with pytest.raises(InvalidStatusTransitionError, match="Cannot transition from in_progress to in_progress"):
+    with pytest.raises(
+        InvalidStatusTransitionError, match="Cannot transition from in_progress to in_progress"
+    ):
         await start_task(async_session, task.id, learner_id)
 
 

@@ -18,7 +18,7 @@ from pathlib import Path
 
 def load_json(filepath: Path) -> dict:
     """Load and parse a JSON file."""
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         return json.load(f)
 
 

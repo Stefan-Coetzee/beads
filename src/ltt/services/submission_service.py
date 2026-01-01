@@ -126,7 +126,9 @@ async def get_submission(
     Raises:
         SubmissionNotFoundError: If submission doesn't exist
     """
-    result = await session.execute(select(SubmissionModel).where(SubmissionModel.id == submission_id))
+    result = await session.execute(
+        select(SubmissionModel).where(SubmissionModel.id == submission_id)
+    )
     submission = result.scalar_one_or_none()
 
     if not submission:

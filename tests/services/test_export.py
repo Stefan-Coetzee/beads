@@ -19,7 +19,10 @@ async def test_export_simple_project(async_session):
     """Test exporting a simple project."""
     # Create project
     project = await create_task(
-        async_session, TaskCreate(title="Test Project", description="Test description", task_type=TaskType.PROJECT)
+        async_session,
+        TaskCreate(
+            title="Test Project", description="Test description", task_type=TaskType.PROJECT
+        ),
     )
 
     # Export
@@ -36,18 +39,26 @@ async def test_export_simple_project(async_session):
 async def test_export_with_hierarchy(async_session):
     """Test exporting project with full hierarchy."""
     # Create hierarchy
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     epic = await create_task(
         async_session,
-        TaskCreate(title="Epic 1", task_type=TaskType.EPIC, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Epic 1", task_type=TaskType.EPIC, parent_id=project.id, project_id=project.id
+        ),
     )
     task = await create_task(
         async_session,
-        TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=epic.id, project_id=project.id),
+        TaskCreate(
+            title="Task 1", task_type=TaskType.TASK, parent_id=epic.id, project_id=project.id
+        ),
     )
     await create_task(
         async_session,
-        TaskCreate(title="Subtask 1", task_type=TaskType.SUBTASK, parent_id=task.id, project_id=project.id),
+        TaskCreate(
+            title="Subtask 1", task_type=TaskType.SUBTASK, parent_id=task.id, project_id=project.id
+        ),
     )
 
     # Export
@@ -67,12 +78,16 @@ async def test_export_with_hierarchy(async_session):
 async def test_export_with_objectives(async_session):
     """Test exporting learning objectives."""
     # Create project with objectives
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     await attach_objective(async_session, project.id, "Build application", BloomLevel.CREATE)
 
     epic = await create_task(
         async_session,
-        TaskCreate(title="Epic", task_type=TaskType.EPIC, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Epic", task_type=TaskType.EPIC, parent_id=project.id, project_id=project.id
+        ),
     )
     await attach_objective(async_session, epic.id, "Apply patterns", BloomLevel.APPLY)
 
@@ -93,18 +108,26 @@ async def test_export_with_objectives(async_session):
 async def test_export_with_dependencies(async_session):
     """Test exporting dependencies."""
     # Create project with dependencies
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     epic = await create_task(
         async_session,
-        TaskCreate(title="Epic", task_type=TaskType.EPIC, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Epic", task_type=TaskType.EPIC, parent_id=project.id, project_id=project.id
+        ),
     )
     task1 = await create_task(
         async_session,
-        TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=epic.id, project_id=project.id),
+        TaskCreate(
+            title="Task 1", task_type=TaskType.TASK, parent_id=epic.id, project_id=project.id
+        ),
     )
     task2 = await create_task(
         async_session,
-        TaskCreate(title="Task 2", task_type=TaskType.TASK, parent_id=epic.id, project_id=project.id),
+        TaskCreate(
+            title="Task 2", task_type=TaskType.TASK, parent_id=epic.id, project_id=project.id
+        ),
     )
 
     # Add dependency: task2 depends on task1
@@ -129,7 +152,9 @@ async def test_export_jsonl_format(async_session):
     )
     await create_task(
         async_session,
-        TaskCreate(title="Epic", task_type=TaskType.EPIC, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Epic", task_type=TaskType.EPIC, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Export as JSONL
@@ -197,17 +222,22 @@ async def test_roundtrip_export_import(async_session, tmp_path):
     """Test export then import produces same structure."""
     # Create project
     project = await create_task(
-        async_session, TaskCreate(title="Original Project", description="Test", task_type=TaskType.PROJECT)
+        async_session,
+        TaskCreate(title="Original Project", description="Test", task_type=TaskType.PROJECT),
     )
     await attach_objective(async_session, project.id, "Main objective", BloomLevel.CREATE)
 
     epic = await create_task(
         async_session,
-        TaskCreate(title="Epic 1", task_type=TaskType.EPIC, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Epic 1", task_type=TaskType.EPIC, parent_id=project.id, project_id=project.id
+        ),
     )
     await create_task(
         async_session,
-        TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=epic.id, project_id=project.id),
+        TaskCreate(
+            title="Task 1", task_type=TaskType.TASK, parent_id=epic.id, project_id=project.id
+        ),
     )
 
     # Export
@@ -261,10 +291,14 @@ async def test_export_with_narrative_context(async_session):
 async def test_export_with_tutor_guidance(async_session):
     """Test exporting tutor_guidance."""
     # Create project with task that has tutor_guidance
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     epic = await create_task(
         async_session,
-        TaskCreate(title="Epic", task_type=TaskType.EPIC, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Epic", task_type=TaskType.EPIC, parent_id=project.id, project_id=project.id
+        ),
     )
     await create_task(
         async_session,

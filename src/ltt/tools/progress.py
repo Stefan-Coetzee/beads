@@ -63,7 +63,6 @@ async def start_task(
     # Check if task is blocked by dependencies (regardless of status)
     is_blocked, blockers = await is_task_blocked(session, input.task_id, learner_id)
     if is_blocked:
-
         blocker_titles = [b.title for b in blockers[:3]]
         return StartTaskOutput(
             success=False,

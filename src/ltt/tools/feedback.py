@@ -35,7 +35,9 @@ async def add_comment(
     - Only this learner will see their private comments
     - Shared comments (instructor notes) have learner_id=NULL
     """
-    comment_data = CommentCreate(task_id=input.task_id, learner_id=learner_id, author=learner_id, text=input.comment)
+    comment_data = CommentCreate(
+        task_id=input.task_id, learner_id=learner_id, author=learner_id, text=input.comment
+    )
 
     comment = await service_add_comment(session, input.task_id, comment_data)
 

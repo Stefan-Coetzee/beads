@@ -21,10 +21,14 @@ async def test_add_comment(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
-        TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Add comment
@@ -50,10 +54,14 @@ async def test_get_comments(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
-        TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Add comments
@@ -87,10 +95,14 @@ async def test_get_comments_respects_limit(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
-        TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Add multiple comments
@@ -102,7 +114,9 @@ async def test_get_comments_respects_limit(async_session):
         )
 
     # Get comments with limit
-    result = await get_comments(GetCommentsInput(task_id=task.id, limit=2), learner_id, async_session)
+    result = await get_comments(
+        GetCommentsInput(task_id=task.id, limit=2), learner_id, async_session
+    )
 
     assert len(result.comments) == 2
     assert result.total == 2  # Total reflects the limited count
@@ -118,10 +132,14 @@ async def test_get_comments_empty(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
-        TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Get comments (none exist)
@@ -146,10 +164,14 @@ async def test_comments_are_learner_scoped(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
-        TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Learner 1 adds a comment

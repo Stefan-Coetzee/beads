@@ -17,7 +17,9 @@ from ltt.utils.ids import PREFIX_LEARNER, generate_entity_id
 async def test_get_progress_empty_project(async_session):
     """Test progress calculation for empty project."""
     # Create empty project
-    project = await create_task(async_session, TaskCreate(title="Empty Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Empty Project", task_type=TaskType.PROJECT)
+    )
     learner_id = "test-learner"
 
     # Get progress
@@ -44,15 +46,26 @@ async def test_get_progress_with_tasks(async_session):
     await async_session.commit()
 
     # Create project with tasks
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task1 = await create_task(
-        async_session, TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id)
+        async_session,
+        TaskCreate(
+            title="Task 1", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
     task2 = await create_task(
-        async_session, TaskCreate(title="Task 2", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id)
+        async_session,
+        TaskCreate(
+            title="Task 2", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
     task3 = await create_task(
-        async_session, TaskCreate(title="Task 3", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id)
+        async_session,
+        TaskCreate(
+            title="Task 3", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Update statuses
@@ -83,7 +96,9 @@ async def test_get_progress_with_objectives(async_session):
     # Create project with tasks
     project = await create_task(
         async_session,
-        TaskCreate(title="Project", task_type=TaskType.PROJECT, acceptance_criteria="Complete all tasks"),
+        TaskCreate(
+            title="Project", task_type=TaskType.PROJECT, acceptance_criteria="Complete all tasks"
+        ),
     )
     task1 = await create_task(
         async_session,
@@ -112,7 +127,9 @@ async def test_get_progress_with_objectives(async_session):
 
     # Complete task1 with passing validation
     await update_status(async_session, task1.id, learner_id, TaskStatus.IN_PROGRESS)
-    submission1 = await create_submission(async_session, task1.id, learner_id, "My work", SubmissionType.TEXT)
+    submission1 = await create_submission(
+        async_session, task1.id, learner_id, "My work", SubmissionType.TEXT
+    )
     await validate_submission(async_session, submission1.id)
     await update_status(async_session, task1.id, learner_id, TaskStatus.CLOSED)
 
@@ -176,7 +193,9 @@ async def test_get_bloom_distribution(async_session):
 
     # Complete task1 with passing validation
     await update_status(async_session, task1.id, learner_id, TaskStatus.IN_PROGRESS)
-    submission1 = await create_submission(async_session, task1.id, learner_id, "My work", SubmissionType.TEXT)
+    submission1 = await create_submission(
+        async_session, task1.id, learner_id, "My work", SubmissionType.TEXT
+    )
     await validate_submission(async_session, submission1.id)
     await update_status(async_session, task1.id, learner_id, TaskStatus.CLOSED)
 
@@ -200,12 +219,20 @@ async def test_get_bloom_distribution(async_session):
 async def test_get_progress_lazy_initialization(async_session):
     """Test that progress works with lazy initialization (no progress records)."""
     # Create project with tasks but don't update any statuses
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
-    await create_task(
-        async_session, TaskCreate(title="Task 1", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id)
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
     )
     await create_task(
-        async_session, TaskCreate(title="Task 2", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id)
+        async_session,
+        TaskCreate(
+            title="Task 1", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
+    )
+    await create_task(
+        async_session,
+        TaskCreate(
+            title="Task 2", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     learner_id = "test-learner"
@@ -232,7 +259,9 @@ async def test_get_progress_nonexistent_project(async_session):
 @pytest.mark.asyncio
 async def test_bloom_distribution_empty_project(async_session):
     """Test Bloom distribution for project with no objectives."""
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     learner_id = "test-learner"
 
     distribution = await get_bloom_distribution(async_session, learner_id, project.id)

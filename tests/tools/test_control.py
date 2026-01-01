@@ -23,10 +23,14 @@ async def test_go_back_reopens_closed_task(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
-        TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Close task
@@ -57,10 +61,14 @@ async def test_go_back_fails_if_not_closed(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
-        TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Task is open (not closed)
@@ -93,10 +101,14 @@ async def test_request_help_creates_comment(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
-        TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Request help
@@ -120,10 +132,14 @@ async def test_request_help_comment_is_tagged(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
-        TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Request help
@@ -156,10 +172,14 @@ async def test_go_back_is_learner_scoped(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     task = await create_task(
         async_session,
-        TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id),
+        TaskCreate(
+            title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
+        ),
     )
 
     # Both learners close the task

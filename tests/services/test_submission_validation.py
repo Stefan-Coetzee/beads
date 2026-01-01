@@ -49,7 +49,9 @@ async def test_create_submission(async_session):
     async_session.add(learner)
     await async_session.commit()
 
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
 
     # Create submission
     submission = await create_submission(
@@ -72,14 +74,20 @@ async def test_create_submission_increments_attempt(async_session):
     async_session.add(learner)
     await async_session.commit()
 
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
 
     # Create first submission
-    submission1 = await create_submission(async_session, project.id, learner_id, "Attempt 1", SubmissionType.TEXT)
+    submission1 = await create_submission(
+        async_session, project.id, learner_id, "Attempt 1", SubmissionType.TEXT
+    )
     assert submission1.attempt_number == 1
 
     # Create second submission
-    submission2 = await create_submission(async_session, project.id, learner_id, "Attempt 2", SubmissionType.TEXT)
+    submission2 = await create_submission(
+        async_session, project.id, learner_id, "Attempt 2", SubmissionType.TEXT
+    )
     assert submission2.attempt_number == 2
 
 
@@ -92,7 +100,9 @@ async def test_cannot_submit_to_closed_task(async_session):
     async_session.add(learner)
     await async_session.commit()
 
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
 
     # Close the task
     await update_status(async_session, project.id, learner_id, TaskStatus.IN_PROGRESS)
@@ -100,7 +110,9 @@ async def test_cannot_submit_to_closed_task(async_session):
 
     # Try to submit to closed task
     with pytest.raises(InvalidStateError, match="already closed"):
-        await create_submission(async_session, project.id, learner_id, "Late submission", SubmissionType.TEXT)
+        await create_submission(
+            async_session, project.id, learner_id, "Late submission", SubmissionType.TEXT
+        )
 
 
 @pytest.mark.asyncio
@@ -109,7 +121,9 @@ async def test_submit_to_nonexistent_task(async_session):
     learner_id = generate_entity_id(PREFIX_LEARNER)
 
     with pytest.raises(TaskNotFoundError, match="does not exist"):
-        await create_submission(async_session, "nonexistent-id", learner_id, "Content", SubmissionType.TEXT)
+        await create_submission(
+            async_session, "nonexistent-id", learner_id, "Content", SubmissionType.TEXT
+        )
 
 
 @pytest.mark.asyncio
@@ -121,10 +135,14 @@ async def test_get_submission(async_session):
     async_session.add(learner)
     await async_session.commit()
 
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
 
     # Create submission
-    created = await create_submission(async_session, project.id, learner_id, "Content", SubmissionType.TEXT)
+    created = await create_submission(
+        async_session, project.id, learner_id, "Content", SubmissionType.TEXT
+    )
 
     # Get submission
     retrieved = await get_submission(async_session, created.id)
@@ -149,7 +167,9 @@ async def test_get_submissions(async_session):
     async_session.add(learner)
     await async_session.commit()
 
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
 
     # Create multiple submissions
     await create_submission(async_session, project.id, learner_id, "Attempt 1", SubmissionType.TEXT)
@@ -175,7 +195,9 @@ async def test_get_latest_submission(async_session):
     async_session.add(learner)
     await async_session.commit()
 
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
 
     # Create submissions
     await create_submission(async_session, project.id, learner_id, "Attempt 1", SubmissionType.TEXT)
@@ -193,7 +215,9 @@ async def test_get_latest_submission(async_session):
 async def test_get_latest_submission_none(async_session):
     """Test that get_latest_submission returns None when no submissions exist."""
     learner_id = generate_entity_id(PREFIX_LEARNER)
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
 
     latest = await get_latest_submission(async_session, project.id, learner_id)
     assert latest is None
@@ -208,7 +232,9 @@ async def test_get_attempt_count(async_session):
     async_session.add(learner)
     await async_session.commit()
 
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
 
     # Initially 0
     count = await get_attempt_count(async_session, project.id, learner_id)
@@ -236,10 +262,14 @@ async def test_validate_submission(async_session):
     async_session.add(learner)
     await async_session.commit()
 
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
 
     # Create submission
-    submission = await create_submission(async_session, project.id, learner_id, "Valid content", SubmissionType.TEXT)
+    submission = await create_submission(
+        async_session, project.id, learner_id, "Valid content", SubmissionType.TEXT
+    )
 
     # Validate
     validation = await validate_submission(async_session, submission.id)
@@ -259,10 +289,14 @@ async def test_empty_submission_fails(async_session):
     async_session.add(learner)
     await async_session.commit()
 
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
 
     # Create empty submission
-    submission = await create_submission(async_session, project.id, learner_id, "   ", SubmissionType.TEXT)
+    submission = await create_submission(
+        async_session, project.id, learner_id, "   ", SubmissionType.TEXT
+    )
 
     # Validate
     validation = await validate_submission(async_session, submission.id)
@@ -280,8 +314,12 @@ async def test_get_validation(async_session):
     async_session.add(learner)
     await async_session.commit()
 
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
-    submission = await create_submission(async_session, project.id, learner_id, "Content", SubmissionType.TEXT)
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
+    submission = await create_submission(
+        async_session, project.id, learner_id, "Content", SubmissionType.TEXT
+    )
     created_validation = await validate_submission(async_session, submission.id)
 
     # Get validation
@@ -307,8 +345,12 @@ async def test_get_validations(async_session):
     async_session.add(learner)
     await async_session.commit()
 
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
-    submission = await create_submission(async_session, project.id, learner_id, "Content", SubmissionType.TEXT)
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
+    submission = await create_submission(
+        async_session, project.id, learner_id, "Content", SubmissionType.TEXT
+    )
 
     # Create multiple validations
     await validate_submission(async_session, submission.id)
@@ -329,12 +371,18 @@ async def test_get_latest_validation(async_session):
     async_session.add(learner)
     await async_session.commit()
 
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
 
-    submission1 = await create_submission(async_session, project.id, learner_id, "Attempt 1", SubmissionType.TEXT)
+    submission1 = await create_submission(
+        async_session, project.id, learner_id, "Attempt 1", SubmissionType.TEXT
+    )
     await validate_submission(async_session, submission1.id)
 
-    submission2 = await create_submission(async_session, project.id, learner_id, "Attempt 2", SubmissionType.TEXT)
+    submission2 = await create_submission(
+        async_session, project.id, learner_id, "Attempt 2", SubmissionType.TEXT
+    )
     validation2 = await validate_submission(async_session, submission2.id)
 
     # Get latest
@@ -354,7 +402,9 @@ async def test_can_close_task_requires_validation_for_subtask(async_session):
     await async_session.commit()
 
     # Create project and subtask
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     subtask = await create_task(
         async_session, TaskCreate(title="Subtask", task_type=TaskType.SUBTASK, parent_id=project.id)
     )
@@ -376,8 +426,12 @@ async def test_can_close_task_allows_task_without_validation(async_session):
     await async_session.commit()
 
     # Create project and task
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
-    task = await create_task(async_session, TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
+    task = await create_task(
+        async_session, TaskCreate(title="Task", task_type=TaskType.TASK, parent_id=project.id)
+    )
 
     # Can close without validation
     can_close, reason = await can_close_task(async_session, task.id, learner_id)
@@ -396,13 +450,17 @@ async def test_failed_validation_blocks_close(async_session):
     await async_session.commit()
 
     # Create project and subtask
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     subtask = await create_task(
         async_session, TaskCreate(title="Subtask", task_type=TaskType.SUBTASK, parent_id=project.id)
     )
 
     # Create empty submission (fails validation)
-    submission = await create_submission(async_session, subtask.id, learner_id, "   ", SubmissionType.TEXT)
+    submission = await create_submission(
+        async_session, subtask.id, learner_id, "   ", SubmissionType.TEXT
+    )
     await validate_submission(async_session, submission.id)
 
     # Try to close
@@ -422,13 +480,17 @@ async def test_subtask_can_close_with_passing_validation(async_session):
     await async_session.commit()
 
     # Create project and subtask
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     subtask = await create_task(
         async_session, TaskCreate(title="Subtask", task_type=TaskType.SUBTASK, parent_id=project.id)
     )
 
     # Create valid submission
-    submission = await create_submission(async_session, subtask.id, learner_id, "Valid content", SubmissionType.TEXT)
+    submission = await create_submission(
+        async_session, subtask.id, learner_id, "Valid content", SubmissionType.TEXT
+    )
     await validate_submission(async_session, submission.id)
 
     # Can close
@@ -448,7 +510,9 @@ async def test_close_task_integrates_with_validation(async_session):
     await async_session.commit()
 
     # Create project and subtask
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
     subtask = await create_task(
         async_session, TaskCreate(title="Subtask", task_type=TaskType.SUBTASK, parent_id=project.id)
     )
@@ -468,8 +532,12 @@ async def test_create_manual_validation(async_session):
     async_session.add(learner)
     await async_session.commit()
 
-    project = await create_task(async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT))
-    submission = await create_submission(async_session, project.id, learner_id, "Content", SubmissionType.TEXT)
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
+    submission = await create_submission(
+        async_session, project.id, learner_id, "Content", SubmissionType.TEXT
+    )
 
     # Create manual validation
     validation = await create_manual_validation(

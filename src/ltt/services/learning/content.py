@@ -125,7 +125,9 @@ async def attach_content_to_task(
         TaskNotFoundError: If task doesn't exist
     """
     # Verify content exists
-    content_result = await session.execute(select(ContentModel).where(ContentModel.id == content_id))
+    content_result = await session.execute(
+        select(ContentModel).where(ContentModel.id == content_id)
+    )
     content = content_result.scalar_one_or_none()
 
     if not content:

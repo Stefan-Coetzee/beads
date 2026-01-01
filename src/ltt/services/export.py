@@ -36,7 +36,9 @@ async def export_project(session: AsyncSession, project_id: str, format: str = "
     data = {
         "title": project.title,
         "description": project.description,
-        "learning_objectives": [{"level": o.level, "description": o.description} for o in objectives],
+        "learning_objectives": [
+            {"level": o.level, "description": o.description} for o in objectives
+        ],
         "content": project.content,
         "epics": [],
     }
@@ -84,7 +86,9 @@ async def export_task_tree(session: AsyncSession, task_id: str) -> dict:
         "title": task.title,
         "description": task.description,
         "acceptance_criteria": task.acceptance_criteria,
-        "learning_objectives": [{"level": o.level, "description": o.description} for o in objectives],
+        "learning_objectives": [
+            {"level": o.level, "description": o.description} for o in objectives
+        ],
         "priority": task.priority,
         "content": task.content,
     }

@@ -278,7 +278,8 @@ def content_create(
 
 @content_app.command("attach")
 def content_attach(
-    content_id: str = typer.Argument(..., help="Content ID"), task_id: str = typer.Argument(..., help="Task ID")
+    content_id: str = typer.Argument(..., help="Content ID"),
+    task_id: str = typer.Argument(..., help="Task ID"),
 ):
     """Attach content to a task."""
     from ltt.services.learning import attach_content_to_task
@@ -375,10 +376,15 @@ app.add_typer(db_app, name="db")
 @db_app.command("init")
 def db_init():
     """Initialize the database (run migrations)."""
+    import os
     import subprocess
 
     typer.echo("Running database migrations...")
-    result = subprocess.run(["PYTHONPATH=src", "uv", "run", "alembic", "upgrade", "head"], capture_output=True)
+    env = os.environ.copy()
+    env["PYTHONPATH"] = "src"
+    result = subprocess.run(
+        ["uv", "run", "alembic", "upgrade", "head"], capture_output=True, env=env
+    )
 
     if result.returncode == 0:
         typer.echo("Database initialized successfully")

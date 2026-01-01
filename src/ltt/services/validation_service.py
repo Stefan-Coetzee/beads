@@ -117,7 +117,9 @@ async def get_validation(
     Raises:
         ValidationNotFoundError: If validation doesn't exist
     """
-    result = await session.execute(select(ValidationModel).where(ValidationModel.id == validation_id))
+    result = await session.execute(
+        select(ValidationModel).where(ValidationModel.id == validation_id)
+    )
     validation = result.scalar_one_or_none()
 
     if not validation:
