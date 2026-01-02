@@ -378,3 +378,71 @@ async def test_ingest_with_tutor_guidance(async_session, tmp_path):
 
     assert subtask.tutor_guidance is not None
     assert "Forgetting the % wildcards" in subtask.tutor_guidance["common_mistakes"]
+
+
+@pytest.mark.asyncio
+async def test_ingest_with_epic_dependencies(async_session, tmp_path):
+    """Test that epic-level dependencies are properly ingested."""
+    from ltt.services.dependency_service import get_blocking_tasks
+
+    project_data = {
+        "title": "Project with Epic Dependencies",
+        "description": "Test epic dependency ingestion",
+        "epics": [
+            {
+                "title": "Epic 1 - Introduction",
+                "description": "First epic",
+                "tasks": [{"title": "Task 1-1"}],
+            },
+            {
+                "title": "Epic 2 - Depends on Epic 1",
+                "description": "Second epic that depends on first",
+                "dependencies": ["Epic 1 - Introduction"],  # Epic dependency
+                "tasks": [{"title": "Task 2-1"}],
+            },
+            {
+                "title": "Epic 3 - Depends on Epic 2",
+                "description": "Third epic that depends on second",
+                "dependencies": ["Epic 2 - Depends on Epic 1"],  # Epic dependency
+                "tasks": [{"title": "Task 3-1"}],
+            },
+        ],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+
+    # Ingest
+    result = await ingest_project_file(async_session, file_path)
+
+    # Get epics
+    project = await get_task(async_session, result.project_id)
+    epics = await get_children(async_session, project.id)
+    assert len(epics) == 3
+
+    epic1 = next(e for e in epics if "Epic 1" in e.title)
+    epic2 = next(e for e in epics if "Epic 2" in e.title)
+    epic3 = next(e for e in epics if "Epic 3" in e.title)
+
+    # Create a test learner
+    from ltt.models import LearnerModel
+    from ltt.utils.ids import PREFIX_LEARNER, generate_entity_id
+
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id)
+    async_session.add(learner)
+    await async_session.commit()
+
+    # Epic 2 should be blocked by Epic 1
+    blockers = await get_blocking_tasks(async_session, epic2.id, learner_id)
+    assert len(blockers) == 1
+    assert blockers[0].id == epic1.id
+
+    # Epic 3 should be blocked by Epic 2
+    blockers = await get_blocking_tasks(async_session, epic3.id, learner_id)
+    assert len(blockers) == 1
+    assert blockers[0].id == epic2.id
+
+    # Epic 1 should not be blocked
+    blockers = await get_blocking_tasks(async_session, epic1.id, learner_id)
+    assert len(blockers) == 0

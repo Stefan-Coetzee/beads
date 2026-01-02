@@ -158,8 +158,8 @@ class SubmitOutput(BaseModel):
     validation_passed: bool | None
     validation_message: str | None
 
-    # Status
-    can_close_task: bool
+    # Current status after submission
+    status: str
     message: str
 
 

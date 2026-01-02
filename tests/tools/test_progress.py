@@ -215,6 +215,9 @@ async def test_submit_validates_automatically(async_session):
         ),
     )
 
+    # Start task first (required for proper workflow)
+    await start_task(StartTaskInput(task_id=task.id), learner_id, async_session)
+
     # Submit work
     result = await submit(
         SubmitInput(task_id=task.id, content="my work", submission_type="text"),
@@ -224,10 +227,112 @@ async def test_submit_validates_automatically(async_session):
 
     # Should have validation result
     assert result.validation_passed is not None
+    assert result.status is not None
     if result.validation_passed:
-        assert "passed" in result.message.lower()
+        assert "successful" in result.message.lower() or "complete" in result.message.lower()
     else:
         assert "failed" in result.message.lower()
+
+
+@pytest.mark.asyncio
+async def test_submit_auto_closes_task_on_success(async_session):
+    """Test submit auto-closes task when validation passes (ADR-002)."""
+    # Create learner
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    # Create project and task
+    project = await create_task(
+        async_session,
+        TaskCreate(title="Project", task_type=TaskType.PROJECT),
+    )
+    task = await create_task(
+        async_session,
+        TaskCreate(
+            title="Task",
+            task_type=TaskType.TASK,
+            parent_id=project.id,
+            project_id=project.id,
+            acceptance_criteria="Submit any work",
+        ),
+    )
+
+    # Start task (moves to in_progress)
+    start_result = await start_task(StartTaskInput(task_id=task.id), learner_id, async_session)
+    assert start_result.new_status == "in_progress"
+
+    # Submit work (should auto-close on success)
+    result = await submit(
+        SubmitInput(task_id=task.id, content="my completed work", submission_type="text"),
+        learner_id,
+        async_session,
+    )
+
+    assert result.success is True
+    assert result.validation_passed is True
+    assert result.status == "closed"
+    assert "complete" in result.message.lower()
+
+
+@pytest.mark.asyncio
+async def test_submit_auto_closes_subtask_on_success(async_session):
+    """Test submit auto-closes subtask when validation passes."""
+    # Create learner
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    # Create hierarchy: project > epic > task > subtask
+    project = await create_task(
+        async_session,
+        TaskCreate(title="Project", task_type=TaskType.PROJECT),
+    )
+    epic = await create_task(
+        async_session,
+        TaskCreate(
+            title="Epic",
+            task_type=TaskType.EPIC,
+            parent_id=project.id,
+            project_id=project.id,
+        ),
+    )
+    task = await create_task(
+        async_session,
+        TaskCreate(
+            title="Task",
+            task_type=TaskType.TASK,
+            parent_id=epic.id,
+            project_id=project.id,
+        ),
+    )
+    subtask = await create_task(
+        async_session,
+        TaskCreate(
+            title="Subtask",
+            task_type=TaskType.SUBTASK,
+            parent_id=task.id,
+            project_id=project.id,
+            acceptance_criteria="Write the code",
+        ),
+    )
+
+    # Start subtask
+    await start_task(StartTaskInput(task_id=subtask.id), learner_id, async_session)
+
+    # Submit work
+    result = await submit(
+        SubmitInput(task_id=subtask.id, content="def hello(): return 'world'", submission_type="code"),
+        learner_id,
+        async_session,
+    )
+
+    assert result.success is True
+    assert result.validation_passed is True
+    assert result.status == "closed"
+    assert "complete" in result.message.lower()
 
 
 @pytest.mark.asyncio

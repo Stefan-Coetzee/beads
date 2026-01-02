@@ -404,22 +404,23 @@ async def get_ready_work(
 
     query = text(f"""
         WITH RECURSIVE
+        -- Tasks directly blocked by 'blocks' dependencies
         blocked_directly AS (
             SELECT DISTINCT d.task_id
             FROM dependencies d
             LEFT JOIN learner_task_progress ltp_blocker
               ON ltp_blocker.task_id = d.depends_on_id
               AND ltp_blocker.learner_id = :learner_id
-            WHERE d.dependency_type IN ('blocks', 'parent_child')
+            WHERE d.dependency_type = 'blocks'
               AND COALESCE(ltp_blocker.status, 'open') != 'closed'
         ),
-        blocked_transitively AS (
-            SELECT task_id, 0 as depth FROM blocked_directly
-            UNION ALL
-            SELECT d.task_id, bt.depth + 1
-            FROM blocked_transitively bt
-            JOIN dependencies d ON d.depends_on_id = bt.task_id
-            WHERE d.dependency_type = 'parent_child' AND bt.depth < 50
+        -- Propagate blocking to children via parent_id hierarchy
+        blocked_with_children AS (
+            SELECT task_id FROM blocked_directly
+            UNION
+            SELECT t.id
+            FROM blocked_with_children bwc
+            JOIN tasks t ON t.parent_id = bwc.task_id
         )
         SELECT
           t.*
@@ -430,7 +431,7 @@ async def get_ready_work(
           AND COALESCE(ltp.status, 'open') IN ('open', 'in_progress')
           {task_type_filter}
           AND NOT EXISTS (
-            SELECT 1 FROM blocked_transitively bt WHERE bt.task_id = t.id
+            SELECT 1 FROM blocked_with_children bwc WHERE bwc.task_id = t.id
           )
         ORDER BY
           CASE COALESCE(ltp.status, 'open')

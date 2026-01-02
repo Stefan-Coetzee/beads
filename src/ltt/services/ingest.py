@@ -142,6 +142,11 @@ async def ingest_epic(
     # Track for dependency resolution
     dependency_map[data["title"]] = epic.id
 
+    # Add dependencies (by title reference) - same as tasks
+    for dep_title in data.get("dependencies", []):
+        if dep_title in dependency_map:
+            await add_dependency(session, epic.id, dependency_map[dep_title], DependencyType.BLOCKS)
+
     # Add objectives
     obj_count = 0
     for obj in data.get("learning_objectives", []):

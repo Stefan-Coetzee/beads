@@ -13,10 +13,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ltt.models import SubmissionType, TaskStatus
 from ltt.services.dependency_service import is_task_blocked
-from ltt.services.progress_service import get_or_create_progress, update_status
+from ltt.services.progress_service import (
+    InvalidStatusTransitionError,
+    close_task,
+    get_or_create_progress,
+    update_status,
+)
 from ltt.services.submission_service import create_submission
 from ltt.services.task_service import get_task
-from ltt.services.validation_service import can_close_task, validate_submission
+from ltt.services.validation_service import validate_submission
 from ltt.tools.navigation import get_context
 from ltt.tools.schemas import (
     GetContextInput,
@@ -96,7 +101,8 @@ async def submit(input: SubmitInput, learner_id: str, session: AsyncSession) -> 
     """
     Submit work for a task and trigger validation.
 
-    Returns validation result and whether task can be closed.
+    If validation passes, the task is automatically closed.
+    See ADR-002 for rationale.
     """
     # Parse submission type (enum values are lowercase)
     try:
@@ -108,7 +114,7 @@ async def submit(input: SubmitInput, learner_id: str, session: AsyncSession) -> 
             attempt_number=0,
             validation_passed=None,
             validation_message=f"Invalid submission type: {input.submission_type}",
-            can_close_task=False,
+            status="",
             message=f"Invalid submission type: {input.submission_type}",
         )
 
@@ -120,13 +126,24 @@ async def submit(input: SubmitInput, learner_id: str, session: AsyncSession) -> 
     # Validate submission
     validation = await validate_submission(session, submission.id)
 
-    # Check if task can be closed
-    can_close, close_message = await can_close_task(session, input.task_id, learner_id)
+    # Get current status
+    progress = await get_or_create_progress(session, input.task_id, learner_id)
+    current_status = progress.status
 
     if validation.passed:
-        message = f"Submission passed validation! (Attempt #{submission.attempt_number})"
+        # Try to auto-close the task (reuses existing close_task logic)
+        try:
+            closed_progress = await close_task(
+                session, input.task_id, learner_id, "Passed validation"
+            )
+            current_status = closed_progress.status
+            message = "Validation successful, task complete"
+        except InvalidStatusTransitionError:
+            # Task can't be closed yet (e.g., children still open)
+            # This is expected for tasks/epics with open subtasks
+            message = "Validation successful"
     else:
-        message = f"Submission failed: {validation.error_message}"
+        message = f"Validation failed: {validation.error_message}"
 
     return SubmitOutput(
         success=True,
@@ -134,6 +151,6 @@ async def submit(input: SubmitInput, learner_id: str, session: AsyncSession) -> 
         attempt_number=submission.attempt_number,
         validation_passed=validation.passed,
         validation_message=validation.error_message if not validation.passed else None,
-        can_close_task=can_close,
+        status=current_status,
         message=message,
     )
