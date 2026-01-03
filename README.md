@@ -2,7 +2,7 @@
 
 > A Python-based learning task management system adapted from [beads](https://github.com/steveyegge/beads), designed to power AI tutoring agents at scale.
 
-[![Tests](https://img.shields.io/badge/tests-167%20passing-brightgreen)]() [![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)]() [![Python](https://img.shields.io/badge/python-3.12%2B-blue)]() [![PostgreSQL](https://img.shields.io/badge/postgresql-17-blue)]()
+[![Tests](https://img.shields.io/badge/tests-190%20passing-brightgreen)]() [![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)]() [![Python](https://img.shields.io/badge/python-3.12%2B-blue)]() [![PostgreSQL](https://img.shields.io/badge/postgresql-17-blue)]()
 
 ---
 
@@ -93,11 +93,12 @@ See [ADR-001](python-port/docs/adr/001-learner-scoped-task-progress.md) for deta
 
 #### Agent Tools (Phase 7)
 - **Navigation**: `get_ready`, `show_task`, `get_context`
-- **Progress**: `start_task`, `submit`
+- **Progress**: `start_task`, `submit` (auto-closes on validation pass)
 - **Feedback**: `add_comment`, `get_comments`
 - **Control**: `go_back`, `request_help`
 - Tool registry for MCP/function calling
 - Stateless design (LangGraph manages sessions)
+- Submission-driven task completion (ADR-002)
 
 #### Admin CLI & Ingestion (Phase 8)
 - **Project management**: create, list, show, export
@@ -366,7 +367,10 @@ These fields guide **HOW** LLM tutors teach, not just **WHAT** they teach.
 - **[PRD.md](python-port/docs/PRD.md)** - Product requirements and system architecture
 - **[BUILD-STATUS.md](BUILD-STATUS.md)** - Implementation status, test counts, phase completion
 - **Module Specs**: [02-task-management.md](python-port/docs/02-task-management.md), [03-dependencies.md](python-port/docs/03-dependencies.md), [04-submissions-validation.md](python-port/docs/04-submissions-validation.md), etc.
-- **[ADR-001](python-port/docs/adr/001-learner-scoped-task-progress.md)** - Two-layer architecture decision
+
+### Architecture Decision Records
+- **[ADR-001](python-port/docs/adr/001-learner-scoped-task-progress.md)** - Two-layer architecture (template + instance)
+- **[ADR-002](python-port/docs/adr/002-submission-driven-task-completion.md)** - Submission-driven task completion (auto-close on validation)
 
 ### Implementation Notes
 - **Phase Completion Reports**: [src/ltt/tempdocs/](src/ltt/tempdocs/) - Detailed reports for each phase
@@ -386,7 +390,8 @@ These fields guide **HOW** LLM tutors teach, not just **WHAT** they teach.
 | **5** | Learning & Progress | 34 | ✅ Complete |
 | **7** | Agent Tools | 26 | ✅ Complete |
 | **8** | Admin CLI & Ingestion | 23 | ✅ Complete |
-| | **Total** | **167** | **All Passing** ✅ |
+| **E2E** | End-to-End Integration | 15 | ✅ Complete |
+| | **Total** | **190** | **All Passing** ✅ |
 
 **Coverage**: 98% overall (services), 100% models
 
@@ -462,7 +467,7 @@ result = await start_task(
     session
 )
 
-# Submit work
+# Submit work (auto-closes on validation pass)
 result = await submit(
     SubmitInput(
         task_id="proj-123.1.1",
@@ -472,6 +477,8 @@ result = await submit(
     learner_id="learner-456",
     session
 )
+# result.status == "closed" if validation passed
+# result.message == "Validation successful, task complete"
 ```
 
 ---
@@ -564,27 +571,28 @@ PYTHONPATH=src uv run alembic history
 - **`PARENT_CHILD`**: Parent can't close until children close
 - **`RELATED`**: Informational link, no blocking
 
-### Validation Flow
+### Validation Flow (ADR-002)
 
 ```
-Submission Created
-      │
-      ▼
-┌──────────────┐
-│  Validate    │
-│ (automated)  │
-└──────┬───────┘
-       │
-  ┌────┴────┐
-  │         │
-  ▼         ▼
-PASS      FAIL
-  │         │
-  ▼         ▼
-Can       Return
-close     error
-task      message
+submit()
+   │
+   ├── Create Submission
+   │
+   ├── Validate (automated)
+   │
+   └── If PASS ──────────────────┐
+       │                         │
+       ▼                         ▼
+   close_task()            If FAIL
+   (auto-close)                  │
+       │                         ▼
+       ▼                    Return error
+   status: "closed"         message
+   message: "task complete"
 ```
+
+**Key behavior**: Tasks auto-close when validation passes. No separate close step needed.
+See [ADR-002](python-port/docs/adr/002-submission-driven-task-completion.md) for details.
 
 ---
 
@@ -666,19 +674,43 @@ See [01-data-models.md](python-port/docs/01-data-models.md) for complete schema.
 
 ## Testing
 
-**167 tests across all phases, all passing**
+**190 tests across all phases, all passing**
 
 ```bash
 # Run all tests
-uv run pytest tests/ -v
+PYTHONPATH=src uv run pytest tests/ -v
 
 # Fast run
-uv run pytest tests/ -q
+PYTHONPATH=src uv run pytest tests/ -q
 
 # Specific module
-uv run pytest tests/services/test_dependency_service.py -v
-uv run pytest tests/tools/ -v
+PYTHONPATH=src uv run pytest tests/services/test_dependency_service.py -v
+PYTHONPATH=src uv run pytest tests/tools/ -v
 ```
+
+### End-to-End Integration Tests
+
+Run comprehensive integration tests that validate the full agentic workflow:
+
+```bash
+PYTHONPATH=src uv run pytest tests/test_e2e_agentic_workflow.py -v
+```
+
+**What's Tested** (15 test cases):
+- ✅ **Database connectivity** - Verifies PostgreSQL is running
+- ✅ **Project ingestion** - Imports from `project_data/DA/MN_Part1/structured/water_analysis_project.json`
+- ✅ **Initial state** - Ready work shows only unblocked tasks
+- ✅ **Task lifecycle** - start_task, submit, validation, auto-close
+- ✅ **Hierarchical closure** - Parent closes only after children
+- ✅ **Epic blocking propagation** - Epic dependencies block child tasks
+- ✅ **Multi-learner isolation**:
+  - Status changes (Learner A's progress doesn't affect Learner B)
+  - Comments (private comments are learner-scoped)
+  - Progress tracking (independent completion counts)
+  - Blocking (dependencies resolved per-learner)
+- ✅ **Go back** - Reopening closed tasks
+- ✅ **Submission attempts** - Attempt numbers increment correctly
+- ✅ **Error handling** - Invalid submission types, blocked tasks
 
 **Test Coverage**:
 - Data models: 99%

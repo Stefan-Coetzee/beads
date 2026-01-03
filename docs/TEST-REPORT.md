@@ -1,6 +1,6 @@
 # LTT Comprehensive Test Report
 
-> Generated: 2026-01-01
+> Generated: 2026-01-01 (Updated: 2026-01-02)
 > Test Environment: Python 3.13.2, PostgreSQL 17, macOS Darwin 24.5.0
 
 ---
@@ -9,10 +9,10 @@
 
 **Overall Status: PASS**
 
-- **Total Tests**: 170 (167 service/tool tests + 3 CLI tests)
-- **Passed**: 170
+- **Total Tests**: 176 (173 service/tool tests + 3 CLI tests)
+- **Passed**: 176
 - **Failed**: 0
-- **Warnings**: 162 (deprecation warnings for `datetime.utcnow()`)
+- **Warnings**: 186 (deprecation warnings for `datetime.utcnow()`)
 
 ---
 
@@ -110,12 +110,13 @@ details: dict | list | None = None
 
 ## Test Coverage by Module
 
-### Service Layer (95 tests)
+### Service Layer (101 tests)
 
 | Module | Tests | Status |
 |--------|-------|--------|
 | task_service | 36 | PASS |
 | dependency_service | 23 | PASS |
+| epic_blocking_propagation | 3 | PASS ✅ NEW |
 | progress_service | 17 | PASS (includes go_back tests) |
 | submission_service | 11 | PASS |
 | validation_service | 11 | PASS |

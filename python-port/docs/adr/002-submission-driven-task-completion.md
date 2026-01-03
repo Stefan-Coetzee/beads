@@ -1,7 +1,7 @@
 # ADR-002: Submission-Driven Task Completion
 
-**Status**: Proposed
-**Date**: 2026-01-01
+**Status**: Partially Implemented (Epic blocking: ✅ Done | Auto-close: ⏳ Pending GH #835)
+**Date**: 2026-01-01 (Updated: 2026-01-02)
 **Deciders**: Stefan Coetzee
 **Related**: [GitHub Issue #835](https://github.com/steveyegge/beads/issues/835)
 
@@ -229,3 +229,64 @@ class SubmitOutput(BaseModel):
 - [ADR-001](./001-learner-scoped-task-progress.md) - Two-layer architecture
 - [GitHub Issue #835](https://github.com/steveyegge/beads/issues/835) - Original feature request
 - [04-submissions-validation.md](../04-submissions-validation.md) - Validation flow
+
+---
+
+## Addendum: Epic Blocking Propagation (2026-01-02)
+
+### Issue Discovered
+
+During end-to-end testing, we discovered that epic-level dependencies were not properly blocking child tasks. When Epic 2 was blocked by Epic 1, the tasks under Epic 2 were still appearing as "ready work".
+
+**Root cause**: The `get_ready_work()` query only checked explicit `dependencies` table entries, not the `parent_id` hierarchy.
+
+### Solution Implemented
+
+Modified `src/ltt/services/dependency_service.py:get_ready_work()` to propagate blocking through parent-child relationships using a recursive CTE:
+
+```sql
+WITH RECURSIVE
+-- Tasks directly blocked by 'blocks' dependencies
+blocked_directly AS (
+    SELECT DISTINCT d.task_id
+    FROM dependencies d
+    LEFT JOIN learner_task_progress ltp_blocker
+      ON ltp_blocker.task_id = d.depends_on_id
+      AND ltp_blocker.learner_id = :learner_id
+    WHERE d.dependency_type = 'blocks'
+      AND COALESCE(ltp_blocker.status, 'open') != 'closed'
+),
+-- Propagate blocking to children via parent_id hierarchy
+blocked_with_children AS (
+    SELECT task_id FROM blocked_directly
+    UNION
+    SELECT t.id
+    FROM blocked_with_children bwc
+    JOIN tasks t ON t.parent_id = bwc.task_id
+)
+```
+
+### Files Modified
+
+1. **src/ltt/services/dependency_service.py** - Modified `get_ready_work()` query
+2. **src/ltt/services/ingest.py** - Fixed `ingest_epic()` to process dependencies
+3. **tests/services/test_epic_blocking_propagation.py** - Added 3 comprehensive tests
+4. **scripts/verify_epic_blocking.py** - Real-world verification script
+
+### Test Results
+
+```
+tests/services/test_epic_blocking_propagation.py:
+  ✅ test_epic_blocking_propagates_to_children
+  ✅ test_nested_epic_blocking
+  ✅ test_task_level_blocking_independent_of_epic_blocking
+
+Real-world verification (water analysis project):
+  Epic 1 tasks in ready work: 2
+  Epic 2 tasks in ready work: 0
+  ✅ PASS: Epic blocking is propagating correctly
+```
+
+### Impact
+
+Epic-level curriculum sequencing now works as expected. When an epic is blocked by another epic, all descendant tasks are also blocked, regardless of nesting depth.

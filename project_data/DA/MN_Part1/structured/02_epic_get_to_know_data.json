@@ -1,0 +1,169 @@
+{
+  "title": "Get to Know Our Data",
+  "description": "Exploring the foundational tables and their structure",
+  "estimated_minutes": 60,
+  "priority": 0,
+  "dependencies": ["Introduction"],
+  "learning_objectives": [
+    {
+      "level": "apply",
+      "description": "Apply SELECT statements to explore unfamiliar database tables"
+    },
+    {
+      "level": "understand",
+      "description": "Understand the structure and purpose of location, visits, and water_source tables"
+    }
+  ],
+  "content": "Before we do anything else, let's take a good look at our data. We'll load up the database and pull up the first few records from each table. It's like getting to know a new city - we need to explore the lay of the land before we can start our journey.",
+  "tasks": [
+    {
+      "title": "Discover what tables exist",
+      "description": "Use SHOW TABLES to explore an unfamiliar database",
+      "estimated_minutes": 10,
+      "priority": 0,
+      "learning_objectives": [
+        {
+          "level": "remember",
+          "description": "Recall SHOW TABLES as a database exploration command"
+        }
+      ],
+      "content": "Start by retrieving the first few records from each table. How many tables are there in our database? What are the names of these tables? Once you've identified the tables, write a SELECT statement to retrieve the first five records from each table. As you look at the data, take note of the columns and their respective data types in each table. What information does each table contain?",
+      "subtasks": [
+        {
+          "title": "Run SHOW TABLES command",
+          "subtask_type": "exercise",
+          "description": "Use SHOW TABLES to see all tables in the md_water_services database",
+          "estimated_minutes": 5,
+          "acceptance_criteria": "- Student runs SHOW TABLES\n- Student can list the 8 tables discovered\n- Student understands this is the first step when exploring unfamiliar databases",
+          "content": "I don't think they showed you this at the Academy, but when you access a new database in MySQL, a handy initial query to run is SHOW TABLES. This will give you a list of all the tables in the database.\n\n```sql\nSHOW TABLES\n```\n\nYou should see something like this:\n\n| Tables_in_md_water_services |\n|-----------------------------|\n| column_legend |\n| employee |\n| global_water_access |\n| location |\n| water_quality |\n| visits |\n| water_source |\n| well_pollution |\n\nIt looks like someone took the time to name all of these tables pretty well because we can kind of figure out what each table is about without really having to think too hard. water_source probably logs information about each source like where it is, what type of source it is and so on.",
+          "learning_objectives": [
+            {
+              "level": "apply",
+              "description": "Apply SHOW TABLES to explore database structure"
+            }
+          ],
+          "tutor_guidance": {
+            "teaching_approach": "Emphasize this as a foundational habit for database exploration",
+            "hints_to_give": [
+              "SHOW TABLES is helpful when dealing with unfamiliar databases",
+              "Keep a data dictionary handy for quick reference"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Explore the location table",
+      "description": "Examine the location table to understand how geographic information is stored",
+      "estimated_minutes": 15,
+      "priority": 0,
+      "dependencies": ["Discover what tables exist"],
+      "learning_objectives": [
+        {
+          "level": "apply",
+          "description": "Apply SELECT with LIMIT to preview table contents"
+        }
+      ],
+      "content": "So let's have a look at one of these tables. Let's use location so we can use that killer query, SELECT * but remember to limit it and tell it which table we are looking at.",
+      "subtasks": [
+        {
+          "title": "Query the location table",
+          "subtask_type": "exercise",
+          "description": "Write a SELECT query to view the first 5 records from the location table",
+          "estimated_minutes": 10,
+          "acceptance_criteria": "- Query uses SELECT * FROM location LIMIT 5\n- Student can identify the columns: location_id, address, province_name, town_name, location_type\n- Student understands this table stores geographic information",
+          "content": "Write a query to see the first 5 rows of the location table:\n\n**Expected query:**\n```sql\nSELECT *\nFROM location\nLIMIT 5\n```\n\nYou should get something like this:\n\n| location_id | address | province_name | town_name | location_type |\n|-------------|---------|---------------|-----------|---------------|\n| AkHa00000 | 2 Addis Ababa Road | Akatsi | Harare | Urban |\n| AkHa00001 | 10 Addis Ababa Road | Akatsi | Harare | Urban |\n| AkHa00002 | 9 Addis Ababa Road | Akatsi | Harare | Urban |\n| AkHa00003 | 139 Addis Ababa Road | Akatsi | Harare | Urban |\n| AkHa00004 | 17 Addis Ababa Road | Akatsi | Harare | Urban |\n\nSo we can see that this table has information on a specific location, with an address, the province and town the location is in, and if it's in a city (Urban) or not. We can't really see what location this is but we can see some sort of identifying number of that location.",
+          "learning_objectives": [
+            {
+              "level": "apply",
+              "description": "Apply SELECT * with LIMIT to preview table data"
+            }
+          ],
+          "tutor_guidance": {
+            "answer_rationale": "SELECT * FROM location LIMIT 5 shows the structure and sample data from the location table",
+            "hints_to_give": [
+              "Use SELECT * to get all columns",
+              "Use LIMIT to restrict the number of rows returned",
+              "Don't forget to specify FROM which table"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Explore the visits table",
+      "description": "Examine the visits table to understand how water source visits are logged",
+      "estimated_minutes": 15,
+      "priority": 0,
+      "dependencies": ["Explore the location table"],
+      "learning_objectives": [
+        {
+          "level": "understand",
+          "description": "Understand the relationship between visits, locations, and water sources"
+        }
+      ],
+      "content": "Ok, so let's look at the visits table.",
+      "subtasks": [
+        {
+          "title": "Query the visits table",
+          "subtask_type": "exercise",
+          "description": "Write a SELECT query to view the first 5 records from the visits table",
+          "estimated_minutes": 10,
+          "acceptance_criteria": "- Query uses SELECT * FROM visits LIMIT 5\n- Student can identify key columns: record_id, location_id, source_id, time_of_record, visit_count, time_in_queue, assigned_employee_id\n- Student understands the concept of foreign keys linking tables",
+          "content": "Query the visits table to see its structure:\n\n**Expected query:**\n```sql\nSELECT *\nFROM visits\nLIMIT 5\n```\n\nHere's what I get:\n\n| record_id | location_id | source_id | time_of_record | visit_count | time_in_queue | assigned_employee_id |\n|-----------|-------------|-----------|----------------|-------------|---------------|----------------------|\n| 0 | SoIl32582 | SoIl32582224 | 2021-01-01 09:10:00 | 1 | 15 | 12 |\n| 1 | KiRu28935 | KiRu28935224 | 2021-01-01 09:17:00 | 1 | 0 | 46 |\n| 2 | HaRu19752 | HaRu19752224 | 2021-01-01 09:36:00 | 1 | 62 | 40 |\n| 3 | AkLu01628 | AkLu01628224 | 2021-01-01 09:53:00 | 1 | 0 | 1 |\n| 4 | AkRu03357 | AkRu03357224 | 2021-01-01 10:11:00 | 1 | 28 | 14 |\n\nYeah, so this is a list of location_id, source_id, record_id, and a date and time, so it makes sense that someone (assigned_employee_id) visited some location (location_id) at some time (time_of_record) and found a 'source' there (source_id). Often the \"_id\" columns are related to another table. In this case, the source_id in the visits table refers to source_id in the water_source table. This is what we call a foreign key, but we'll get more into this next time.",
+          "learning_objectives": [
+            {
+              "level": "understand",
+              "description": "Understand how tables relate through foreign keys"
+            }
+          ],
+          "tutor_guidance": {
+            "answer_rationale": "The visits table logs each time an employee visited a location to record data about a water source",
+            "hints_to_give": [
+              "Look for columns ending in '_id' - they often link to other tables",
+              "time_in_queue tells us how long people wait for water"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Explore the water_source table",
+      "description": "Examine the water_source table to understand the types of water sources",
+      "estimated_minutes": 15,
+      "priority": 0,
+      "dependencies": ["Explore the visits table"],
+      "learning_objectives": [
+        {
+          "level": "understand",
+          "description": "Understand what water sources are and how they're categorized"
+        }
+      ],
+      "content": "Ok, so let's look at the water_source table to see what a 'source' is. Normally \"_id\" columns are related to another table.",
+      "subtasks": [
+        {
+          "title": "Query the water_source table",
+          "subtask_type": "exercise",
+          "description": "Write a SELECT query to view the first 5 records from the water_source table",
+          "estimated_minutes": 10,
+          "acceptance_criteria": "- Query uses SELECT * FROM water_source LIMIT 5\n- Student can identify columns: source_id, type_of_water_source, number_of_people_served\n- Student understands that water sources serve different numbers of people",
+          "content": "Query the water_source table:\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_source\nLIMIT 5\n```\n\nI get:\n\n| source_id | type_of_water_source | number_of_people_served |\n|-----------|----------------------|-------------------------|\n| AkHa00000224 | tap_in_home | 956 |\n| AkHa00001224 | tap_in_home_broken | 930 |\n| AkHa00002224 | tap_in_home_broken | 486 |\n| AkHa00003224 | clean_well | 364 |\n| AkHa00004224 | tap_in_home_broken | 94 |\n\nNice! Ok, we're getting somewhere now... Water sources are where people get their water from! Ok, this database is actually complex, so maybe a good idea for you is to look at the rest of the tables quickly. You can just select them, but remember in good SQL there would be a data dictionary somewhere that documents all of this information, so you should read that as well, and even keep a copy of that close if we need to find information quickly.\n\nA data dictionary has been embedded into the database. If you query the data_dictionary table, an explanation of each column is given there.",
+          "learning_objectives": [
+            {
+              "level": "understand",
+              "description": "Understand the water_source table structure and its relationship to visits"
+            }
+          ],
+          "tutor_guidance": {
+            "answer_rationale": "Water sources are categorized by type (tap_in_home, well, etc.) and track how many people each source serves",
+            "hints_to_give": [
+              "Notice the different types of water sources",
+              "number_of_people_served tells us the scale of impact",
+              "The data_dictionary table can help explain columns"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

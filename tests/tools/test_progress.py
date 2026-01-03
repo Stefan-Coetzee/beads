@@ -324,7 +324,9 @@ async def test_submit_auto_closes_subtask_on_success(async_session):
 
     # Submit work
     result = await submit(
-        SubmitInput(task_id=subtask.id, content="def hello(): return 'world'", submission_type="code"),
+        SubmitInput(
+            task_id=subtask.id, content="def hello(): return 'world'", submission_type="code"
+        ),
         learner_id,
         async_session,
     )
