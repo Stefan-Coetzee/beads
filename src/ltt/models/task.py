@@ -65,6 +65,12 @@ class TaskBase(BaseModel):
         default=None, description="Real-world narrative context (primarily for projects)"
     )
 
+    # Hierarchical summary (for epics/tasks - summarizes children)
+    summary: str | None = Field(
+        default=None,
+        description="Auto-generated summary of children (subtasks for tasks, tasks for epics)",
+    )
+
 
 class TaskCreate(TaskBase):
     """Schema for creating a new task."""
@@ -176,6 +182,9 @@ class TaskModel(Base, TimestampMixin):
     # Pedagogical guidance fields
     tutor_guidance: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     narrative_context: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Hierarchical summary (for epics/tasks - summarizes children)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Versioning
     version: Mapped[int] = mapped_column(Integer, default=1)

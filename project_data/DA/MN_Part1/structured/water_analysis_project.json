@@ -58,6 +58,7 @@
               "subtask_type": "conversational",
               "description": "Absorb the context and motivation for this data analysis project",
               "estimated_minutes": 5,
+              "acceptance_criteria": "- Learner has read and acknowledged the message\n- Learner shows understanding of the mission (analyzing 60,000 water survey records)\n- Learner expresses readiness or curiosity to proceed",
               "content": "Dear Team,\n\nCongratulations on the successful completion of our extensive survey. Your dedication and hard work have resulted in an invaluable asset - a database of 60,000 records, meticulously collected by our devoted team of engineers, field workers, scientists, and analysts.\n\nNow, the next crucial phase of our mission begins. We need to make sense of this immense data trove and extract meaningful insights. We must breathe life into these records and listen to the story they are telling us.\n\nI urge you to load this database and thoroughly acquaint yourselves with it. Dive deep, explore its structure, understand the variables and the connections between them. Each record is a chapter of our story; each query you run is a thread weaving that story together. This is a process of discovery - to uncover the patterns and nuances in our data. It's a chance to ask the right questions, to identify the pressing problems, and to set the course for our data-driven solutions.\n\nAs you proceed, always remember that every bit of information is a piece of the bigger puzzle. Every insight, no matter how small, brings us one step closer to solving our water crisis. Together, we have embarked on this journey to bring about change. Let's continue to march ahead with the same determination and resolve.\n\nI believe in our collective potential. Together, we will unravel the secrets held within these records, and use this knowledge to shape a brighter future for Maji Ndogo.\n\nBest regards,\nAziza Naledi",
               "learning_objectives": [
                 {
@@ -91,26 +92,35 @@
               ]
             },
             {
-              "title": "Review the 5 tasks ahead",
+              "title": "Review the 5 epics ahead",
               "subtask_type": "conversational",
-              "description": "Understand the roadmap of tasks that Chidi has broken down from Naledi's instructions",
+              "description": "Understand the roadmap of major phases (epics) that Chidi has broken down from Naledi's instructions. This is just an overview - you'll work through each epic's tasks separately.",
               "estimated_minutes": 5,
               "dependencies": [
                 "Meet your mentor Chidi Kunto"
               ],
-              "content": "Hey there,\n\nYou've probably seen President Naledi's message by now. She has emphasised the importance of our newly collected survey data and how vital it is for us to dive in and start making sense of it. As the senior data analyst, I've taken a close look at her message and have broken it down into a series of tasks that we need to tackle. So, let's roll up our sleeves and get started!\n\n**1. Get to know our data:** Before we do anything else, let's take a good look at our data. We'll load up the database and pull up the first few records from each table. It's like getting to know a new city - we need to explore the lay of the land before we can start our journey.\n\n**2. Dive into the water sources:** We've got a whole table dedicated to the types of water sources in our database. Let's dig into it and figure out all the unique types of water sources we're dealing with.\n\n**3. Unpack the visits to water sources:** The 'visits' table in our database is like a logbook of all the trips made to different water sources. We need to unravel this logbook to understand the frequency and distribution of these visits. Let's identify which locations have been visited more than a certain number of times.\n\n**4. Assess the quality of water sources:** The quality of our water sources is a pretty big deal. We'll turn to the water_quality table to find records where the subjective_quality_score is within a certain range and the visit_count is above a certain threshold. This should help us spot the water sources that are frequently visited and have a decent quality score.\n\n**5. Investigate any pollution issues:** We can't overlook the pollution status of our water sources. Let's find those water sources where the pollution_tests result came back as 'dirty' or 'biologically contaminated'. This will help us flag the areas that need immediate attention.\n\nBy working through these tasks, we'll not only be answering President Naledi's call to explore the database and extract meaningful insights, but we'll also be honing our SQL skills. It's a win-win situation! So, are you ready to dive in and start exploring with me?\n\nLet's do this!",
+              "acceptance_criteria": "- Learner understands there are 5 major phases (epics) ahead\n- Learner can name at least 3 of the 5 epics\n- Learner understands this is just a preview - actual work happens in each epic separately",
+              "content": "Hey there,\n\nYou've probably seen President Naledi's message by now. She has emphasised the importance of our newly collected survey data and how vital it is for us to dive in and start making sense of it. As the senior data analyst, I've taken a close look at her message and have broken it down into **5 major phases** - think of them as chapters in our journey. Each phase has its own set of tasks we'll work through together.\n\n**Here are the 5 phases (epics) of our project:**\n\n**Epic 1: Get to know our data** - Before we do anything else, let's take a good look at our data. We'll load up the database and pull up the first few records from each table. It's like getting to know a new city - we need to explore the lay of the land before we can start our journey.\n\n**Epic 2: Dive into the water sources** - We've got a whole table dedicated to the types of water sources in our database. Let's dig into it and figure out all the unique types of water sources we're dealing with.\n\n**Epic 3: Unpack the visits to water sources** - The 'visits' table in our database is like a logbook of all the trips made to different water sources. We need to unravel this logbook to understand the frequency and distribution of these visits.\n\n**Epic 4: Assess the quality of water sources** - The quality of our water sources is a pretty big deal. We'll turn to the water_quality table to find records and spot the water sources that are frequently visited and have a decent quality score.\n\n**Epic 5: Investigate any pollution issues** - We can't overlook the pollution status of our water sources. Let's find those water sources where the pollution_tests result came back as 'dirty' or 'biologically contaminated'.\n\n**Important:** Right now, we're just previewing the road ahead. You don't need to do anything with these epics yet - each one has its own tasks that we'll tackle one by one when we get there. Think of this as looking at a map before a journey.\n\nSo, are you ready to start the journey? Once you understand the roadmap, we'll begin with Epic 1.\n\nLet's do this!",
               "learning_objectives": [
                 {
                   "level": "remember",
-                  "description": "Recall the 5 main tasks and their purposes"
+                  "description": "Recall the 5 major epics (phases) and their purposes"
+                },
+                {
+                  "level": "understand",
+                  "description": "Understand that each epic contains separate tasks to complete"
                 }
               ],
               "tutor_guidance": {
-                "teaching_approach": "This is an overview - don't dive into details yet, just set expectations",
+                "teaching_approach": "This is ONLY an overview - don't dive into details yet. The goal is awareness, not action. Once learner shows they understand the roadmap, move on. Do NOT start working on Epic 1 content here - that's a separate epic with its own tasks.",
                 "discussion_prompts": [
-                  "Which of these 5 tasks sounds most interesting to you?",
-                  "Which task do you think will be most challenging?",
+                  "Which of these 5 epics sounds most interesting to you?",
+                  "Which epic do you think will be most challenging?",
                   "Why do you think we start with 'getting to know the data' before diving into analysis?"
+                ],
+                "common_mistakes": [
+                  "Trying to start working on Epic 1 content during this preview - remind them we'll get there next",
+                  "Confusing these epics with tasks - clarify that each epic has multiple tasks inside it"
                 ]
               }
             }

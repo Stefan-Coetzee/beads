@@ -28,6 +28,12 @@ class TaskSummaryOutput(BaseModel):
     task_type: str
     priority: int
     has_children: bool
+    parent_id: str | None = None  # For hierarchy context
+
+    # Content and summary (for epics and tasks with children)
+    description: str | None = None
+    content: str | None = None
+    summary: str | None = None  # LLM-generated hierarchical summary
 
 
 class GetReadyOutput(BaseModel):
@@ -121,20 +127,35 @@ class StartTaskInput(BaseModel):
     task_id: str = Field(..., description="Task to start working on")
 
 
+class StartTaskContextOutput(BaseModel):
+    """Focused context for a started task - just what's needed to teach."""
+
+    task_id: str
+    title: str
+    task_type: str
+    status: str
+
+    # Content for teaching
+    description: str
+    acceptance_criteria: str
+    content: str | None = None
+    narrative_context: str | None = None
+
+    # Pedagogical
+    learning_objectives: list[dict]  # Include Bloom levels: {"level": "apply", "description": "..."}
+    tutor_guidance: dict | None = None
+
+
 class StartTaskOutput(BaseModel):
-    """Result of starting a task - includes full context."""
+    """Result of starting a task."""
 
     success: bool
     task_id: str
-    old_status: str
-    new_status: str
+    status: str  # Just current status, no old/new confusion
     message: str
 
-    # Full context for the task (same as get_context)
-    context: GetContextOutput | None
-
-    # Side effects
-    newly_unblocked: list[str]
+    # Focused context (only when task is newly started)
+    context: StartTaskContextOutput | None = None
 
 
 class SubmitInput(BaseModel):
@@ -161,6 +182,9 @@ class SubmitOutput(BaseModel):
     # Current status after submission
     status: str
     message: str
+
+    # Ready tasks after successful submission (to avoid extra get_ready call)
+    ready_tasks: list[TaskSummaryOutput] | None = None
 
 
 # =============================================================================

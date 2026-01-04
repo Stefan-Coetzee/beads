@@ -1,7 +1,8 @@
 """
 Simulation runner for tutor-learner conversations.
 
-Orchestrates the interaction between the Socratic tutor and simulated learner.
+Uses the FastAPI server for agent interactions, which provides
+proper database connection pooling.
 """
 
 import asyncio
@@ -10,17 +11,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from langchain_core.messages import AIMessage, ToolMessage
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.syntax import Syntax
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent.config import Config, get_config
-from agent.graph import create_agent
+from api.client import AgentClient, ChatResponse
 from learner_sim.simulator import create_learner_simulator
-from ltt.db.connection import get_session_factory
 
 
 @dataclass
@@ -75,27 +72,25 @@ class ConversationLog:
 class ConversationRunner:
     """
     Runs a conversation between the tutor and simulated learner.
+
+    Uses the FastAPI server for agent interactions, which provides
+    proper database connection pooling.
     """
 
     def __init__(
         self,
         learner_id: str,
         project_id: str,
-        session: AsyncSession,
+        api_client: AgentClient,
         config: Config | None = None,
     ):
         self.learner_id = learner_id
         self.project_id = project_id
-        self.session = session
+        self.api_client = api_client
         self.config = config or get_config()
+        self.thread_id = f"{learner_id}-{project_id}"
 
-        # Create the agents
-        self.tutor = create_agent(
-            learner_id=learner_id,
-            project_id=project_id,
-            session=session,
-            config=self.config,
-        )
+        # Create the learner simulator (local, no DB needed)
         self.learner = create_learner_simulator(config=self.config)
 
         # Conversation state
@@ -110,7 +105,7 @@ class ConversationRunner:
         )
         self.console = Console()
         self.turn_count = 0
-        self.show_tools = False  # Will be set by run()
+        self.show_tools = False
 
     async def run(
         self,
@@ -158,23 +153,29 @@ class ConversationRunner:
         if verbose:
             self._print_message("learner", learner_greeting)
 
-        # Initial tutor response
         current_message = learner_greeting
 
         while self.turn_count < max_turns:
             self.turn_count += 1
 
-            # Tutor responds
+            # Tutor responds via API
             if verbose:
                 with self.console.status("[bold green]Tutor thinking..."):
-                    tutor_response = await self._get_tutor_response(current_message)
+                    response = await self._get_tutor_response(current_message)
             else:
-                tutor_response = await self._get_tutor_response(current_message)
+                response = await self._get_tutor_response(current_message)
 
-            self.log.add_turn("tutor", tutor_response, turn=self.turn_count)
+            tutor_response = response.response
+            tool_calls = response.tool_calls or []
+
+            # Log tutor turn
+            tutor_metadata = {"turn": self.turn_count}
+            if tool_calls:
+                tutor_metadata["tool_calls"] = tool_calls
+            self.log.add_turn("tutor", tutor_response, **tutor_metadata)
 
             if verbose:
-                self._print_message("tutor", tutor_response)
+                self._print_message("tutor", tutor_response, tool_calls)
                 await asyncio.sleep(delay)
 
             # Check for natural ending
@@ -199,147 +200,101 @@ class ConversationRunner:
             current_message = learner_response
 
         if verbose:
-            self.console.print(
-                Panel(
-                    f"[bold green]Simulation Complete[/bold green]\n\n"
-                    f"Total Turns: {self.turn_count}\n"
-                    f"Messages: {len(self.log.turns)}",
-                    title="Summary",
-                    border_style="green",
-                )
-            )
-            # Print project status
-            await self._print_project_status()
+            self._print_summary()
 
         return self.log
 
-    async def _print_project_status(self):
-        """Print the current project status after simulation."""
+    def _print_summary(self):
+        """Print detailed simulation summary."""
         from rich.table import Table
 
-        from ltt.services.learning.progress import get_progress
-        from ltt.services.dependency_service import get_ready_work
+        # Calculate duration
+        duration = (datetime.now() - self.log.started_at).total_seconds()
 
-        try:
-            # Get progress stats
-            progress = await get_progress(self.session, self.learner_id, self.project_id)
+        # Count tool calls by name
+        tool_counts: dict[str, int] = {}
+        for t in self.log.turns:
+            if t.speaker == "tutor":
+                for tc in t.metadata.get("tool_calls", []):
+                    if isinstance(tc, dict) and "name" in tc:
+                        name = tc["name"]
+                        tool_counts[name] = tool_counts.get(name, 0) + 1
 
-            # Get ready tasks
-            ready_tasks = await get_ready_work(
-                self.session,
-                self.project_id,
-                self.learner_id,
-                limit=10,
-            )
+        total_tool_calls = sum(tool_counts.values())
+        tutor_turns = len([t for t in self.log.turns if t.speaker == "tutor"])
 
-            # Create progress table
-            self.console.print("\n")
-            self.console.print(
-                Panel(
-                    f"[bold]Progress:[/bold] {progress.completed_tasks}/{progress.total_tasks} "
-                    f"({progress.completion_percentage:.1f}%)\n"
-                    f"[bold]In Progress:[/bold] {progress.in_progress_tasks}\n"
-                    f"[bold]Blocked:[/bold] {progress.blocked_tasks}\n"
-                    f"[bold]Objectives:[/bold] {progress.objectives_achieved}/{progress.total_objectives}",
-                    title="[bold cyan]Project Status[/bold cyan]",
-                    border_style="cyan",
-                )
-            )
-
-            # Create ready tasks table
-            if ready_tasks:
-                table = Table(title="Ready Tasks", show_header=True, header_style="bold magenta")
-                table.add_column("ID", style="dim")
-                table.add_column("Title")
-                table.add_column("Type")
-                table.add_column("Status", style="green")
-
-                for task in ready_tasks[:5]:
-                    # Get status for this task
-                    from ltt.services.progress_service import get_or_create_progress
-                    task_progress = await get_or_create_progress(
-                        self.session, task.id, self.learner_id
-                    )
-                    table.add_row(
-                        task.id,
-                        task.title[:40] + "..." if len(task.title) > 40 else task.title,
-                        task.task_type.value if hasattr(task.task_type, 'value') else str(task.task_type),
-                        task_progress.status.value if hasattr(task_progress.status, 'value') else str(task_progress.status),
-                    )
-
-                self.console.print(table)
-
-        except Exception as e:
-            self.console.print(f"[dim]Could not fetch project status: {e}[/dim]")
-
-    async def _get_tutor_response(self, message: str, verbose: bool = True) -> str:
-        """Get tutor's response to a message, showing tool calls if enabled."""
-        tool_calls_made = []
-        final_response = ""
-
-        # Use streaming to capture intermediate steps
-        async for state in self.tutor.astream(message):
-            messages = state.get("messages", [])
-
-            for msg in messages:
-                # Capture tool calls from AI messages
-                if isinstance(msg, AIMessage) and msg.tool_calls:
-                    for tc in msg.tool_calls:
-                        tool_calls_made.append({
-                            "name": tc["name"],
-                            "args": tc["args"],
-                        })
-                        if self.show_tools and verbose:
-                            self._print_tool_call(tc["name"], tc["args"])
-
-                # Capture tool results
-                if isinstance(msg, ToolMessage) and self.show_tools and verbose:
-                    self._print_tool_result(msg.name, msg.content)
-
-                # Capture final AI response (with content, no tool calls)
-                if isinstance(msg, AIMessage) and msg.content and not msg.tool_calls:
-                    final_response = msg.content
-
-        # Log tool calls in metadata
-        if tool_calls_made:
-            self.log.turns[-1].metadata["tool_calls"] = tool_calls_made if self.log.turns else None
-
-        return final_response or "I'm here to help. What would you like to work on?"
-
-    def _print_tool_call(self, name: str, args: dict):
-        """Print a tool call to the console."""
-        args_json = json.dumps(args, indent=2)
+        # Basic summary
         self.console.print(
             Panel(
-                Syntax(args_json, "json", theme="monokai", word_wrap=True),
-                title=f"[bold yellow]Tool Call: {name}[/bold yellow]",
-                border_style="yellow",
+                f"[bold green]Simulation Complete[/bold green]\n\n"
+                f"Total Turns: {self.turn_count}\n"
+                f"Messages: {len(self.log.turns)}\n"
+                f"Duration: {duration:.1f}s\n"
+                f"Total Tool Calls: {total_tool_calls}\n"
+                f"Avg Calls/Turn: {total_tool_calls / max(1, tutor_turns):.1f}",
+                title="Summary",
+                border_style="green",
             )
         )
 
-    def _print_tool_result(self, name: str, result: str):
-        """Print a tool result to the console."""
-        # Try to format as JSON if possible
-        try:
-            parsed = json.loads(result)
-            result_display = json.dumps(parsed, indent=2)
-            is_json = True
-        except (json.JSONDecodeError, TypeError):
-            result_display = str(result)[:500]  # Truncate long results
-            is_json = False
+        # Tool calls breakdown table
+        if tool_counts:
+            table = Table(title="Tool Call Breakdown", show_header=True)
+            table.add_column("Tool", style="cyan")
+            table.add_column("Count", justify="right")
+            table.add_column("% of Total", justify="right")
 
-        # Truncate if too long
-        if len(result_display) > 1000:
-            result_display = result_display[:1000] + "\n... (truncated)"
+            for name, count in sorted(tool_counts.items(), key=lambda x: -x[1]):
+                pct = (count / total_tool_calls * 100) if total_tool_calls > 0 else 0
+                table.add_row(name, str(count), f"{pct:.1f}%")
 
-        content = Syntax(result_display, "json" if is_json else "text", theme="monokai", word_wrap=True)
+            self.console.print(table)
 
-        self.console.print(
-            Panel(
-                content,
-                title=f"[bold magenta]Tool Result: {name}[/bold magenta]",
-                border_style="magenta",
+        # Try to extract project state from last tool calls
+        self._print_project_state()
+
+    def _print_project_state(self):
+        """Print current project state based on logged data."""
+        # Count submissions from tool calls
+        submissions = 0
+        tasks_started = set()
+        tasks_completed = set()
+
+        for t in self.log.turns:
+            for tc in t.metadata.get("tool_calls", []):
+                if isinstance(tc, dict):
+                    name = tc.get("name", "")
+                    args = tc.get("args", {})
+
+                    if name == "submit":
+                        submissions += 1
+                        task_id = args.get("task_id")
+                        if task_id:
+                            tasks_completed.add(task_id)
+
+                    if name == "start_task":
+                        task_id = args.get("task_id")
+                        if task_id:
+                            tasks_started.add(task_id)
+
+        if tasks_started or submissions:
+            self.console.print(
+                Panel(
+                    f"Tasks Started: {len(tasks_started)}\n"
+                    f"Submissions Made: {submissions}\n"
+                    f"Tasks IDs Started: {', '.join(sorted(tasks_started)) if tasks_started else 'None'}",
+                    title="Project Progress",
+                    border_style="blue",
+                )
             )
+
+    async def _get_tutor_response(self, message: str) -> ChatResponse:
+        """Get tutor's response via the API."""
+        return await self.api_client.chat(
+            message=message,
+            learner_id=self.learner_id,
+            project_id=self.project_id,
+            thread_id=self.thread_id,
         )
 
     def _should_end_conversation(self, message: str) -> bool:
@@ -355,9 +310,14 @@ class ConversationRunner:
         message_lower = message.lower()
         return any(phrase in message_lower for phrase in end_phrases)
 
-    def _print_message(self, speaker: str, message: str):
+    def _print_message(self, speaker: str, message: str, tool_calls: list[dict] | None = None):
         """Print a message to the console."""
         if speaker == "tutor":
+            tool_summary = ""
+            if tool_calls and not self.show_tools:
+                tool_names = [tc.get("name", "unknown") for tc in tool_calls]
+                tool_summary = f"[dim]Tools: {', '.join(tool_names)}[/dim]"
+
             self.console.print(
                 Panel(
                     Markdown(message),
@@ -365,6 +325,8 @@ class ConversationRunner:
                     border_style="green",
                 )
             )
+            if tool_summary:
+                self.console.print(tool_summary)
         else:
             self.console.print(
                 Panel(
@@ -383,9 +345,14 @@ async def run_simulation(
     save_log: bool = True,
     verbose: bool = True,
     show_tools: bool = False,
+    api_url: str = "http://localhost:8000",
 ) -> ConversationLog:
     """
-    Run a simulation with automatic session management.
+    Run a simulation using the FastAPI server.
+
+    Prerequisites:
+        Start the API server first:
+        $ PYTHONPATH=src uvicorn api.app:app --reload
 
     Args:
         learner_id: The learner ID
@@ -395,6 +362,7 @@ async def run_simulation(
         save_log: Whether to save the conversation log
         verbose: Whether to print the conversation
         show_tools: Whether to show tool calls in output
+        api_url: URL of the FastAPI server
 
     Returns:
         The conversation log
@@ -402,12 +370,18 @@ async def run_simulation(
     if config is None:
         config = get_config()
 
-    factory = get_session_factory()
-    async with factory() as session:
+    async with AgentClient(api_url) as client:
+        # Check if API is available
+        if not await client.health_check():
+            raise RuntimeError(
+                f"API server not available at {api_url}. "
+                "Start it with: PYTHONPATH=src uvicorn api.app:app --reload"
+            )
+
         runner = ConversationRunner(
             learner_id=learner_id,
             project_id=project_id,
-            session=session,
+            api_client=client,
             config=config,
         )
 
@@ -422,3 +396,20 @@ async def run_simulation(
                 Console().print(f"\n[dim]Log saved to: {log_path}[/dim]")
 
         return log
+
+
+# CLI entry point
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) < 3:
+        print("Usage: python -m simulation.runner <learner_id> <project_id> [max_turns]")
+        print("\nMake sure the API server is running:")
+        print("  PYTHONPATH=src uvicorn api.app:app --reload")
+        sys.exit(1)
+
+    learner_id = sys.argv[1]
+    project_id = sys.argv[2]
+    max_turns = int(sys.argv[3]) if len(sys.argv) > 3 else 10
+
+    asyncio.run(run_simulation(learner_id, project_id, max_turns=max_turns))

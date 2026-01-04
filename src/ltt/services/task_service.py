@@ -191,6 +191,29 @@ async def update_task(session: AsyncSession, task_id: str, updates: TaskUpdate) 
     return Task.model_validate(task_model)
 
 
+async def update_task_summary(session: AsyncSession, task_id: str, summary: str) -> None:
+    """
+    Update the summary field of a task.
+
+    Used during ingestion to set hierarchical summaries
+    (subtask summaries for tasks, task summaries for epics).
+
+    Args:
+        session: Database session
+        task_id: Task ID
+        summary: Summary text to set
+
+    Raises:
+        TaskNotFoundError: If task does not exist
+    """
+    task_model = await session.get(TaskModel, task_id)
+    if not task_model:
+        raise TaskNotFoundError(f"Task {task_id} not found")
+
+    task_model.summary = summary
+    await session.commit()
+
+
 async def delete_task(session: AsyncSession, task_id: str) -> None:
     """
     Delete a task and all its children (cascade).

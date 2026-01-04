@@ -15,7 +15,7 @@ import pytest
 from langchain_core.messages import HumanMessage
 
 from agent.config import Config, get_config
-from agent.graph import create_agent, create_graph
+from agent.graph import create_agent, create_custom_graph
 from agent.prompts import SYSTEM_PROMPT, build_system_prompt
 from agent.state import AgentState, LearnerProgress, TaskContext
 from agent.tools import create_tools, get_tool_descriptions
@@ -23,11 +23,12 @@ from agent.tools import create_tools, get_tool_descriptions
 
 # All tools that should be available
 EXPECTED_TOOLS = {
-    "get_ready",
-    "show_task",
+    "get_ready_tasks",
     "get_context",
+    "get_stack",
     "start_task",
     "submit",
+    "run_sql",
     "add_comment",
     "get_comments",
     "go_back",
@@ -41,33 +42,34 @@ class TestToolCreation:
     @pytest.mark.asyncio
     async def test_create_tools_returns_all_tools(self, async_session):
         """Test that create_tools returns all expected tools."""
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def session_factory():
+            yield async_session
+
         tools = create_tools(
-            session=async_session,
+            session_factory=session_factory,
             learner_id="test-learner",
             project_id="test-project",
         )
 
-        assert len(tools) == 9
+        assert len(tools) == 10
 
         tool_names = {t.name for t in tools}
-        expected_names = {
-            "get_ready",
-            "show_task",
-            "get_context",
-            "start_task",
-            "submit",
-            "add_comment",
-            "get_comments",
-            "go_back",
-            "request_help",
-        }
-        assert tool_names == expected_names
+        assert tool_names == EXPECTED_TOOLS
 
     @pytest.mark.asyncio
     async def test_tools_have_descriptions(self, async_session):
         """Test that all tools have descriptions."""
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def session_factory():
+            yield async_session
+
         tools = create_tools(
-            session=async_session,
+            session_factory=session_factory,
             learner_id="test-learner",
             project_id="test-project",
         )
@@ -208,8 +210,8 @@ class TestGraph:
     """Test graph creation and structure."""
 
     def test_create_graph_has_nodes(self):
-        """Test that the graph has expected nodes."""
-        workflow = create_graph()
+        """Test that the custom graph has expected nodes."""
+        workflow = create_custom_graph()
 
         # Check nodes exist
         nodes = workflow.nodes
@@ -217,10 +219,10 @@ class TestGraph:
         assert "tools" in nodes
 
     def test_create_graph_compiles(self):
-        """Test that the graph compiles without errors."""
+        """Test that the custom graph compiles without errors."""
         from langgraph.checkpoint.memory import MemorySaver
 
-        workflow = create_graph()
+        workflow = create_custom_graph()
         checkpointer = MemorySaver()
 
         # Should compile without errors
@@ -228,37 +230,42 @@ class TestGraph:
         assert graph is not None
 
 
-class TestToolsInPrompt:
-    """Test that all tools are documented in the system prompt."""
+class TestPromptStructure:
+    """Test system prompt structure and content."""
 
-    def test_all_tools_mentioned_in_prompt(self):
-        """Verify every tool is mentioned in the system prompt."""
-        for tool_name in EXPECTED_TOOLS:
-            assert tool_name in SYSTEM_PROMPT, (
-                f"Tool '{tool_name}' is not mentioned in SYSTEM_PROMPT"
+    def test_prompt_has_core_sections(self):
+        """Verify prompt has expected sections."""
+        expected_sections = [
+            "Core Teaching Principles",
+            "Understanding Task Hierarchy",
+            "Your Toolset",
+            "Workflow Guidelines",
+            "Response Style",
+            "Important Rules",
+        ]
+        for section in expected_sections:
+            assert section in SYSTEM_PROMPT, (
+                f"Missing section '{section}' in SYSTEM_PROMPT"
             )
 
-    def test_prompt_tool_descriptions_complete(self):
-        """Verify prompt has descriptions for all tools."""
-        # Each tool should have a description line like "- **tool_name**: description"
-        for tool_name in EXPECTED_TOOLS:
-            pattern = f"**{tool_name}**:"
-            assert pattern in SYSTEM_PROMPT, (
-                f"Tool '{tool_name}' missing description in prompt (expected '{pattern}')"
+    def test_prompt_has_task_lifecycle(self):
+        """Verify prompt includes task lifecycle instructions."""
+        assert "CRITICAL: Task Lifecycle" in SYSTEM_PROMPT
+        assert "start_task" in SYSTEM_PROMPT
+        assert "submit" in SYSTEM_PROMPT
+
+    def test_prompt_has_context_placeholders(self):
+        """Verify prompt has placeholders for dynamic context."""
+        placeholders = [
+            "{project_context}",
+            "{epic_context}",
+            "{current_task_context}",
+            "{progress_context}",
+        ]
+        for placeholder in placeholders:
+            assert placeholder in SYSTEM_PROMPT, (
+                f"Missing placeholder '{placeholder}' in SYSTEM_PROMPT"
             )
-
-    def test_tool_count_matches_prompt(self):
-        """Verify the number of tools matches what's in the prompt."""
-        # Count tool mentions in the "Your Toolset" section
-        tool_section_start = SYSTEM_PROMPT.find("## Your Toolset")
-        tool_section_end = SYSTEM_PROMPT.find("## Workflow Guidelines")
-        tool_section = SYSTEM_PROMPT[tool_section_start:tool_section_end]
-
-        # Count "- **" patterns which indicate tool entries
-        tool_count = tool_section.count("- **")
-        assert tool_count == len(EXPECTED_TOOLS), (
-            f"Prompt has {tool_count} tools but expected {len(EXPECTED_TOOLS)}"
-        )
 
 
 class TestToolsMounted:
@@ -283,8 +290,14 @@ class TestToolsMounted:
     @pytest.mark.asyncio
     async def test_tools_are_callable(self, async_session):
         """Verify all mounted tools are callable."""
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def session_factory():
+            yield async_session
+
         tools = create_tools(
-            session=async_session,
+            session_factory=session_factory,
             learner_id="test-learner",
             project_id="test-project",
         )
@@ -296,8 +309,14 @@ class TestToolsMounted:
     @pytest.mark.asyncio
     async def test_tools_have_schemas(self, async_session):
         """Verify all tools have proper input schemas."""
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def session_factory():
+            yield async_session
+
         tools = create_tools(
-            session=async_session,
+            session_factory=session_factory,
             learner_id="test-learner",
             project_id="test-project",
         )

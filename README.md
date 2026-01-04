@@ -155,6 +155,72 @@ uv run pytest tests/ -v
 uv run ruff check src/
 ```
 
+### Setup MySQL Database (Maji Ndogo Project)
+
+For the Maji Ndogo water services project, set up the MySQL database:
+
+```bash
+# Run the setup script
+./scripts/setup_mysql.sh
+```
+
+Or manually:
+
+```bash
+# Start MySQL container
+docker-compose up -d mysql
+
+# Wait for MySQL to be ready, then ingest data
+docker-compose exec -T mysql mysql -u root -proot_password < project_data/DA/MN_Part1/MD_water_services_stu_v2.sql
+```
+
+**Connection details:**
+- Host: `localhost`
+- Port: `3306`
+- Database: `md_water_services`
+- User: `learner`
+- Password: `learner_password`
+
+**Tables available:**
+- `column_legend` - Column descriptions
+- `employee` - Survey employees
+- `visits` - Visit records (60k+ rows)
+- `water_source` - Water sources (39k+ rows)
+- `location` - Locations
+- `quality_score` - Quality assessments
+- `well_pollution` - Pollution data
+- `global_water_access` - Global statistics
+
+### Run the API Server
+
+```bash
+# Start the API server
+PYTHONPATH=src uv run uvicorn api.app:app --host 0.0.0.0 --port 8000
+
+# Test health endpoint
+curl http://localhost:8000/health
+
+# Chat with the tutor (use actual project ID)
+curl -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello", "learner_id": "learner-1", "project_id": "proj-9b46"}'
+```
+
+**Current Project ID:** `proj-9b46` (Maji Ndogo Water Crisis - Part 1)
+
+### Run Tutor-Learner Simulation
+
+```bash
+# Run simulation with auto-created learner
+PYTHONPATH=src uv run python -m simulation.main run -p proj-9b46
+
+# Run with existing learner
+PYTHONPATH=src uv run python -m simulation.main run -l learner-123 -p proj-9b46
+
+# With options
+PYTHONPATH=src uv run python -m simulation.main run -p proj-9b46 --max-turns 20 --show-tools
+```
+
 ---
 
 ## Usage

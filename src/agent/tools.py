@@ -15,7 +15,6 @@ from ltt.tools import (
     GetReadyInput,
     GoBackInput,
     RequestHelpInput,
-    ShowTaskInput,
     StartTaskInput,
     SubmitInput,
 )
@@ -25,7 +24,6 @@ from ltt.tools import get_context as ltt_get_context
 from ltt.tools import get_ready as ltt_get_ready
 from ltt.tools import go_back as ltt_go_back
 from ltt.tools import request_help as ltt_request_help
-from ltt.tools import show_task as ltt_show_task
 from ltt.tools import start_task as ltt_start_task
 from ltt.tools import submit as ltt_submit
 
@@ -41,12 +39,6 @@ class GetReadyToolInput(BaseModel):
         None, description="Filter by task type: 'task', 'subtask', 'epic'"
     )
     limit: int = Field(5, description="Maximum number of tasks to return (1-20)", ge=1, le=20)
-
-
-class ShowTaskToolInput(BaseModel):
-    """Show details for a specific task."""
-
-    task_id: str = Field(..., description="The task ID to show (e.g., 'proj-abc.1.2')")
 
 
 class GetContextToolInput(BaseModel):
@@ -105,12 +97,23 @@ class RequestHelpToolInput(BaseModel):
 # =============================================================================
 
 
-def create_tools(session: AsyncSession, learner_id: str, project_id: str) -> list[StructuredTool]:
+from typing import Callable
+
+
+def create_tools(
+    session_factory: Callable[[], AsyncSession],
+    learner_id: str,
+    project_id: str,
+) -> list[StructuredTool]:
     """
-    Create LangGraph tools bound to a specific session and learner.
+    Create LangGraph tools bound to a specific session factory and learner.
+
+    Uses a session factory instead of a session instance to avoid event loop
+    mismatch issues when tools are executed by create_react_agent in a
+    different async context.
 
     Args:
-        session: Database session for tool execution
+        session_factory: Callable that returns a fresh AsyncSession
         learner_id: The learner's ID
         project_id: The current project ID
 
@@ -124,19 +127,10 @@ def create_tools(session: AsyncSession, learner_id: str, project_id: str) -> lis
         Returns a list of tasks prioritized by status (in_progress first) and priority.
         Use this to see what the learner can work on next.
         """
-        input_data = GetReadyInput(project_id=project_id, task_type=task_type, limit=limit)
-        result = await ltt_get_ready(input=input_data, learner_id=learner_id, session=session)
-        return result.model_dump_json(indent=2)
-
-    async def show_task(task_id: str) -> str:
-        """Show detailed information about a specific task.
-
-        Returns task details including description, acceptance criteria,
-        learning objectives, tutor guidance, and submission history.
-        """
-        input_data = ShowTaskInput(task_id=task_id)
-        result = await ltt_show_task(input=input_data, learner_id=learner_id, session=session)
-        return result.model_dump_json(indent=2)
+        async with session_factory() as session:
+            input_data = GetReadyInput(project_id=project_id, task_type=task_type, limit=limit)
+            result = await ltt_get_ready(input=input_data, learner_id=learner_id, session=session)
+            return result.model_dump_json(indent=2)
 
     async def get_context(task_id: str) -> str:
         """Get full context for a task including hierarchy and progress.
@@ -144,9 +138,10 @@ def create_tools(session: AsyncSession, learner_id: str, project_id: str) -> lis
         Returns task details, project hierarchy, ready tasks list, and learner progress.
         Use this to understand where a task fits in the bigger picture.
         """
-        input_data = GetContextInput(task_id=task_id)
-        result = await ltt_get_context(input=input_data, learner_id=learner_id, session=session)
-        return result.model_dump_json(indent=2)
+        async with session_factory() as session:
+            input_data = GetContextInput(task_id=task_id)
+            result = await ltt_get_context(input=input_data, learner_id=learner_id, session=session)
+            return result.model_dump_json(indent=2)
 
     async def start_task(task_id: str) -> str:
         """Start working on a task.
@@ -154,9 +149,10 @@ def create_tools(session: AsyncSession, learner_id: str, project_id: str) -> lis
         Sets the task status to 'in_progress' and returns full context.
         Use this when the learner decides to begin work on a task.
         """
-        input_data = StartTaskInput(task_id=task_id)
-        result = await ltt_start_task(input=input_data, learner_id=learner_id, session=session)
-        return result.model_dump_json(indent=2)
+        async with session_factory() as session:
+            input_data = StartTaskInput(task_id=task_id)
+            result = await ltt_start_task(input=input_data, learner_id=learner_id, session=session)
+            return result.model_dump_json(indent=2)
 
     async def submit(task_id: str, content: str, submission_type: str = "text") -> str:
         """Submit work for a task and trigger validation.
@@ -166,9 +162,10 @@ def create_tools(session: AsyncSession, learner_id: str, project_id: str) -> lis
 
         Submission types: code, sql, text, jupyter_cell, result_set
         """
-        input_data = SubmitInput(task_id=task_id, content=content, submission_type=submission_type)
-        result = await ltt_submit(input=input_data, learner_id=learner_id, session=session)
-        return result.model_dump_json(indent=2)
+        async with session_factory() as session:
+            input_data = SubmitInput(task_id=task_id, content=content, submission_type=submission_type)
+            result = await ltt_submit(input=input_data, learner_id=learner_id, session=session)
+            return result.model_dump_json(indent=2)
 
     async def add_comment(task_id: str, comment: str) -> str:
         """Add a comment or note to a task.
@@ -177,18 +174,20 @@ def create_tools(session: AsyncSession, learner_id: str, project_id: str) -> lis
         """
         from ltt.tools.schemas import AddCommentInput as CommentInput
 
-        input_data = CommentInput(task_id=task_id, comment=comment)
-        result = await ltt_add_comment(input=input_data, learner_id=learner_id, session=session)
-        return result.model_dump_json(indent=2)
+        async with session_factory() as session:
+            input_data = CommentInput(task_id=task_id, comment=comment)
+            result = await ltt_add_comment(input=input_data, learner_id=learner_id, session=session)
+            return result.model_dump_json(indent=2)
 
     async def get_comments(task_id: str, limit: int = 10) -> str:
         """Get comments on a task.
 
         Returns both shared comments and this learner's private comments.
         """
-        input_data = GetCommentsInput(task_id=task_id, limit=limit)
-        result = await ltt_get_comments(input=input_data, learner_id=learner_id, session=session)
-        return result.model_dump_json(indent=2)
+        async with session_factory() as session:
+            input_data = GetCommentsInput(task_id=task_id, limit=limit)
+            result = await ltt_get_comments(input=input_data, learner_id=learner_id, session=session)
+            return result.model_dump_json(indent=2)
 
     async def go_back(task_id: str, reason: str) -> str:
         """Reopen a previously closed task.
@@ -196,9 +195,10 @@ def create_tools(session: AsyncSession, learner_id: str, project_id: str) -> lis
         Use when the learner wants to revisit or redo a completed task.
         Requires a reason for the audit trail.
         """
-        input_data = GoBackInput(task_id=task_id, reason=reason)
-        result = await ltt_go_back(input=input_data, learner_id=learner_id, session=session)
-        return result.model_dump_json(indent=2)
+        async with session_factory() as session:
+            input_data = GoBackInput(task_id=task_id, reason=reason)
+            result = await ltt_go_back(input=input_data, learner_id=learner_id, session=session)
+            return result.model_dump_json(indent=2)
 
     async def request_help(task_id: str, message: str) -> str:
         """Request help from an instructor.
@@ -206,28 +206,47 @@ def create_tools(session: AsyncSession, learner_id: str, project_id: str) -> lis
         Use when the learner is stuck and needs human assistance.
         This creates a help request that instructors can review.
         """
-        input_data = RequestHelpInput(task_id=task_id, message=message)
-        result = await ltt_request_help(input=input_data, learner_id=learner_id, session=session)
-        return result.model_dump_json(indent=2)
+        async with session_factory() as session:
+            input_data = RequestHelpInput(task_id=task_id, message=message)
+            result = await ltt_request_help(input=input_data, learner_id=learner_id, session=session)
+            return result.model_dump_json(indent=2)
+
+    async def get_stack() -> str:
+        """Get information about the database and development environment.
+
+        Returns the database type (MySQL), IDE (MySQL Workbench),
+        available tables, and helpful starter queries.
+        Use this to understand what tools and data are available.
+        """
+        import json
+
+        stack_info = {
+            "database": {
+                "type": "MySQL",
+                "version": "8.0",
+                "database_name": "md_water_services",
+                "ide": "MySQL Workbench",
+            }
+        }
+        return json.dumps(stack_info, indent=2)
+
+    # Import MySQL tools
+    from agent.mysql_tools import create_mysql_tools
+
+    mysql_tools = create_mysql_tools()
 
     # Create StructuredTool instances
     tools = [
         StructuredTool.from_function(
             coroutine=get_ready,
-            name="get_ready",
-            description="Get tasks that are unblocked and ready to work on. Returns prioritized list of tasks.",
+            name="get_ready_tasks",
+            description="Get tasks that are unblocked and ready to work on. Returns prioritized list of tasks. Call ONCE at session start.",
             args_schema=GetReadyToolInput,
-        ),
-        StructuredTool.from_function(
-            coroutine=show_task,
-            name="show_task",
-            description="Show detailed information about a specific task including criteria and tutor guidance.",
-            args_schema=ShowTaskToolInput,
         ),
         StructuredTool.from_function(
             coroutine=get_context,
             name="get_context",
-            description="Get full context for a task including hierarchy, progress, and related tasks.",
+            description="Get full context for a task including hierarchy, progress, and related tasks. Rarely needed.",
             args_schema=GetContextToolInput,
         ),
         StructuredTool.from_function(
@@ -266,7 +285,15 @@ def create_tools(session: AsyncSession, learner_id: str, project_id: str) -> lis
             description="Request help from an instructor when the learner is stuck.",
             args_schema=RequestHelpToolInput,
         ),
+        StructuredTool.from_function(
+            coroutine=get_stack,
+            name="get_stack",
+            description="Get information about the database and development environment (database type, IDE, tables).",
+        ),
     ]
+
+    # Add MySQL tools (run_sql)
+    tools.extend(mysql_tools)
 
     return tools
 
@@ -277,13 +304,12 @@ def get_tool_descriptions() -> str:
 ## Available Tools
 
 ### Navigation
-- **get_ready**: Get tasks that are unblocked and ready to work on
-- **show_task**: Show detailed information about a specific task
-- **get_context**: Get full context including hierarchy and progress
+- **get_ready_tasks**: Get tasks that are unblocked and ready to work on (call ONCE at session start)
+- **get_context**: Get full context including hierarchy and progress (rarely needed)
 
 ### Progress
-- **start_task**: Begin working on a task (sets to in_progress)
-- **submit**: Submit work for validation (closes task if passed)
+- **start_task**: Begin working on a task - sets to in_progress AND returns full context (content, acceptance criteria, tutor guidance)
+- **submit**: Submit work for validation (closes task if passed, returns ready_tasks for next steps)
 
 ### Feedback
 - **add_comment**: Add notes or questions to a task
@@ -292,5 +318,9 @@ def get_tool_descriptions() -> str:
 ### Control
 - **go_back**: Reopen a previously closed task
 - **request_help**: Request human instructor assistance
+
+### Database
+- **run_sql**: Execute read-only SQL queries (VALIDATION ONLY - to verify learner's submitted queries)
+- **get_stack**: Get information about the database and IDE environment
 """
     return descriptions

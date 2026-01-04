@@ -2,10 +2,21 @@
 Database connection and session management for the Learning Task Tracker.
 
 Uses SQLAlchemy 2.0 async engine with asyncpg driver.
+
+FOR SCRIPTS/TESTS (this module):
+- Uses NullPool by default (no connection reuse)
+- Safe for any async context
+- Slight performance cost but rock-solid reliability
+
+FOR PRODUCTION (use api.database instead):
+- FastAPI manages database lifecycle
+- Uses QueuePool with proper connection pooling
+- Pool initialized in the event loop for correct binding
 """
 
 import os
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import (
@@ -14,6 +25,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import NullPool, QueuePool
 
 # Load environment variables
 load_dotenv()
@@ -24,91 +36,93 @@ DATABASE_URL = os.getenv(
     "postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev",
 )
 
+# NullPool = no connection reuse = no async issues
+# Set DB_USE_NULL_POOL=false only if you know what you're doing
+USE_NULL_POOL = os.getenv("DB_USE_NULL_POOL", "true").lower() == "true"
 
-# Global engine and session factory
-_engine: AsyncEngine | None = None
-_session_factory: async_sessionmaker[AsyncSession] | None = None
+
+def _create_engine() -> AsyncEngine:
+    """Create the async engine with appropriate pooling."""
+    engine_kwargs = {
+        "echo": os.getenv("SQL_ECHO", "false").lower() == "true",
+    }
+
+    if USE_NULL_POOL:
+        # NullPool: Fresh connection per operation
+        # - No event loop binding issues
+        # - No "another operation in progress" errors
+        # - Slightly slower (connection overhead per query)
+        engine_kwargs["poolclass"] = NullPool
+    else:
+        # QueuePool: Connection reuse
+        # - Faster (reuses connections)
+        # - REQUIRES: Engine created in same event loop where used
+        # - REQUIRES: Proper session scoping to avoid concurrent ops
+        engine_kwargs["poolclass"] = QueuePool
+        engine_kwargs["pool_pre_ping"] = True
+        engine_kwargs["pool_size"] = 10
+        engine_kwargs["max_overflow"] = 20
+
+    return create_async_engine(DATABASE_URL, **engine_kwargs)
+
+
+# =============================================================================
+# Simple Global Access
+# =============================================================================
+
+# Engine created at import time - with NullPool this is safe
+_engine: AsyncEngine = _create_engine()
+_session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+    _engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
 
 
 def get_engine() -> AsyncEngine:
-    """
-    Get or create the global async database engine.
-
-    Returns:
-        AsyncEngine instance configured for PostgreSQL with asyncpg
-    """
-    global _engine
-
-    if _engine is None:
-        _engine = create_async_engine(
-            DATABASE_URL,
-            echo=os.getenv("SQL_ECHO", "false").lower() == "true",
-            pool_pre_ping=True,  # Verify connections before using
-            pool_size=5,
-            max_overflow=10,
-        )
-
+    """Get the database engine."""
     return _engine
 
 
 def get_session_factory() -> async_sessionmaker[AsyncSession]:
-    """
-    Get or create the global async session factory.
-
-    Returns:
-        Async session factory for creating database sessions
-    """
-    global _session_factory
-
-    if _session_factory is None:
-        engine = get_engine()
-        _session_factory = async_sessionmaker(
-            engine,
-            class_=AsyncSession,
-            expire_on_commit=False,  # Allow accessing attributes after commit
-        )
-
+    """Get the session factory for creating sessions."""
     return _session_factory
 
 
+@asynccontextmanager
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """
-    Dependency for getting database sessions in FastAPI or other async contexts.
-
-    Yields:
-        AsyncSession instance
+    Get a database session.
 
     Usage:
         async with get_session() as session:
-            # Use session here
-            pass
-
-        # Or with FastAPI dependency injection:
-        @app.get("/items")
-        async def read_items(session: AsyncSession = Depends(get_session)):
-            ...
+            result = await session.execute(...)
     """
-    factory = get_session_factory()
-    async with factory() as session:
+    async with _session_factory() as session:
         try:
             yield session
             await session.commit()
         except Exception:
             await session.rollback()
             raise
-        finally:
-            await session.close()
 
 
 async def close_engine() -> None:
-    """
-    Close the database engine and release all connections.
+    """Close the database engine. Call at application shutdown."""
+    global _engine
+    await _engine.dispose()
 
-    Call this during application shutdown.
-    """
+
+# =============================================================================
+# For Testing / Reconfiguration
+# =============================================================================
+
+def reset_engine() -> None:
+    """Reset engine (for testing). Creates fresh engine on next access."""
     global _engine, _session_factory
-
-    if _engine is not None:
-        await _engine.dispose()
-        _engine = None
-        _session_factory = None
+    _engine = _create_engine()
+    _session_factory = async_sessionmaker(
+        _engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )

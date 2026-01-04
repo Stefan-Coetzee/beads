@@ -50,7 +50,7 @@ async def get_ready(input: GetReadyInput, learner_id: str, session: AsyncSession
         limit=input.limit,
     )
 
-    # Convert to summaries
+    # Convert to summaries with content and hierarchical summaries
     summaries = []
     for task in ready_tasks:
         # Get learner-specific status
@@ -60,6 +60,9 @@ async def get_ready(input: GetReadyInput, learner_id: str, session: AsyncSession
         children = await get_children(session, task.id)
         has_children = len(children) > 0
 
+        # Include content and summary for epics and tasks (not subtasks)
+        include_content = task.task_type in ("epic", "task")
+
         summaries.append(
             TaskSummaryOutput(
                 id=task.id,
@@ -68,6 +71,10 @@ async def get_ready(input: GetReadyInput, learner_id: str, session: AsyncSession
                 task_type=task.task_type,
                 priority=task.priority,
                 has_children=has_children,
+                parent_id=task.parent_id,
+                description=task.description if include_content else None,
+                content=task.content if include_content else None,
+                summary=task.summary if include_content else None,
             )
         )
 

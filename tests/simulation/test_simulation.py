@@ -11,10 +11,12 @@ import json
 import tempfile
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from agent.config import Config, ModelConfig, SimulationConfig
+from api.client import AgentClient, ChatResponse
 from simulation.runner import ConversationLog, ConversationRunner, ConversationTurn
 
 
@@ -104,26 +106,39 @@ class TestConversationLog:
             assert data["ended_at"] is not None
 
 
+@pytest.fixture
+def mock_api_client():
+    """Create a mock AgentClient for testing."""
+    client = MagicMock(spec=AgentClient)
+    client.chat = AsyncMock(return_value=ChatResponse(
+        response="Hello, how can I help you?",
+        thread_id="thread-123",
+        tool_calls=[],
+    ))
+    client.health_check = AsyncMock(return_value=True)
+    return client
+
+
 class TestConversationRunnerCreation:
     """Test conversation runner creation."""
 
     @pytest.mark.asyncio
-    async def test_runner_creation(self, async_session):
+    async def test_runner_creation(self, mock_api_client):
         """Test creating a conversation runner."""
         runner = ConversationRunner(
             learner_id="learner-123",
             project_id="proj-abc",
-            session=async_session,
+            api_client=mock_api_client,
         )
 
         assert runner.learner_id == "learner-123"
         assert runner.project_id == "proj-abc"
-        assert runner.tutor is not None
+        assert runner.api_client is mock_api_client
         assert runner.learner is not None
         assert runner.log is not None
 
     @pytest.mark.asyncio
-    async def test_runner_with_custom_config(self, async_session):
+    async def test_runner_with_custom_config(self, mock_api_client):
         """Test runner with custom configuration."""
         config = Config(
             model=ModelConfig(
@@ -138,7 +153,7 @@ class TestConversationRunnerCreation:
         runner = ConversationRunner(
             learner_id="learner-123",
             project_id="proj-abc",
-            session=async_session,
+            api_client=mock_api_client,
             config=config,
         )
 
@@ -155,8 +170,8 @@ class TestConfig:
 
         config = get_config()
 
-        assert config.model.tutor_model == "claude-haiku-4-5-20250514"
-        assert config.model.learner_model == "claude-haiku-4-5-20250514"
+        assert config.model.tutor_model == "claude-haiku-4-5-20251001"
+        assert config.model.learner_model == "claude-haiku-4-5-20251001"
         assert config.learner_sim.comprehension_rate == 0.6
         assert config.simulation.max_turns == 30
 

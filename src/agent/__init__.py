@@ -14,7 +14,7 @@ Usage:
 """
 
 from agent.config import Config, create_config, get_config
-from agent.graph import AgentWrapper, create_agent, create_agent_with_session
+from agent.graph import AgentWrapper, create_agent, create_agent_simple
 from agent.state import AgentState
 
 __all__ = [
@@ -24,7 +24,7 @@ __all__ = [
     "get_config",
     # Agent
     "create_agent",
-    "create_agent_with_session",
+    "create_agent_simple",
     "AgentWrapper",
     "AgentState",
 ]

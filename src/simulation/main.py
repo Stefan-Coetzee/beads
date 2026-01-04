@@ -2,7 +2,7 @@
 CLI for running tutor-learner simulations.
 
 Usage:
-    python -m simulation.main run --learner-id learner-123 --project-id proj-abc
+    python -m simulation.main run --project-id proj-abc
     python -m simulation.main run -l learner-123 -p proj-abc --max-turns 20
 """
 
@@ -21,9 +21,24 @@ app = typer.Typer(
 console = Console()
 
 
+async def create_learner() -> str:
+    """Create a new learner and return the ID."""
+    from ltt.db.connection import get_session_factory
+    from ltt.models import LearnerModel
+    from ltt.utils.ids import PREFIX_LEARNER, generate_entity_id
+
+    factory = get_session_factory()
+    async with factory() as session:
+        learner_id = generate_entity_id(PREFIX_LEARNER)
+        learner = LearnerModel(id=learner_id, learner_metadata="{}")
+        session.add(learner)
+        await session.commit()
+        return learner_id
+
+
 @app.command()
 def run(
-    learner_id: str = typer.Option(..., "--learner-id", "-l", help="Learner ID"),
+    learner_id: str = typer.Option(None, "--learner-id", "-l", help="Learner ID (auto-creates if not provided)"),
     project_id: str = typer.Option(..., "--project-id", "-p", help="Project ID"),
     max_turns: int = typer.Option(30, "--max-turns", "-t", help="Maximum conversation turns"),
     comprehension: float = typer.Option(
@@ -40,6 +55,11 @@ def run(
     show_tools: bool = typer.Option(False, "--show-tools", help="Show tool calls and results"),
 ):
     """Run a simulation between tutor and simulated learner."""
+    # Create learner if not provided
+    if learner_id is None:
+        learner_id = asyncio.run(create_learner())
+        console.print(f"[green]Created new learner:[/green] {learner_id}")
+
     # Build configuration
     config = Config(
         model=ModelConfig(

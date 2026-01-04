@@ -4,19 +4,22 @@ Learner Simulator implementation.
 A LangGraph-based agent that simulates a learner interacting with the tutor.
 """
 
+import json
 import os
 from contextlib import contextmanager
-from typing import Annotated
+from typing import Annotated, Literal
 
 from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import StructuredTool
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, ConfigDict, Field
 
 from agent.config import Config, get_config
+from agent.mysql_tools import create_learner_mysql_tools
 from learner_sim.prompts import LEARNER_GREETING, build_learner_prompt
 
 
@@ -56,9 +59,14 @@ async def learner_node(state: LearnerState, config: RunnableConfig) -> dict:
     configurable = config.get("configurable", {})
     model = configurable.get("model")
     system_prompt = configurable.get("system_prompt", "")
+    tools = configurable.get("tools", [])
 
     if not model:
         raise ValueError("Model not configured.")
+
+    # Bind tools if available
+    if tools:
+        model = model.bind_tools(tools)
 
     # Build messages
     messages = [SystemMessage(content=system_prompt)] + list(state.messages)
@@ -72,12 +80,71 @@ async def learner_node(state: LearnerState, config: RunnableConfig) -> dict:
     }
 
 
+async def tool_node(state: LearnerState, config: RunnableConfig) -> dict:
+    """Execute tool calls from the learner."""
+    configurable = config.get("configurable", {})
+    tools = configurable.get("tools", [])
+
+    if not tools:
+        return {"messages": []}
+
+    tools_by_name = {tool.name: tool for tool in tools}
+
+    last_message = state.messages[-1]
+    if not isinstance(last_message, AIMessage) or not last_message.tool_calls:
+        return {"messages": []}
+
+    outputs = []
+    for tool_call in last_message.tool_calls:
+        tool_name = tool_call["name"]
+        tool_args = tool_call["args"]
+
+        if tool_name not in tools_by_name:
+            result = json.dumps({"error": f"Unknown tool: {tool_name}"})
+        else:
+            try:
+                tool = tools_by_name[tool_name]
+                result = await tool.ainvoke(tool_args)
+            except Exception as e:
+                result = json.dumps({"error": str(e)})
+
+        outputs.append(
+            ToolMessage(
+                content=result,
+                name=tool_name,
+                tool_call_id=tool_call["id"],
+            )
+        )
+
+    return {"messages": outputs}
+
+
+def should_continue(state: LearnerState) -> Literal["tools", "end"]:
+    """Check if we should continue to tools or end."""
+    if not state.messages:
+        return "end"
+
+    last_message = state.messages[-1]
+    if isinstance(last_message, AIMessage) and last_message.tool_calls:
+        return "tools"
+
+    return "end"
+
+
 def create_learner_graph() -> StateGraph:
-    """Create the learner simulator graph."""
+    """Create the learner simulator graph with tool support."""
     workflow = StateGraph(LearnerState)
     workflow.add_node("learner", learner_node)
+    workflow.add_node("tools", tool_node)
     workflow.set_entry_point("learner")
-    workflow.add_edge("learner", END)
+
+    workflow.add_conditional_edges(
+        "learner",
+        should_continue,
+        {"tools": "tools", "end": END},
+    )
+    workflow.add_edge("tools", "learner")
+
     return workflow
 
 
@@ -93,10 +160,12 @@ class LearnerSimulator:
         self,
         model: ChatAnthropic,
         system_prompt: str,
+        tools: list[StructuredTool] | None = None,
         checkpointer: MemorySaver | None = None,
     ):
         self.model = model
         self.system_prompt = system_prompt
+        self.tools = tools or []
 
         workflow = create_learner_graph()
         self.graph = workflow.compile(checkpointer=checkpointer or MemorySaver())
@@ -108,6 +177,7 @@ class LearnerSimulator:
             "configurable": {
                 "model": self.model,
                 "system_prompt": self.system_prompt,
+                "tools": self.tools,
                 "thread_id": thread_id or self._thread_id,
             }
         }
@@ -191,7 +261,11 @@ def create_learner_simulator(
         max_tokens=config.model.max_tokens,
     )
 
+    # Create MySQL tools for the learner (with exploration-friendly description)
+    tools = create_learner_mysql_tools()
+
     return LearnerSimulator(
         model=model,
         system_prompt=system_prompt,
+        tools=tools,
     )

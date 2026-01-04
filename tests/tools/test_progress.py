@@ -44,10 +44,9 @@ async def test_start_task_sets_status(async_session):
 
     assert result.success is True
     assert result.task_id == task.id
-    assert result.old_status == "open"
-    assert result.new_status == "in_progress"
+    assert result.status == "in_progress"
     assert result.context is not None
-    assert result.context.current_task.status == "in_progress"
+    assert result.context.status == "in_progress"
 
 
 @pytest.mark.asyncio
@@ -77,10 +76,10 @@ async def test_start_task_returns_context(async_session):
     # Start task
     result = await start_task(StartTaskInput(task_id=task.id), learner_id, async_session)
 
-    assert result.context.current_task.id == task.id
-    assert result.context.current_task.title == "Task"
-    assert result.context.project_id == project.id
-    assert result.context.progress is not None
+    assert result.context.task_id == task.id
+    assert result.context.title == "Task"
+    assert result.context.description == "Test task"
+    # No project_id or progress in simplified context
 
 
 @pytest.mark.asyncio
@@ -177,6 +176,9 @@ async def test_submit_creates_submission(async_session):
         ),
     )
 
+    # Start the task first (required before submit)
+    await start_task(StartTaskInput(task_id=task.id), learner_id, async_session)
+
     # Submit work
     result = await submit(
         SubmitInput(task_id=task.id, content="my code", submission_type="code"),
@@ -261,7 +263,7 @@ async def test_submit_auto_closes_task_on_success(async_session):
 
     # Start task (moves to in_progress)
     start_result = await start_task(StartTaskInput(task_id=task.id), learner_id, async_session)
-    assert start_result.new_status == "in_progress"
+    assert start_result.status == "in_progress"
 
     # Submit work (should auto-close on success)
     result = await submit(
@@ -362,12 +364,24 @@ async def test_submit_increments_attempt_number(async_session):
         ),
     )
 
-    # Submit multiple times
+    # Start task first (required before submit)
+    await start_task(StartTaskInput(task_id=task.id), learner_id, async_session)
+
+    # First submission (will auto-close task on success)
     result1 = await submit(
         SubmitInput(task_id=task.id, content="attempt 1", submission_type="text"),
         learner_id,
         async_session,
     )
+
+    # Reopen task using go_back (task is now closed after first submit)
+    from ltt.tools.control import go_back, GoBackInput
+    await go_back(GoBackInput(task_id=task.id, reason="Need to resubmit"), learner_id, async_session)
+
+    # Start task again
+    await start_task(StartTaskInput(task_id=task.id), learner_id, async_session)
+
+    # Second submission
     result2 = await submit(
         SubmitInput(task_id=task.id, content="attempt 2", submission_type="text"),
         learner_id,
@@ -397,6 +411,9 @@ async def test_submit_invalid_type(async_session):
             title="Task", task_type=TaskType.TASK, parent_id=project.id, project_id=project.id
         ),
     )
+
+    # Start task first (required before submit)
+    await start_task(StartTaskInput(task_id=task.id), learner_id, async_session)
 
     # Submit with invalid type
     result = await submit(

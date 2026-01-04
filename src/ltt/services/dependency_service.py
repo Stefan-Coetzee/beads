@@ -438,9 +438,16 @@ async def get_ready_work(
             WHEN 'in_progress' THEN 0
             WHEN 'open' THEN 1
           END,
+          -- Hierarchy: project → epic → task → subtask
+          CASE t.task_type
+            WHEN 'project' THEN 0
+            WHEN 'epic' THEN 1
+            WHEN 'task' THEN 2
+            WHEN 'subtask' THEN 3
+            ELSE 4
+          END,
           t.priority ASC,
-          length(t.id) - length(replace(t.id, '.', '')) ASC,
-          t.created_at ASC
+          t.id ASC  -- Hierarchical IDs sort naturally (parent before child)
         LIMIT :limit
     """)
 

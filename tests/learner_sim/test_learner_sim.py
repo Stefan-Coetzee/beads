@@ -44,7 +44,7 @@ class TestLearnerPrompts:
         """Test that learner greeting is defined."""
         assert LEARNER_GREETING
         assert "Thabo" in LEARNER_GREETING
-        assert "SQL" in LEARNER_GREETING
+        assert "Ready" in LEARNER_GREETING
 
     def test_prompt_includes_persona_details(self):
         """Test that prompt includes key persona details."""

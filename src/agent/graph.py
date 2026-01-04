@@ -6,6 +6,10 @@ This module defines the agent graph that:
 2. Processes them with an LLM using Socratic teaching principles
 3. Executes tools to interact with the Learning Task Tracker
 4. Returns responses that guide learning through questioning
+
+Supports two modes:
+- ReAct agent (recommended): Uses LangGraph's prebuilt create_react_agent
+- Custom graph: Legacy implementation with manual state management
 """
 
 import json
@@ -17,6 +21,8 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
+# Note: create_react_agent will move to langchain.agents in LangGraph 2.0
+from langgraph.prebuilt import create_react_agent
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent.config import Config, get_config
@@ -24,8 +30,94 @@ from agent.prompts import build_system_prompt
 from agent.state import AgentState, EpicContext, LearnerProgress, ProjectContext, TaskContext
 from agent.tools import create_tools
 
+
 # =============================================================================
-# Node Functions
+# Model Creation
+# =============================================================================
+
+
+def create_model(config: Config, model_name: str | None = None) -> ChatAnthropic:
+    """
+    Create a ChatAnthropic model with configured settings.
+
+    Args:
+        config: Application configuration
+        model_name: Optional model name override
+
+    Returns:
+        Configured ChatAnthropic instance
+    """
+    actual_model = model_name or config.model.tutor_model
+
+    # Build model kwargs
+    model_kwargs: dict = {
+        "model": actual_model,
+        "temperature": config.model.tutor_temperature,
+        "max_tokens": config.model.max_tokens,
+    }
+
+    # Add extended thinking if enabled
+    if config.model.thinking_enabled:
+        model_kwargs["thinking"] = {
+            "type": "enabled",
+            "budget_tokens": config.model.thinking_budget_tokens,
+        }
+
+    return ChatAnthropic(**model_kwargs)
+
+
+# =============================================================================
+# ReAct Agent (Recommended)
+# =============================================================================
+
+
+def create_react_tutor_agent(
+    learner_id: str,
+    project_id: str,
+    session: AsyncSession,
+    model: ChatAnthropic,
+    tools: list,
+    checkpointer: MemorySaver | None = None,
+    system_prompt: str | None = None,
+) -> CompiledStateGraph:
+    """
+    Create a ReAct agent using LangGraph's prebuilt create_react_agent.
+
+    This is the recommended approach - simpler and handles the agent loop
+    automatically.
+
+    Args:
+        learner_id: The learner's ID
+        project_id: The project ID
+        session: Database session for tool execution
+        model: The ChatAnthropic model instance
+        tools: List of tools for the agent
+        checkpointer: Optional checkpointer for persistence
+        system_prompt: System prompt for the agent
+
+    Returns:
+        Compiled ReAct agent graph
+    """
+    if checkpointer is None:
+        checkpointer = MemorySaver()
+
+    # Build default system prompt if not provided
+    if system_prompt is None:
+        system_prompt = build_system_prompt(project_id=project_id)
+
+    # Create the ReAct agent
+    graph = create_react_agent(
+        model=model,
+        tools=tools,
+        prompt=system_prompt,
+        checkpointer=checkpointer,
+    )
+
+    return graph
+
+
+# =============================================================================
+# Custom Graph (Legacy)
 # =============================================================================
 
 
@@ -252,14 +344,9 @@ def should_continue(state: AgentState) -> Literal["tools", "end"]:
     return "end"
 
 
-# =============================================================================
-# Graph Construction
-# =============================================================================
-
-
-def create_graph() -> StateGraph:
+def create_custom_graph() -> StateGraph:
     """
-    Create the agent graph structure.
+    Create the custom agent graph structure (legacy).
 
     Returns an uncompiled StateGraph that can be compiled with tools.
     """
@@ -289,24 +376,40 @@ def create_graph() -> StateGraph:
     return workflow
 
 
+# =============================================================================
+# Agent Factory
+# =============================================================================
+
+
+from typing import Callable
+from contextlib import asynccontextmanager
+
+
 def create_agent(
     learner_id: str,
     project_id: str,
-    session: AsyncSession,
+    session_factory: Callable[[], AsyncSession] | None = None,
     model_name: str | None = None,
     checkpointer: MemorySaver | None = None,
     config: Config | None = None,
+    *,
+    session: AsyncSession | None = None,  # Deprecated, use session_factory
 ) -> "AgentWrapper":
     """
     Create a compiled tutor agent ready for use.
 
+    Uses either the prebuilt ReAct agent (recommended) or custom graph
+    based on config.agent.use_react_agent setting.
+
     Args:
         learner_id: The learner's ID
         project_id: The project ID
-        session: Database session for tool execution
+        session_factory: Callable that returns an async context manager for sessions.
+            Required for ReAct agent mode to avoid event loop issues.
         model_name: Anthropic model to use (overrides config)
         checkpointer: Optional checkpointer for persistence
         config: Optional configuration (uses default if not provided)
+        session: Deprecated. Use session_factory instead.
 
     Returns:
         AgentWrapper instance
@@ -314,26 +417,48 @@ def create_agent(
     if config is None:
         config = get_config()
 
-    # Use provided model_name or fall back to config
-    actual_model = model_name or config.model.tutor_model
+    # Handle backwards compatibility
+    if session_factory is None:
+        if session is not None:
+            # Wrap the existing session in a factory-like callable
+            # WARNING: This may cause event loop issues with ReAct agent
+            @asynccontextmanager
+            async def _session_wrapper():
+                yield session
 
-    # Create the model with configured temperature
-    model = ChatAnthropic(
-        model=actual_model,
-        temperature=config.model.tutor_temperature,
-        max_tokens=config.model.max_tokens,
-    )
+            session_factory = _session_wrapper
+        else:
+            # Use global session factory
+            from ltt.db.connection import get_session_factory
 
-    # Create tools bound to session and learner
-    tools = create_tools(session, learner_id, project_id)
+            session_factory = get_session_factory()
 
-    # Create and compile the graph
-    workflow = create_graph()
+    # Create the model with thinking support if enabled
+    model = create_model(config, model_name)
 
+    # Create tools bound to session factory and learner
+    tools = create_tools(session_factory, learner_id, project_id)
+
+    # Create checkpointer if not provided
     if checkpointer is None:
         checkpointer = MemorySaver()
 
-    graph = workflow.compile(checkpointer=checkpointer)
+    # Choose agent implementation based on config
+    if config.agent.use_react_agent:
+        # Use prebuilt ReAct agent (recommended)
+        # Note: Project context is loaded at first invocation and cached
+        # For now, build a minimal prompt - full context comes from tools
+        system_prompt = build_system_prompt(project_id=project_id)
+        graph = create_react_agent(
+            model=model,
+            tools=tools,
+            prompt=system_prompt,
+            checkpointer=checkpointer,
+        )
+    else:
+        # Use custom graph (legacy)
+        workflow = create_custom_graph()
+        graph = workflow.compile(checkpointer=checkpointer)
 
     # Return a configured wrapper
     return AgentWrapper(
@@ -342,7 +467,8 @@ def create_agent(
         tools=tools,
         learner_id=learner_id,
         project_id=project_id,
-        session=session,
+        session_factory=session_factory,
+        config=config,
     )
 
 
@@ -360,18 +486,25 @@ class AgentWrapper:
         tools: list,
         learner_id: str,
         project_id: str,
-        session: AsyncSession,
+        session_factory: Callable[[], AsyncSession],
+        config: Config | None = None,
     ):
         self.graph = graph
         self.model = model
         self.tools = tools
         self.learner_id = learner_id
         self.project_id = project_id
-        self.session = session
+        self.session_factory = session_factory
+        self.config = config or get_config()
         self._thread_id = f"{learner_id}-{project_id}"
         self._project_context: ProjectContext | None = None
         self._current_epic: EpicContext | None = None
         self._context_loaded = False
+
+    @property
+    def use_react_agent(self) -> bool:
+        """Whether using the prebuilt ReAct agent."""
+        return self.config.agent.use_react_agent
 
     async def _load_project_context(self) -> ProjectContext | None:
         """Load project context from database (lazy loading)."""
@@ -381,14 +514,15 @@ class AgentWrapper:
         try:
             from ltt.services.task_service import get_task
 
-            project = await get_task(self.session, self.project_id)
-            if project:
-                self._project_context = ProjectContext(
-                    project_id=project.id,
-                    title=project.title,
-                    description=project.description,
-                    narrative_context=project.narrative_context,
-                )
+            async with self.session_factory() as session:
+                project = await get_task(session, self.project_id)
+                if project:
+                    self._project_context = ProjectContext(
+                        project_id=project.id,
+                        title=project.title,
+                        description=project.description,
+                        narrative_context=project.narrative_context,
+                    )
         except Exception:
             pass  # Project context is optional
 
@@ -405,49 +539,50 @@ class AgentWrapper:
             from ltt.services.task_service import get_children
             from ltt.services.progress_service import get_or_create_progress
 
-            # Get all epics for this project
-            children = await get_children(self.session, self.project_id, recursive=False)
-            epics = [c for c in children if c.task_type == TaskType.EPIC]
+            async with self.session_factory() as session:
+                # Get all epics for this project
+                children = await get_children(session, self.project_id, recursive=False)
+                epics = [c for c in children if c.task_type == TaskType.EPIC]
 
-            if not epics:
-                return None
+                if not epics:
+                    return None
 
-            # Find epic with in-progress tasks first
-            for epic in epics:
-                progress = await get_or_create_progress(
-                    self.session, epic.id, self.learner_id
-                )
-                status = progress.status.value if hasattr(progress.status, "value") else progress.status
-                if status == "in_progress":
-                    self._current_epic = EpicContext(
-                        epic_id=epic.id,
-                        title=epic.title,
-                        description=epic.description,
+                # Find epic with in-progress tasks first
+                for epic in epics:
+                    progress = await get_or_create_progress(
+                        session, epic.id, self.learner_id
                     )
-                    return self._current_epic
+                    status = progress.status.value if hasattr(progress.status, "value") else progress.status
+                    if status == "in_progress":
+                        self._current_epic = EpicContext(
+                            epic_id=epic.id,
+                            title=epic.title,
+                            description=epic.description,
+                        )
+                        return self._current_epic
 
-            # Fall back to first open epic
-            for epic in epics:
-                progress = await get_or_create_progress(
-                    self.session, epic.id, self.learner_id
-                )
-                status = progress.status.value if hasattr(progress.status, "value") else progress.status
-                if status in ("open", "in_progress"):
-                    self._current_epic = EpicContext(
-                        epic_id=epic.id,
-                        title=epic.title,
-                        description=epic.description,
+                # Fall back to first open epic
+                for epic in epics:
+                    progress = await get_or_create_progress(
+                        session, epic.id, self.learner_id
                     )
-                    return self._current_epic
+                    status = progress.status.value if hasattr(progress.status, "value") else progress.status
+                    if status in ("open", "in_progress"):
+                        self._current_epic = EpicContext(
+                            epic_id=epic.id,
+                            title=epic.title,
+                            description=epic.description,
+                        )
+                        return self._current_epic
 
-            # No open epics - return first one for context
-            epic = epics[0]
-            self._current_epic = EpicContext(
-                epic_id=epic.id,
-                title=epic.title,
-                description=epic.description,
-            )
-            return self._current_epic
+                # No open epics - return first one for context
+                epic = epics[0]
+                self._current_epic = EpicContext(
+                    epic_id=epic.id,
+                    title=epic.title,
+                    description=epic.description,
+                )
+                return self._current_epic
 
         except Exception:
             return None  # Epic context is optional
@@ -479,18 +614,21 @@ class AgentWrapper:
         """
         config = self._get_config(thread_id)
 
-        # Load context (lazy loading)
-        project_context = await self._load_project_context()
-        current_epic = await self._load_current_epic()
+        if self.use_react_agent:
+            # ReAct agent uses simpler message format
+            input_state = {"messages": [{"role": "user", "content": message}]}
+        else:
+            # Custom graph needs full state
+            project_context = await self._load_project_context()
+            current_epic = await self._load_current_epic()
 
-        # Create initial state if needed
-        input_state = {
-            "learner_id": self.learner_id,
-            "project_id": self.project_id,
-            "messages": [HumanMessage(content=message)],
-            "project_context": project_context,
-            "current_epic": current_epic,
-        }
+            input_state = {
+                "learner_id": self.learner_id,
+                "project_id": self.project_id,
+                "messages": [HumanMessage(content=message)],
+                "project_context": project_context,
+                "current_epic": current_epic,
+            }
 
         return await self.graph.ainvoke(input_state, config)
 
@@ -511,17 +649,21 @@ class AgentWrapper:
         """
         config = self._get_config(thread_id)
 
-        # Load context (lazy loading)
-        project_context = await self._load_project_context()
-        current_epic = await self._load_current_epic()
+        if self.use_react_agent:
+            # ReAct agent uses simpler message format
+            input_state = {"messages": [{"role": "user", "content": message}]}
+        else:
+            # Custom graph needs full state
+            project_context = await self._load_project_context()
+            current_epic = await self._load_current_epic()
 
-        input_state = {
-            "learner_id": self.learner_id,
-            "project_id": self.project_id,
-            "messages": [HumanMessage(content=message)],
-            "project_context": project_context,
-            "current_epic": current_epic,
-        }
+            input_state = {
+                "learner_id": self.learner_id,
+                "project_id": self.project_id,
+                "messages": [HumanMessage(content=message)],
+                "project_context": project_context,
+                "current_epic": current_epic,
+            }
 
         async for event in self.graph.astream(input_state, config, stream_mode="values"):
             yield event
@@ -534,17 +676,26 @@ class AgentWrapper:
         except Exception:
             return None
 
+    async def aget_state(self, thread_id: str | None = None) -> dict | None:
+        """Get the current state for a thread (async version)."""
+        config = self._get_config(thread_id)
+        try:
+            return await self.graph.aget_state(config)
+        except Exception:
+            return None
 
-async def create_agent_with_session(
+
+def create_agent_simple(
     learner_id: str,
     project_id: str,
     model_name: str | None = None,
     config: Config | None = None,
-) -> tuple["AgentWrapper", AsyncSession]:
+) -> "AgentWrapper":
     """
-    Create an agent with a fresh database session.
+    Create an agent using the global session factory.
 
-    Convenience function that creates both session and agent.
+    Simple way to create an agent - just call it.
+    Uses NullPool by default so no event loop issues.
 
     Args:
         learner_id: The learner's ID
@@ -553,19 +704,153 @@ async def create_agent_with_session(
         config: Optional configuration
 
     Returns:
-        Tuple of (agent, session) - caller must manage session lifecycle
+        AgentWrapper ready for use
+
+    Usage:
+        agent = create_agent_simple("learner-1", "proj-1")
+        response = await agent.ainvoke("Hello!")
     """
     from ltt.db.connection import get_session_factory
 
-    factory = get_session_factory()
-    session = factory()
-
-    agent = create_agent(
+    return create_agent(
         learner_id=learner_id,
         project_id=project_id,
-        session=session,
+        session_factory=get_session_factory(),
         model_name=model_name,
         config=config,
     )
 
-    return agent, session
+
+async def create_agent_with_context(
+    learner_id: str,
+    project_id: str,
+    session_factory: Callable[[], AsyncSession] | None = None,
+    model_name: str | None = None,
+    checkpointer: MemorySaver | None = None,
+    config: Config | None = None,
+) -> "AgentWrapper":
+    """
+    Create an agent with full project context loaded.
+
+    This async factory function loads the project context from the database
+    before creating the agent, ensuring the system prompt includes:
+    - Project description
+    - Narrative context
+    - Project content
+
+    Args:
+        learner_id: The learner's ID
+        project_id: The project ID
+        session_factory: Callable that returns an async context manager for sessions
+        model_name: Anthropic model to use (overrides config)
+        checkpointer: Optional checkpointer for persistence
+        config: Optional configuration
+
+    Returns:
+        AgentWrapper with full project context
+
+    Usage:
+        agent = await create_agent_with_context("learner-1", "proj-1")
+        response = await agent.ainvoke("Hello!")
+    """
+    if config is None:
+        config = get_config()
+
+    if session_factory is None:
+        from ltt.db.connection import get_session_factory
+        session_factory = get_session_factory()
+
+    # Load project context from database
+    project_description = None
+    narrative_context = None
+    project_content = None
+    current_epic_dict = None
+
+    try:
+        from ltt.services.task_service import get_task, get_children
+        from ltt.services.progress_service import get_or_create_progress
+
+        async with session_factory() as session:
+            project = await get_task(session, project_id)
+            if project:
+                project_description = project.description
+                narrative_context = project.narrative_context
+                project_content = project.content
+
+                # Find current epic (in-progress or first open)
+                children = await get_children(session, project_id, recursive=False)
+                epics = [c for c in children if c.task_type == "epic"]
+
+                for epic in epics:
+                    progress = await get_or_create_progress(session, epic.id, learner_id)
+                    status = progress.status.value if hasattr(progress.status, "value") else progress.status
+                    if status in ("in_progress", "open"):
+                        current_epic_dict = {
+                            "id": epic.id,
+                            "title": epic.title,
+                            "description": epic.description,
+                        }
+                        break
+    except Exception:
+        pass  # Context is optional, proceed with defaults
+
+    # Create model
+    model = create_model(config, model_name)
+
+    # Create tools
+    tools = create_tools(session_factory, learner_id, project_id)
+
+    # Create checkpointer
+    if checkpointer is None:
+        checkpointer = MemorySaver()
+
+    # Build system prompt with full context
+    system_prompt = build_system_prompt(
+        project_id=project_id,
+        narrative_context=narrative_context,
+        project_description=project_description,
+        project_content=project_content,
+        current_epic=current_epic_dict,
+    )
+
+    # Create the graph
+    if config.agent.use_react_agent:
+        graph = create_react_agent(
+            model=model,
+            tools=tools,
+            prompt=system_prompt,
+            checkpointer=checkpointer,
+        )
+    else:
+        workflow = create_custom_graph()
+        graph = workflow.compile(checkpointer=checkpointer)
+
+    # Return wrapper
+    wrapper = AgentWrapper(
+        graph=graph,
+        model=model,
+        tools=tools,
+        learner_id=learner_id,
+        project_id=project_id,
+        session_factory=session_factory,
+        config=config,
+    )
+
+    # Pre-populate cached context
+    if project_description or narrative_context:
+        wrapper._project_context = ProjectContext(
+            project_id=project_id,
+            title="",  # We don't store title separately
+            description=project_description or "",
+            narrative_context=narrative_context,
+        )
+        wrapper._context_loaded = True
+
+    if current_epic_dict:
+        wrapper._current_epic = EpicContext(
+            epic_id=current_epic_dict["id"],
+            title=current_epic_dict["title"],
+            description=current_epic_dict["description"],
+        )
+
+    return wrapper

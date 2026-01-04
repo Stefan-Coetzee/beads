@@ -25,10 +25,20 @@ class ModelConfig:
     # Max tokens for responses
     max_tokens: int = 2048
 
+    # Extended thinking configuration (Claude 3.7+)
+    # Set to None to disable, or {"type": "enabled", "budget_tokens": N}
+    thinking_enabled: bool = False
+    thinking_budget_tokens: int = 2000  # Token budget for thinking when enabled
+
 
 @dataclass
 class AgentConfig:
     """Configuration for agent behavior."""
+
+    # Use LangGraph's prebuilt create_react_agent (recommended)
+    # This works correctly with async database connections when using NullPool
+    # (enabled by default via DB_USE_NULL_POOL=true in ltt.db.connection)
+    use_react_agent: bool = True
 
     # Maximum conversation turns before forcing a summary
     max_conversation_turns: int = 50
