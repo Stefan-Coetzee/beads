@@ -17,12 +17,14 @@ from ltt.services.progress_service import (
     InvalidStatusTransitionError,
     close_task,
     get_or_create_progress,
+    try_auto_close_ancestors,
     update_status,
 )
 from ltt.services.submission_service import create_submission
 from ltt.services.task_service import get_children, get_task
 from ltt.services.validation_service import validate_submission
 from ltt.tools.schemas import (
+    AutoClosedTask,
     StartTaskContextOutput,
     StartTaskInput,
     StartTaskOutput,
@@ -182,6 +184,7 @@ async def submit(input: SubmitInput, learner_id: str, session: AsyncSession) -> 
     current_status = progress.status
 
     ready_tasks_list = None
+    auto_closed_list = None
 
     if validation.passed:
         # Try to auto-close the task (reuses existing close_task logic)
@@ -191,6 +194,29 @@ async def submit(input: SubmitInput, learner_id: str, session: AsyncSession) -> 
             )
             current_status = closed_progress.status
             message = "Validation successful, task complete!"
+
+            # Try to auto-close ancestors (parent task, epic, etc.)
+            auto_closed_ids = await try_auto_close_ancestors(
+                session, input.task_id, learner_id
+            )
+
+            if auto_closed_ids:
+                # Fetch details for auto-closed tasks
+                auto_closed_list = []
+                for aid in auto_closed_ids:
+                    auto_task = await get_task(session, aid)
+                    if auto_task:
+                        auto_closed_list.append(
+                            AutoClosedTask(
+                                id=auto_task.id,
+                                title=auto_task.title,
+                                task_type=auto_task.task_type,
+                            )
+                        )
+
+                # Update message to include auto-closed tasks
+                closed_names = ", ".join([t.title for t in auto_closed_list])
+                message = f"Validation successful, task complete! Also completed: {closed_names}"
 
             # Get ready tasks so tutor knows what's next (avoid extra get_ready call)
             task = await get_task(session, input.task_id)
@@ -236,4 +262,5 @@ async def submit(input: SubmitInput, learner_id: str, session: AsyncSession) -> 
         status=current_status,
         message=message,
         ready_tasks=ready_tasks_list,
+        auto_closed=auto_closed_list,
     )

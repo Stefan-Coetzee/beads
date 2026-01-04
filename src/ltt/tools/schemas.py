@@ -168,6 +168,14 @@ class SubmitInput(BaseModel):
     )
 
 
+class AutoClosedTask(BaseModel):
+    """A task that was auto-closed due to all children completing."""
+
+    id: str
+    title: str
+    task_type: str
+
+
 class SubmitOutput(BaseModel):
     """Result of submission."""
 
@@ -185,6 +193,9 @@ class SubmitOutput(BaseModel):
 
     # Ready tasks after successful submission (to avoid extra get_ready call)
     ready_tasks: list[TaskSummaryOutput] | None = None
+
+    # Tasks auto-closed due to all children completing (hierarchical auto-close)
+    auto_closed: list[AutoClosedTask] | None = None
 
 
 # =============================================================================

@@ -2,7 +2,7 @@
 
 > A Python-based learning task management system adapted from [beads](https://github.com/steveyegge/beads), designed to power AI tutoring agents at scale.
 
-[![Tests](https://img.shields.io/badge/tests-190%20passing-brightgreen)]() [![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)]() [![Python](https://img.shields.io/badge/python-3.12%2B-blue)]() [![PostgreSQL](https://img.shields.io/badge/postgresql-17-blue)]()
+[![Tests](https://img.shields.io/badge/tests-231%20passing-brightgreen)]() [![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)]() [![Python](https://img.shields.io/badge/python-3.12%2B-blue)]() [![PostgreSQL](https://img.shields.io/badge/postgresql-17-blue)]()
 
 ---
 
@@ -99,6 +99,7 @@ See [ADR-001](python-port/docs/adr/001-learner-scoped-task-progress.md) for deta
 - Tool registry for MCP/function calling
 - Stateless design (LangGraph manages sessions)
 - Submission-driven task completion (ADR-002)
+- **Hierarchical auto-close**: When all children complete, parent tasks/epics auto-close
 
 #### Admin CLI & Ingestion (Phase 8)
 - **Project management**: create, list, show, export
@@ -457,7 +458,8 @@ These fields guide **HOW** LLM tutors teach, not just **WHAT** they teach.
 | **7** | Agent Tools | 26 | ✅ Complete |
 | **8** | Admin CLI & Ingestion | 23 | ✅ Complete |
 | **E2E** | End-to-End Integration | 15 | ✅ Complete |
-| | **Total** | **190** | **All Passing** ✅ |
+| **Agent** | Agent & Learner Sim | 31 | ✅ Complete |
+| | **Total** | **231** | **All Passing** ✅ |
 
 **Coverage**: 98% overall (services), 100% models
 
@@ -544,7 +546,8 @@ result = await submit(
     session
 )
 # result.status == "closed" if validation passed
-# result.message == "Validation successful, task complete"
+# result.message == "Validation successful, task complete!"
+# result.auto_closed == [parent_task, epic, ...] if ancestors were auto-closed
 ```
 
 ---
@@ -653,11 +656,25 @@ submit()
    (auto-close)                  │
        │                         ▼
        ▼                    Return error
-   status: "closed"         message
+   try_auto_close_ancestors()    message
+       │
+       ▼
+   For each parent:
+   - All children closed? → auto-close parent
+   - Continue up hierarchy
+       │
+       ▼
+   status: "closed"
    message: "task complete"
+   auto_closed: [parent, epic, ...]
 ```
 
-**Key behavior**: Tasks auto-close when validation passes. No separate close step needed.
+**Key behaviors**:
+- Tasks auto-close when validation passes (no separate close step needed)
+- Parent tasks/epics auto-close when all children complete
+- `requires_submission` flag controls which tasks need explicit submissions
+- Default: subtasks require submission, tasks/epics/projects don't
+
 See [ADR-002](python-port/docs/adr/002-submission-driven-task-completion.md) for details.
 
 ---
@@ -722,6 +739,7 @@ See [ADR-002](python-port/docs/adr/002-submission-driven-task-completion.md) for
 - `dependencies` - Blocking relationships
 - `content` - Learning materials
 - `acceptance_criteria` - Validation rules
+- `requires_submission` - Controls auto-close behavior (default: true for subtasks)
 
 ### Instance Layer
 - `learner_task_progress` - Per-learner status
@@ -740,7 +758,7 @@ See [01-data-models.md](python-port/docs/01-data-models.md) for complete schema.
 
 ## Testing
 
-**190 tests across all phases, all passing**
+**231 tests across all phases, all passing**
 
 ```bash
 # Run all tests
@@ -850,6 +868,13 @@ PYTHONPATH=src
 - Future: Custom validators (code tests, SQL result checks, etc.)
 - Subtasks require passing validation to close
 
+**Q: How does hierarchical auto-close work?**
+- When a subtask passes validation, it auto-closes
+- System then checks: are all siblings closed?
+- If yes, parent task auto-closes (unless it requires explicit submission)
+- Process continues up: task → epic → project
+- Use `requires_submission: true` on a task to require explicit submission instead of auto-close
+
 ---
 
 ## Roadmap
@@ -864,6 +889,8 @@ PYTHONPATH=src
 - [x] Admin CLI and JSON ingestion
 - [x] Pedagogical guidance fields
 - [x] Comprehensive documentation
+- [x] Hierarchical auto-close (tasks/epics auto-close when children complete)
+- [x] Agent and learner simulation testing
 
 ### 🔜 Next Steps
 - [ ] Integration testing (multi-learner scenarios)

@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import ARRAY, ForeignKey, Integer, String, Text
+from sqlalchemy import ARRAY, Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -69,6 +69,13 @@ class TaskBase(BaseModel):
     summary: str | None = Field(
         default=None,
         description="Auto-generated summary of children (subtasks for tasks, tasks for epics)",
+    )
+
+    # Submission requirement flag
+    requires_submission: bool | None = Field(
+        default=None,
+        description="Whether this task requires a submission to close. "
+        "Default: True for subtasks, False for tasks/epics/projects",
     )
 
 
@@ -189,6 +196,9 @@ class TaskModel(Base, TimestampMixin):
     # Versioning
     version: Mapped[int] = mapped_column(Integer, default=1)
     version_tag: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # Submission requirement flag
+    requires_submission: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)
 
     # Relationships
     parent: Mapped[Optional["TaskModel"]] = relationship(

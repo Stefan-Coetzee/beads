@@ -183,6 +183,22 @@ async def get_latest_validation(
     return Validation.model_validate(validation) if validation else None
 
 
+def _get_requires_submission(task: TaskModel) -> bool:
+    """
+    Determine if task requires submission based on flag or default.
+
+    Default behavior:
+    - Subtasks: requires_submission = True
+    - Tasks/Epics/Projects: requires_submission = False (auto-close eligible)
+
+    The requires_submission field can override these defaults.
+    """
+    if task.requires_submission is not None:
+        return task.requires_submission
+    # Default based on task type
+    return task.task_type == TaskType.SUBTASK.value
+
+
 async def can_close_task(
     session: AsyncSession,
     task_id: str,
@@ -191,11 +207,10 @@ async def can_close_task(
     """
     Check if a task can be closed based on validation.
 
-    Rules:
-    - Subtasks: MUST have a passing validation
-    - Tasks: Allowed (validation is feedback, not gate)
-    - Epics: Allowed (no direct submissions)
-    - Projects: Allowed (no direct submissions)
+    Rules (respecting requires_submission flag):
+    - requires_submission=True: MUST have a passing validation
+    - requires_submission=False: Allowed (validation is optional)
+    - Default: Subtasks require submission, others don't
 
     Args:
         session: Database session
@@ -214,11 +229,11 @@ async def can_close_task(
     if not task:
         return False, f"Task {task_id} does not exist"
 
-    # Non-subtasks can always close (validation is optional)
-    if task.task_type != TaskType.SUBTASK.value:
+    # Check if this task requires submission
+    if not _get_requires_submission(task):
         return True, ""
 
-    # Subtasks require passing validation
+    # Task requires submission - check for passing validation
     latest_validation = await get_latest_validation(session, task_id, learner_id)
 
     if latest_validation is None:

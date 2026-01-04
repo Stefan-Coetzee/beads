@@ -117,6 +117,7 @@ async def ingest_project_file(
             task_type=TaskType.PROJECT,
             content=data.get("content"),
             narrative_context=data.get("narrative_context"),
+            requires_submission=data.get("requires_submission"),
         ),
     )
 
@@ -194,6 +195,7 @@ async def ingest_epic(
             task_type=TaskType.EPIC,
             content=data.get("content"),
             tutor_guidance=data.get("tutor_guidance"),
+            requires_submission=data.get("requires_submission"),
         ),
     )
 
@@ -321,6 +323,7 @@ async def ingest_task(
             priority=data.get("priority", 2),
             content=data.get("content"),
             tutor_guidance=data.get("tutor_guidance"),
+            requires_submission=data.get("requires_submission"),
         ),
     )
 

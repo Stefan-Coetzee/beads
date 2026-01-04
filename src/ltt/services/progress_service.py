@@ -242,6 +242,75 @@ async def reopen_task(session: AsyncSession, task_id: str, learner_id: str) -> L
     return await update_status(session, task_id, learner_id, TaskStatus.OPEN)
 
 
+async def try_auto_close_ancestors(
+    session: AsyncSession,
+    task_id: str,
+    learner_id: str,
+) -> list[str]:
+    """
+    After a task closes, check if parent(s) can auto-close.
+
+    Climbs up the task hierarchy. For each parent:
+    1. Check if parent requires submission (if yes, stop)
+    2. Check if all children are closed (if no, stop)
+    3. Auto-close the parent
+    4. Continue to grandparent
+
+    Args:
+        session: Database session
+        task_id: The task that just closed
+        learner_id: Learner ID
+
+    Returns:
+        List of task IDs that were auto-closed (bottom-up order)
+    """
+    from ltt.services.validation_service import _get_requires_submission
+
+    auto_closed = []
+
+    # Get the task that just closed
+    task = await session.get(TaskModel, task_id)
+    if not task or not task.parent_id:
+        return auto_closed
+
+    current_parent_id = task.parent_id
+
+    while current_parent_id:
+        parent = await session.get(TaskModel, current_parent_id)
+        if not parent:
+            break
+
+        # Check if parent requires submission
+        if _get_requires_submission(parent):
+            break  # Parent needs explicit submission, stop climbing
+
+        # Check if all children are closed
+        result = await session.execute(
+            select(TaskModel).where(TaskModel.parent_id == current_parent_id)
+        )
+        children = result.scalars().all()
+
+        all_closed = True
+        for child in children:
+            child_progress = await get_or_create_progress(session, child.id, learner_id)
+            if child_progress.status != TaskStatus.CLOSED.value:
+                all_closed = False
+                break
+
+        if not all_closed:
+            break  # Not all children closed, stop climbing
+
+        # Try to auto-close this parent
+        try:
+            await close_task(session, current_parent_id, learner_id, "Auto-closed: all children complete")
+            auto_closed.append(current_parent_id)
+            current_parent_id = parent.parent_id  # Continue climbing
+        except InvalidStatusTransitionError:
+            break  # Can't close, stop climbing
+
+    return auto_closed
+
+
 async def get_learner_tasks_by_status(
     session: AsyncSession, learner_id: str, status: TaskStatus, project_id: str | None = None
 ) -> list[tuple[TaskModel, LearnerTaskProgressModel]]:
