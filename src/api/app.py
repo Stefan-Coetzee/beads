@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.database import init_database, close_database
 from api.routes import router
+from api.frontend_routes import router as frontend_router
 
 
 @asynccontextmanager
@@ -60,6 +61,7 @@ def get_app() -> FastAPI:
 
     # Include routes
     app.include_router(router, prefix="/api/v1")
+    app.include_router(frontend_router)  # Frontend routes already have /api/v1 prefix
 
     # Health check at root
     @app.get("/health")

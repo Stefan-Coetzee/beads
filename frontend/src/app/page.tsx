@@ -5,8 +5,8 @@ import { BookOpen, Code, MessageSquare } from "lucide-react";
 
 export default function Home() {
   // Default project ID for development
-  const defaultProjectId = "proj-maji-ndogo";
-  const defaultLearnerId = "learner-dev-001";
+  const defaultProjectId = "proj-9b46";
+  const defaultLearnerId = "learner-7b63e4ee";
 
   return (
     <main className="min-h-screen bg-background">
