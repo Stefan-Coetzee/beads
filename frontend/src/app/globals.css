@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+@theme {
+  /* Dark Theme (Primary) */
+  --color-background: oklch(13% 0.01 264);
+  --color-foreground: oklch(98% 0 0);
+
+  /* Surfaces */
+  --color-surface: oklch(17% 0.01 264);
+  --color-elevated: oklch(21% 0.01 264);
+
+  /* Borders */
+  --color-border: oklch(27% 0.01 264);
+
+  /* Text variants */
+  --color-muted-foreground: oklch(63% 0.01 264);
+  --color-tertiary-foreground: oklch(44% 0.01 264);
+
+  /* Semantic colors */
+  --color-accent: oklch(75% 0.18 70);
+  --color-accent-foreground: oklch(98% 0 0);
+  --color-accent-muted: oklch(35% 0.08 50);
+
+  --color-success: oklch(65% 0.2 145);
+  --color-warning: oklch(80% 0.18 85);
+  --color-error: oklch(60% 0.22 25);
+  --color-info: oklch(60% 0.2 250);
+
+  /* Status colors */
+  --color-status-open: oklch(44% 0.01 264);
+  --color-status-in-progress: oklch(75% 0.18 70);
+  --color-status-blocked: oklch(60% 0.22 25);
+  --color-status-closed: oklch(65% 0.2 145);
+
+  /* Component colors */
+  --color-card: oklch(17% 0.01 264);
+  --color-card-foreground: oklch(98% 0 0);
+  --color-popover: oklch(17% 0.01 264);
+  --color-popover-foreground: oklch(98% 0 0);
+  --color-primary: oklch(75% 0.18 70);
+  --color-primary-foreground: oklch(13% 0 0);
+  --color-secondary: oklch(27% 0.01 264);
+  --color-secondary-foreground: oklch(98% 0 0);
+  --color-muted: oklch(27% 0.01 264);
+  --color-destructive: oklch(60% 0.22 25);
+  --color-destructive-foreground: oklch(98% 0 0);
+  --color-input: oklch(27% 0.01 264);
+  --color-ring: oklch(75% 0.18 70);
+
+  --radius: 0.5rem;
+
+  /* Fonts */
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
+
+  /* Animations */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-shimmer: shimmer 2s infinite linear;
+}
+
+@keyframes accordion-down {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-background);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(50% 0.01 264);
+  }
+}
+
+@layer utilities {
+  /* Status badge styles */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .status-open {
+    background-color: oklch(40% 0.01 264 / 0.3);
+    color: oklch(70% 0.01 264);
+  }
+
+  .status-in-progress {
+    background-color: oklch(75% 0.18 70 / 0.2);
+    color: oklch(75% 0.18 70);
+  }
+
+  .status-blocked {
+    background-color: oklch(60% 0.22 25 / 0.2);
+    color: oklch(65% 0.22 25);
+  }
+
+  .status-closed {
+    background-color: oklch(65% 0.2 145 / 0.2);
+    color: oklch(70% 0.2 145);
+  }
+
+  /* Skeleton shimmer */
+  .skeleton {
+    animation: var(--animate-shimmer);
+    background: linear-gradient(to right, transparent, oklch(100% 0 0 / 0.05), transparent);
+    background-size: 200% 100%;
+  }
+}
