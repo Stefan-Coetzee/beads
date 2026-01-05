@@ -13,10 +13,9 @@ import { ChatPanel } from "@/components/chat/ChatPanel";
 import { TaskDetailDrawer } from "@/components/shared/TaskDetailDrawer";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import {
-  createDatabase,
   executeQuery,
-  SAMPLE_SCHEMA,
   isDatabaseReady,
+  loadMajiNdogoDatabase,
 } from "@/lib/sql-engine";
 import type { QueryResult } from "@/types";
 
@@ -45,8 +44,12 @@ export default function WorkspacePage() {
   useEffect(() => {
     async function init() {
       if (!isDatabaseReady()) {
-        await createDatabase(SAMPLE_SCHEMA);
-        console.log("Database initialized with sample schema");
+        try {
+          await loadMajiNdogoDatabase();
+          console.log("Database initialized with Maji Ndogo data");
+        } catch (e) {
+          console.error("Failed to load database:", e);
+        }
       }
     }
     init();

@@ -153,6 +153,29 @@ class DatabaseSchemaResponse(BaseModel):
 # =============================================================================
 
 
+@router.get("/projects")
+async def list_projects() -> list[dict]:
+    """
+    List all available projects.
+
+    Returns basic project info for selection.
+    """
+    from sqlalchemy import select, text
+
+    session_factory = get_session_factory()
+
+    async with session_factory() as session:
+        try:
+            # Get all projects (task_type = 'project')
+            result = await session.execute(
+                text("SELECT id, title FROM tasks WHERE task_type = 'project' ORDER BY created_at DESC")
+            )
+            projects = [{"id": row[0], "title": row[1]} for row in result.fetchall()]
+            return projects
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/project/{project_id}/tree", response_model=ProjectTreeResponse)
 async def get_project_tree(
     project_id: str,

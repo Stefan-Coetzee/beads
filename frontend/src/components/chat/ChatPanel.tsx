@@ -75,6 +75,7 @@ export function ChatPanel({
       try {
         // Stream response
         let fullContent = "";
+        let lastToolCall = "";
         const stream = streamChat(
           userMessage.content,
           learnerId,
@@ -94,9 +95,36 @@ export function ChatPanel({
                 m.id === assistantId ? { ...m, content: fullContent } : m
               )
             );
+          } else if (chunk.type === "tool_call") {
+            // Track tool calls for display if no text response
+            const toolName = typeof chunk.content === "object" && chunk.content
+              ? (chunk.content as { name?: string }).name || "tool"
+              : "tool";
+            lastToolCall = toolName;
+          } else if (chunk.type === "tool_result") {
+            // Tool completed
           } else if (chunk.type === "done") {
             break;
+          } else if (chunk.type === "error") {
+            fullContent = `Error: ${typeof chunk.content === "string" ? chunk.content : "Unknown error"}`;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, content: fullContent } : m
+              )
+            );
           }
+        }
+
+        // Ensure message has content after stream completes
+        if (!fullContent) {
+          fullContent = lastToolCall
+            ? `[Used ${lastToolCall} - waiting for response...]`
+            : "I processed your request but have no text response.";
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: fullContent } : m
+            )
+          );
         }
 
         // Set thread ID for conversation continuity

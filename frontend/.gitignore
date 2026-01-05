@@ -33,3 +33,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Large generated data files (regenerate with: python scripts/convert_mysql_to_sqlite.py)
+/public/data/*.sql
+/public/data/*.json

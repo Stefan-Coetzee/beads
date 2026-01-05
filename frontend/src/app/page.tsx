@@ -1,25 +1,66 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen, Code, MessageSquare } from "lucide-react";
+import { LearnerIdInput, useLearnerIdState } from "@/components/shared/LearnerIdInput";
+import { ProjectSelector } from "@/components/shared/ProjectSelector";
+import { api } from "@/lib/api";
 
 export default function Home() {
-  // Default project ID for development
-  const defaultProjectId = "proj-9b46";
-  const defaultLearnerId = "learner-7b63e4ee";
+  const { learnerId, setLearnerId, isLoaded } = useLearnerIdState();
+  const [projectId, setProjectId] = useState<string>("");
+
+  // Fetch projects to set default
+  const { data: projects } = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => api.getProjects(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Set default project when projects load
+  useEffect(() => {
+    if (projects && projects.length > 0 && !projectId) {
+      setProjectId(projects[0].id);
+    }
+  }, [projects, projectId]);
+
+  if (!isLoaded) {
+    return (
+      <main className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-background">
+      {/* Header with Learner ID */}
+      <header className="border-b border-border">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <h2 className="font-semibold">Learning Task Tracker</h2>
+          <LearnerIdInput value={learnerId} onChange={setLearnerId} />
+        </div>
+      </header>
+
       {/* Hero Section */}
-      <div className="container mx-auto px-4 py-16">
-        <div className="text-center mb-12">
+      <div className="container mx-auto px-4 py-12">
+        <div className="text-center mb-10">
           <h1 className="text-4xl font-bold tracking-tight mb-4">
-            Learning Task Tracker
+            Project-Based Learning
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Project-based learning with AI guidance. Navigate tasks, write code,
-            and receive real-time feedback.
+            Navigate tasks, write SQL, and receive real-time AI guidance.
           </p>
+        </div>
+
+        {/* Project Selector */}
+        <div className="flex items-center justify-center gap-3 mb-10">
+          <span className="text-sm text-muted-foreground">Select project:</span>
+          <ProjectSelector value={projectId} onChange={setProjectId} />
         </div>
 
         {/* Quick Start Cards */}
@@ -44,9 +85,11 @@ export default function Home() {
                 Track your completion status and find your next step.
               </p>
               <Link
-                href={`/project/${defaultProjectId}?learnerId=${defaultLearnerId}`}
+                href={projectId ? `/project/${projectId}?learnerId=${learnerId}` : "#"}
               >
-                <Button className="w-full">View Project</Button>
+                <Button className="w-full" disabled={!projectId}>
+                  View Project
+                </Button>
               </Link>
             </CardContent>
           </Card>
@@ -71,9 +114,9 @@ export default function Home() {
                 from your AI tutor as you work through tasks.
               </p>
               <Link
-                href={`/workspace/${defaultProjectId}?learnerId=${defaultLearnerId}`}
+                href={projectId ? `/workspace/${projectId}?learnerId=${learnerId}` : "#"}
               >
-                <Button variant="secondary" className="w-full">
+                <Button variant="secondary" className="w-full" disabled={!projectId}>
                   Open Workspace
                 </Button>
               </Link>
