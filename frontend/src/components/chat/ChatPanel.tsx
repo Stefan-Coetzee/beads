@@ -102,7 +102,19 @@ export function ChatPanel({
               : "tool";
             lastToolCall = toolName;
           } else if (chunk.type === "tool_result") {
-            // Tool completed
+            // Check if this is the final response (name is null and result contains the message)
+            if (typeof chunk.content === "object" && chunk.content) {
+              const resultContent = chunk.content as { name?: string | null; result?: string };
+              if (resultContent.name === null && resultContent.result) {
+                // This is the final formatted response from the agent
+                fullContent = resultContent.result;
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId ? { ...m, content: fullContent } : m
+                  )
+                );
+              }
+            }
           } else if (chunk.type === "done") {
             break;
           } else if (chunk.type === "error") {

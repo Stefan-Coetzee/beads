@@ -15,12 +15,24 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from api.database import get_session_factory
-from ltt.models import SubmissionType, TaskStatus
+from ltt.models import SubmissionType, TaskStatus, LearnerModel
 from ltt.services.task_service import get_task, get_children, TaskNotFoundError
 from ltt.services.progress_service import get_or_create_progress, update_status
 from ltt.services.dependency_service import get_ready_work, is_task_blocked
 from ltt.services.submission_service import create_submission
 from ltt.services.validation_service import validate_submission
+from sqlalchemy import select
+
+
+async def ensure_learner_exists(session, learner_id: str) -> None:
+    """Create learner if it doesn't exist."""
+    result = await session.execute(
+        select(LearnerModel).where(LearnerModel.id == learner_id)
+    )
+    if not result.scalar_one_or_none():
+        learner = LearnerModel(id=learner_id, learner_metadata="{}")
+        session.add(learner)
+        await session.commit()
 
 router = APIRouter(prefix="/api/v1", tags=["frontend"])
 
@@ -190,6 +202,9 @@ async def get_project_tree(
 
     async with session_factory() as session:
         try:
+            # Ensure learner exists
+            await ensure_learner_exists(session, learner_id)
+
             # Get project (root task)
             project = await get_task(session, project_id)
 
@@ -285,6 +300,7 @@ async def get_task_details(
 
     async with session_factory() as session:
         try:
+            await ensure_learner_exists(session, learner_id)
             task = await get_task(session, task_id)
             progress = await get_or_create_progress(session, task_id, learner_id)
             is_blocked, blockers = await is_task_blocked(session, task_id, learner_id)
@@ -326,6 +342,7 @@ async def get_ready_tasks(
 
     async with session_factory() as session:
         try:
+            await ensure_learner_exists(session, learner_id)
             ready_tasks = await get_ready_work(
                 session,
                 project_id=project_id,
@@ -376,6 +393,7 @@ async def start_task(
 
     async with session_factory() as session:
         try:
+            await ensure_learner_exists(session, request.learner_id)
             # Check task exists
             await get_task(session, task_id)
 
@@ -429,6 +447,7 @@ async def submit_work(
 
     async with session_factory() as session:
         try:
+            await ensure_learner_exists(session, request.learner_id)
             # Map string to enum
             try:
                 sub_type = SubmissionType(request.submission_type)

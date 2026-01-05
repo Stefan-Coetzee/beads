@@ -4,14 +4,13 @@ Convert MySQL dump to SQLite format for browser-based SQL.js
 """
 
 import re
-import json
 from pathlib import Path
 
 
 def convert_mysql_to_sqlite(mysql_file: Path, output_file: Path):
     """Convert MySQL dump to SQLite-compatible SQL."""
 
-    with open(mysql_file, "r") as f:
+    with open(mysql_file, "r", encoding="utf-8") as f:
         content = f.read()
 
     sqlite_statements = []
@@ -123,41 +122,88 @@ CREATE TABLE IF NOT EXISTS column_legend (
         if table_name not in create_tables:
             continue
 
-        # Clean up the values - MySQL uses backticks, SQLite doesn't need them
-        # Split into individual value sets
-        # Handle multi-row inserts
+        # Clean up the values
         values_str = values_str.strip()
 
-        # Convert MySQL-specific syntax
-        # NULL values are fine in SQLite
-        # Escape single quotes properly
+        # The values string contains multiple rows like: (v1,v2),(v1,v2),...
+        # We need to properly parse this respecting quotes
 
-        # Build the SQLite INSERT statement
-        insert_stmt = f"INSERT INTO {table_name} VALUES {values_str};"
-        sqlite_statements.append(insert_stmt)
+        # Parse individual value tuples properly
+        rows = []
+        current_row = []
+        current_value = ""
+        in_string = False
+        paren_depth = 0
+        i = 0
+
+        while i < len(values_str):
+            char = values_str[i]
+
+            if char == "'" and (i == 0 or values_str[i-1] != "\\"):
+                in_string = not in_string
+                current_value += char
+            elif char == "(" and not in_string:
+                paren_depth += 1
+                if paren_depth == 1:
+                    current_value = ""
+                else:
+                    current_value += char
+            elif char == ")" and not in_string:
+                paren_depth -= 1
+                if paren_depth == 0:
+                    current_row.append(current_value)
+                    rows.append(current_row)
+                    current_row = []
+                    current_value = ""
+                else:
+                    current_value += char
+            elif char == "," and not in_string and paren_depth == 1:
+                current_row.append(current_value)
+                current_value = ""
+            elif char == "," and not in_string and paren_depth == 0:
+                # Between rows, skip
+                pass
+            else:
+                current_value += char
+
+            i += 1
+
+        # Convert rows to SQLite INSERT statements
+        # Process in batches to avoid huge statements
+        batch_size = 500
+        for batch_start in range(0, len(rows), batch_size):
+            batch = rows[batch_start:batch_start + batch_size]
+
+            # Build value strings, escaping single quotes properly
+            value_strs = []
+            for row in batch:
+                escaped_values = []
+                for val in row:
+                    val = val.strip()
+                    if val.startswith("'") and val.endswith("'"):
+                        # String value - need to escape internal single quotes
+                        inner = val[1:-1]
+                        # Replace any unescaped single quotes with escaped ones
+                        # First, un-escape MySQL's escaped quotes, then re-escape for SQLite
+                        inner = inner.replace("\\'", "'")  # MySQL escape
+                        inner = inner.replace("''", "'")   # SQL standard escape
+                        inner = inner.replace("'", "''")   # SQLite escape
+                        escaped_values.append(f"'{inner}'")
+                    else:
+                        escaped_values.append(val)
+                value_strs.append(f"({','.join(escaped_values)})")
+
+            insert_stmt = f"INSERT INTO {table_name} VALUES\n" + ",\n".join(value_strs) + ";"
+            sqlite_statements.append(insert_stmt)
 
     # Write output
     output_content = "\n\n".join(sqlite_statements)
 
-    with open(output_file, "w") as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         f.write(output_content)
 
     print(f"Converted {mysql_file} to {output_file}")
     print(f"Total size: {len(output_content) / 1024:.1f} KB")
-
-    # Also create a JSON version for easier frontend consumption
-    json_output = output_file.with_suffix(".json")
-    with open(json_output, "w") as f:
-        json.dump(
-            {
-                "schema": "\n".join(create_tables[t] for t in table_order if t in create_tables),
-                "data": "\n".join(
-                    stmt for stmt in sqlite_statements if stmt.startswith("INSERT")
-                ),
-            },
-            f,
-        )
-    print(f"Also created JSON version: {json_output}")
 
 
 if __name__ == "__main__":
