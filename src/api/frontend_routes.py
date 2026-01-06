@@ -83,24 +83,6 @@ class ProjectTreeResponse(BaseModel):
     progress: ProjectProgress
 
 
-class TaskDetailResponse(BaseModel):
-    """Detailed task information."""
-
-    id: str
-    title: str
-    description: str | None
-    acceptance_criteria: str | None
-    task_type: str
-    status: str
-    priority: int
-    content: str | None
-    tutor_guidance: dict[str, Any] | None
-    is_blocked: bool
-    blocking_tasks: list[str]
-    parent_id: str | None
-    project_id: str
-
-
 class TaskSummaryResponse(BaseModel):
     """Summary of a task for listing."""
 
@@ -109,6 +91,24 @@ class TaskSummaryResponse(BaseModel):
     task_type: str
     status: str
     priority: int
+
+
+class TaskDetailResponse(BaseModel):
+    """Detailed task information."""
+
+    id: str
+    title: str
+    description: str | None
+    acceptance_criteria: str | None
+    task_type: str
+    status: str  # Effective status (accounts for blocking)
+    priority: int
+    content: str | None
+    tutor_guidance: dict[str, Any] | None
+    blocked_by: list[TaskSummaryResponse]  # Tasks blocking this one
+    blocks: list[TaskSummaryResponse]  # Tasks this one blocks
+    parent_id: str | None
+    project_id: str
 
 
 class ReadyTasksResponse(BaseModel):
@@ -209,18 +209,36 @@ async def get_project_tree(
             project = await get_task(session, project_id)
 
             # Recursively build tree with progress
-            async def build_tree(task_id: str) -> tuple[TaskNode, dict]:
+            # parent_blocked: if True, this task is blocked because an ancestor is blocked
+            async def build_tree(task_id: str, parent_blocked: bool = False) -> tuple[TaskNode, dict]:
                 task = await get_task(session, task_id)
                 progress = await get_or_create_progress(session, task_id, learner_id)
 
-                # Get children
+                # Check if task is blocked by its own dependencies
+                blocked_by_deps, _ = await is_task_blocked(session, task_id, learner_id)
+
+                # Task is effectively blocked if:
+                # 1. Its parent is blocked (transitive), OR
+                # 2. It has its own blocking dependencies
+                is_blocked = parent_blocked or blocked_by_deps
+
+                # Determine effective status
+                if progress.status == TaskStatus.CLOSED.value:
+                    effective_status = TaskStatus.CLOSED.value
+                elif is_blocked:
+                    effective_status = TaskStatus.BLOCKED.value
+                else:
+                    effective_status = progress.status
+
+                # Get children - pass down blocked status
                 children = await get_children(session, task_id, recursive=False)
 
                 child_nodes = []
                 stats = {"total": 0, "completed": 0, "in_progress": 0, "blocked": 0}
 
                 for child in children:
-                    child_node, child_stats = await build_tree(child.id)
+                    # Children inherit blocked status from parent
+                    child_node, child_stats = await build_tree(child.id, parent_blocked=is_blocked)
                     child_nodes.append(child_node)
 
                     # Aggregate stats
@@ -232,11 +250,11 @@ async def get_project_tree(
                 # Count this task (if it's a leaf or task type)
                 if task.task_type.value in ("task", "subtask") or not children:
                     stats["total"] += 1
-                    if progress.status == TaskStatus.CLOSED.value:
+                    if effective_status == TaskStatus.CLOSED.value:
                         stats["completed"] += 1
-                    elif progress.status == TaskStatus.IN_PROGRESS.value:
+                    elif effective_status == TaskStatus.IN_PROGRESS.value:
                         stats["in_progress"] += 1
-                    elif progress.status == TaskStatus.BLOCKED.value:
+                    elif effective_status == TaskStatus.BLOCKED.value:
                         stats["blocked"] += 1
 
                 # Add progress info to task nodes
@@ -248,7 +266,7 @@ async def get_project_tree(
                     id=task.id,
                     title=task.title,
                     task_type=task.task_type.value,
-                    status=progress.status,
+                    status=effective_status,
                     priority=task.priority,
                     description=task.description,
                     acceptance_criteria=task.acceptance_criteria,
@@ -258,7 +276,7 @@ async def get_project_tree(
 
                 return node, stats
 
-            root_node, stats = await build_tree(project_id)
+            root_node, stats = await build_tree(project_id, parent_blocked=False)
 
             # Calculate percentage
             percentage = (stats["completed"] / stats["total"] * 100) if stats["total"] > 0 else 0
@@ -286,6 +304,37 @@ async def get_project_tree(
             raise HTTPException(status_code=500, detail=str(e))
 
 
+async def is_ancestor_blocked(session, task_id: str, learner_id: str) -> bool:
+    """Check if any ancestor of this task is blocked by dependencies."""
+    task = await get_task(session, task_id)
+    current_id = task.parent_id
+
+    while current_id:
+        blocked, _ = await is_task_blocked(session, current_id, learner_id)
+        if blocked:
+            return True
+        parent_task = await get_task(session, current_id)
+        current_id = parent_task.parent_id
+
+    return False
+
+
+async def get_tasks_blocked_by(session, task_id: str, learner_id: str) -> list:
+    """Get tasks that are blocked by this task (reverse of get_blocking_tasks)."""
+    from sqlalchemy import text
+    from ltt.models import Task
+
+    query = text("""
+        SELECT t.*
+        FROM tasks t
+        JOIN dependencies d ON d.task_id = t.id
+        WHERE d.depends_on_id = :task_id
+          AND d.dependency_type = 'blocks'
+    """)
+    result = await session.execute(query, {"task_id": task_id})
+    return [Task.model_validate(dict(row)) for row in result.mappings()]
+
+
 @router.get("/task/{task_id}", response_model=TaskDetailResponse)
 async def get_task_details(
     task_id: str,
@@ -303,7 +352,49 @@ async def get_task_details(
             await ensure_learner_exists(session, learner_id)
             task = await get_task(session, task_id)
             progress = await get_or_create_progress(session, task_id, learner_id)
-            is_blocked, blockers = await is_task_blocked(session, task_id, learner_id)
+
+            # Check if blocked by direct dependencies
+            blocked_by_deps, blockers = await is_task_blocked(session, task_id, learner_id)
+
+            # Check if blocked by ancestor being blocked (transitive)
+            ancestor_blocked = await is_ancestor_blocked(session, task_id, learner_id)
+
+            # Effective blocked status
+            effectively_blocked = blocked_by_deps or ancestor_blocked
+
+            # Determine effective status
+            if progress.status == TaskStatus.CLOSED.value:
+                effective_status = TaskStatus.CLOSED.value
+            elif effectively_blocked:
+                effective_status = TaskStatus.BLOCKED.value
+            else:
+                effective_status = progress.status
+
+            # Get tasks this one blocks
+            blocks_tasks = await get_tasks_blocked_by(session, task_id, learner_id)
+
+            # Convert to response format
+            blocked_by = [
+                TaskSummaryResponse(
+                    id=b.id,
+                    title=b.title,
+                    task_type=b.task_type.value,
+                    status="open",  # Blockers are by definition not closed
+                    priority=b.priority,
+                )
+                for b in blockers
+            ]
+
+            blocks = [
+                TaskSummaryResponse(
+                    id=b.id,
+                    title=b.title,
+                    task_type=b.task_type.value,
+                    status="blocked",  # These are blocked by this task
+                    priority=b.priority,
+                )
+                for b in blocks_tasks
+            ]
 
             return TaskDetailResponse(
                 id=task.id,
@@ -311,12 +402,12 @@ async def get_task_details(
                 description=task.description,
                 acceptance_criteria=task.acceptance_criteria,
                 task_type=task.task_type.value,
-                status=progress.status,
+                status=effective_status,
                 priority=task.priority,
                 content=task.content,
                 tutor_guidance=task.tutor_guidance,
-                is_blocked=is_blocked,
-                blocking_tasks=[b.id for b in blockers],
+                blocked_by=blocked_by,
+                blocks=blocks,
                 parent_id=task.parent_id,
                 project_id=task.project_id,
             )

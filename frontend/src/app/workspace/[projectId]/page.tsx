@@ -13,9 +13,11 @@ import { ChatPanel } from "@/components/chat/ChatPanel";
 import { TaskDetailDrawer } from "@/components/shared/TaskDetailDrawer";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import {
+  createDatabase,
   executeQuery,
   isDatabaseReady,
   loadMajiNdogoDatabase,
+  SAMPLE_SCHEMA,
 } from "@/lib/sql-engine";
 import type { QueryResult } from "@/types";
 

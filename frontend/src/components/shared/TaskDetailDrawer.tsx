@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { X, ExternalLink, BookOpen, Target, AlertCircle } from "lucide-react";
 import { Drawer } from "vaul";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import ReactMarkdown from "react-markdown";
 
 import { Button } from "@/components/ui/button";
@@ -90,6 +91,9 @@ export function TaskDetailDrawer({
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/40 z-40" />
         <Drawer.Content className="fixed right-0 top-0 bottom-0 w-[450px] max-w-[90vw] bg-surface border-l border-border z-50 flex flex-col">
+          <VisuallyHidden.Root>
+            <Drawer.Title>Task Details</Drawer.Title>
+          </VisuallyHidden.Root>
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border">
             <div className="flex items-center gap-2">
@@ -139,7 +143,7 @@ export function TaskDetailDrawer({
                 </section>
 
                 {/* Learning Objectives */}
-                {task.learning_objectives.length > 0 && (
+                {task.learning_objectives?.length > 0 && (
                   <section>
                     <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2 mb-3">
                       <BookOpen className="h-4 w-4" />
@@ -208,9 +212,9 @@ export function TaskDetailDrawer({
                 )}
 
                 {/* Dependencies */}
-                {(task.blocked_by.length > 0 || task.blocks.length > 0) && (
+                {(task.blocked_by?.length > 0 || task.blocks?.length > 0) && (
                   <section className="border-t border-border pt-4">
-                    {task.blocked_by.length > 0 && (
+                    {task.blocked_by?.length > 0 && (
                       <div className="mb-3">
                         <span className="text-sm text-muted-foreground">Blocked by: </span>
                         {task.blocked_by.map((t) => (
@@ -220,7 +224,7 @@ export function TaskDetailDrawer({
                         ))}
                       </div>
                     )}
-                    {task.blocks.length > 0 && (
+                    {task.blocks?.length > 0 && (
                       <div>
                         <span className="text-sm text-muted-foreground">Blocks: </span>
                         {task.blocks.map((t) => (

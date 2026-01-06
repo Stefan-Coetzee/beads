@@ -16,6 +16,7 @@
     "@radix-ui/react-dialog": "latest",
     "@radix-ui/react-slot": "latest",
     "@radix-ui/react-tooltip": "latest",
+    "@radix-ui/react-visually-hidden": "^1.2.4",
     "@tanstack/react-query": "latest",
     "@tanstack/react-table": "latest",
     "@uiw/react-codemirror": "latest",

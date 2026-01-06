@@ -60,3 +60,7 @@ disallow_untyped_defs = true
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = "-m 'not integration'"
+markers = [
+    "integration: slow integration/e2e tests (run with: pytest -m integration)",
+]

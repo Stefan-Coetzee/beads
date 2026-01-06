@@ -10,6 +10,8 @@ Requirements:
 3. Tests CLI commands for learner creation
 4. Tests multi-learner isolation (comments, status, progress)
 5. Validates all failure modes
+
+Run with: pytest -m integration
 """
 
 import asyncio
@@ -17,6 +19,9 @@ import os
 from pathlib import Path
 
 import pytest
+
+# Mark all tests in this module as integration tests (skipped by default)
+pytestmark = pytest.mark.integration
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
