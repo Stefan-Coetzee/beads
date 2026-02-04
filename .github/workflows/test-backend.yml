@@ -1,0 +1,53 @@
+name: Test Backend
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ltt_user
+          POSTGRES_PASSWORD: ltt_password
+          POSTGRES_DB: ltt_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_test
+        run: uv run alembic upgrade head
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_test
+        run: uv run pytest -v --cov=services --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml

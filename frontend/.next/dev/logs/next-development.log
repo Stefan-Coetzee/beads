@@ -1,0 +1,14 @@
+[03:51:39.318] Server  ERROR   ⨯ Error: Cannot find module 'next/dist/client/components/builtin/global-not-found'
+Require stack:
+- /Users/stefancoetzee/GitHub/beadslocal/frontend/node_modules/next/dist/server/dev/on-demand-entry-handler.js
+- /Users/stefancoetzee/GitHub/beadslocal/frontend/node_modules/next/dist/server/dev/hot-reloader-turbopack.js
+- /Users/stefancoetzee/GitHub/beadslocal/frontend/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
+- /Users/stefancoetzee/GitHub/beadslocal/frontend/node_modules/next/dist/server/lib/router-server.js
+- /Users/stefancoetzee/GitHub/beadslocal/frontend/node_modules/next/dist/server/lib/start-server.js
+[03:51:39.332] Server  ERROR   ⨯ Error: Cannot find module 'next/dist/client/components/builtin/global-not-found'
+Require stack:
+- /Users/stefancoetzee/GitHub/beadslocal/frontend/node_modules/next/dist/server/dev/on-demand-entry-handler.js
+- /Users/stefancoetzee/GitHub/beadslocal/frontend/node_modules/next/dist/server/dev/hot-reloader-turbopack.js
+- /Users/stefancoetzee/GitHub/beadslocal/frontend/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
+- /Users/stefancoetzee/GitHub/beadslocal/frontend/node_modules/next/dist/server/lib/router-server.js
+- /Users/stefancoetzee/GitHub/beadslocal/frontend/node_modules/next/dist/server/lib/start-server.js

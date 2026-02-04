@@ -61,3 +61,9 @@ htmlcov/
 
 # Alembic
 alembic/versions/*.pyc
+
+# Simulation logs (runtime artifacts)
+simulation_logs/
+
+# Archive (historical code)
+archive/

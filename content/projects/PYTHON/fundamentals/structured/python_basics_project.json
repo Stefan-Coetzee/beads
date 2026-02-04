@@ -1,0 +1,467 @@
+{
+  "title": "Python Programming Fundamentals",
+  "description": "Learn the basics of Python programming through hands-on coding exercises. You'll start with simple output statements and progress through variables, data types, operators, and control flow.",
+  "workspace_type": "python",
+  "narrative_context": "You're learning Python to automate everyday tasks and analyze data. These fundamental skills will form the foundation for everything you build with Python - from web applications to data science projects.",
+  "learning_objectives": [
+    {"level": "remember", "description": "Recall Python syntax for print statements, variables, and basic operators"},
+    {"level": "understand", "description": "Explain how Python handles different data types and type conversion"},
+    {"level": "apply", "description": "Write Python programs that use variables, operators, and control flow"},
+    {"level": "analyze", "description": "Debug Python code by identifying syntax and logic errors"}
+  ],
+  "content": "## Welcome to Python!\n\nPython is one of the most popular programming languages in the world. It's known for being:\n\n- **Easy to read** - Python uses indentation and simple syntax\n- **Versatile** - Used for web development, data science, automation, and more\n- **Beginner-friendly** - Great first programming language\n\nIn this project, you'll learn the fundamentals step by step.",
+  "epics": [
+    {
+      "title": "Getting Started",
+      "description": "Your first Python programs - learning to output text and use comments",
+      "learning_objectives": [
+        {"level": "remember", "description": "Recall the syntax for print() and comments"}
+      ],
+      "tasks": [
+        {
+          "title": "Hello World",
+          "description": "Write your first Python program that displays a message",
+          "acceptance_criteria": "- Successfully use the print() function\n- Display text output in the console",
+          "tutor_guidance": {
+            "teaching_approach": "Start with the absolute basics. Let the learner experiment and see immediate results.",
+            "discussion_prompts": ["What do you think print() does?", "Why do we need quotes around text?"],
+            "common_mistakes": ["Forgetting quotes around strings", "Using Print() instead of print()", "Missing parentheses"],
+            "hints_to_give": ["Python uses print() to display output", "Text needs to be wrapped in quotes", "Try: print(\"Hello, World!\")"]
+          },
+          "subtasks": [
+            {
+              "title": "Print a greeting",
+              "description": "Use the print() function to display 'Hello, World!'",
+              "acceptance_criteria": "- Use print() function correctly\n- Output contains 'Hello, World!'",
+              "validation": {
+                "type": "python_output",
+                "expected": {
+                  "output_contains": ["Hello, World!"]
+                }
+              },
+              "tutor_guidance": {
+                "teaching_approach": "This is their first program - celebrate the success! Explain each part.",
+                "hints_to_give": [
+                  "In Python, we use print() to show output",
+                  "Text (called a 'string') goes inside quotes",
+                  "The full syntax is: print(\"Hello, World!\")"
+                ],
+                "common_mistakes": [
+                  "Forgetting the quotes: print(Hello, World!)",
+                  "Wrong capitalization: Print() or PRINT()",
+                  "Missing closing parenthesis"
+                ],
+                "answer_rationale": "print() is Python's built-in function for output. The text inside quotes is a 'string literal'. This simple program demonstrates the basic structure: function_name(argument)."
+              }
+            },
+            {
+              "title": "Print multiple lines",
+              "description": "Use multiple print() statements to display your name and a fun fact about yourself",
+              "acceptance_criteria": "- Use at least 2 print() statements\n- Display your name on one line\n- Display a fact on another line",
+              "validation": {
+                "type": "python_output",
+                "expected": {
+                  "output_contains": ["\\n"],
+                  "no_errors": true
+                }
+              },
+              "tutor_guidance": {
+                "teaching_approach": "Build on their success. Show that programs execute line by line, top to bottom.",
+                "hints_to_give": [
+                  "You can have multiple print() statements",
+                  "Each print() creates a new line by default",
+                  "Try: print(\"My name is...\") then print(\"I like...\")"
+                ],
+                "common_mistakes": [
+                  "Putting everything in one print() without understanding newlines",
+                  "Forgetting quotes on the second statement"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "title": "Comments",
+          "description": "Learn to write comments to document your code",
+          "acceptance_criteria": "- Understand single-line comments using #\n- Know when and why to use comments",
+          "tutor_guidance": {
+            "teaching_approach": "Explain that comments are notes for humans, not instructions for the computer.",
+            "discussion_prompts": ["Why would we want to write notes in our code?", "Who might read our comments later?"],
+            "common_mistakes": ["Over-commenting obvious code", "Forgetting comments explain WHY, not just WHAT"]
+          },
+          "subtasks": [
+            {
+              "title": "Add a comment",
+              "description": "Add a comment explaining what your code does, then print a message",
+              "acceptance_criteria": "- Include at least one comment starting with #\n- The comment explains the code's purpose\n- Code still runs and produces output",
+              "validation": {
+                "type": "python_output",
+                "expected": {
+                  "no_errors": true
+                }
+              },
+              "tutor_guidance": {
+                "teaching_approach": "Show that comments are ignored by Python. The learner should see that comments don't affect output.",
+                "hints_to_give": [
+                  "Comments start with the # symbol",
+                  "Everything after # on that line is ignored by Python",
+                  "Example: # This prints a greeting"
+                ],
+                "common_mistakes": [
+                  "Putting # inside the string quotes",
+                  "Thinking comments will show in output"
+                ],
+                "answer_rationale": "Comments with # are single-line comments. Python ignores them completely, but they help humans understand the code's purpose."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Variables and Data Types",
+      "description": "Learn to store and work with different types of data",
+      "learning_objectives": [
+        {"level": "understand", "description": "Explain the purpose of variables and different data types"},
+        {"level": "apply", "description": "Create variables and use them in expressions"}
+      ],
+      "tasks": [
+        {
+          "title": "Creating Variables",
+          "description": "Learn to create variables to store information",
+          "acceptance_criteria": "- Create variables with meaningful names\n- Assign values to variables\n- Use variables in print() statements",
+          "tutor_guidance": {
+            "teaching_approach": "Use the analogy of labeled boxes that hold values. Emphasize that variable names should be descriptive.",
+            "discussion_prompts": ["What would be a good name for a variable storing someone's age?", "Why might 'x' be a poor variable name?"],
+            "common_mistakes": ["Using spaces in variable names", "Starting with numbers", "Using Python keywords as names"]
+          },
+          "subtasks": [
+            {
+              "title": "Store and print a name",
+              "description": "Create a variable called 'name' with your name, then print it",
+              "acceptance_criteria": "- Create a variable named 'name'\n- Assign a string value\n- Print the variable (not the literal text)",
+              "validation": {
+                "type": "python_output",
+                "expected": {
+                  "no_errors": true
+                }
+              },
+              "tutor_guidance": {
+                "teaching_approach": "Show the difference between printing a literal string vs. a variable. Variables don't need quotes when used.",
+                "hints_to_give": [
+                  "Create a variable: name = \"Your Name\"",
+                  "Use the variable in print: print(name)",
+                  "Notice: no quotes around 'name' in print()"
+                ],
+                "common_mistakes": [
+                  "Printing print(\"name\") instead of print(name)",
+                  "Forgetting the = sign",
+                  "Putting the variable name in quotes"
+                ],
+                "answer_rationale": "Variables store values for later use. The = sign is the assignment operator - it puts the value on the right into the variable on the left."
+              }
+            },
+            {
+              "title": "Store a number",
+              "description": "Create a variable called 'age' with a number, then print a message using it",
+              "acceptance_criteria": "- Create a variable with a numeric value (no quotes)\n- Print the age in a sentence",
+              "validation": {
+                "type": "python_output",
+                "expected": {
+                  "no_errors": true
+                }
+              },
+              "tutor_guidance": {
+                "teaching_approach": "Highlight that numbers don't need quotes. Introduce the concept of different data types.",
+                "hints_to_give": [
+                  "Numbers don't need quotes: age = 25",
+                  "You can combine strings and variables",
+                  "Try: print(\"I am\", age, \"years old\")"
+                ],
+                "common_mistakes": [
+                  "Putting quotes around numbers: age = \"25\"",
+                  "Trying to concatenate without conversion"
+                ],
+                "answer_rationale": "Python has different data types. Numbers (integers) are written without quotes. Strings (text) need quotes. Python keeps track of what type each variable holds."
+              }
+            }
+          ]
+        },
+        {
+          "title": "Data Types",
+          "description": "Understand the main data types in Python: strings, integers, floats, and booleans",
+          "acceptance_criteria": "- Identify different data types\n- Use type() to check data types\n- Understand when to use each type",
+          "tutor_guidance": {
+            "teaching_approach": "Use real-world examples for each type: names (strings), ages (integers), prices (floats), yes/no (booleans).",
+            "discussion_prompts": ["What type would you use for a price?", "What type would you use for a true/false question?"]
+          },
+          "subtasks": [
+            {
+              "title": "Check types",
+              "description": "Create variables of different types and use type() to check them",
+              "acceptance_criteria": "- Create at least one string, one integer, one float, and one boolean\n- Use type() to print each variable's type",
+              "validation": {
+                "type": "python_output",
+                "expected": {
+                  "output_contains": ["<class"]
+                }
+              },
+              "tutor_guidance": {
+                "teaching_approach": "Let them discover what type() returns. Build intuition about types.",
+                "hints_to_give": [
+                  "String: text = \"hello\"",
+                  "Integer: count = 42",
+                  "Float: price = 19.99",
+                  "Boolean: is_student = True",
+                  "Check with: print(type(text))"
+                ],
+                "common_mistakes": [
+                  "Lowercase true/false (must be True/False)",
+                  "Putting quotes around numbers",
+                  "Forgetting that floats have decimal points"
+                ],
+                "answer_rationale": "Python's four basic types: str (strings for text), int (integers for whole numbers), float (for decimals), bool (True/False for logic). type() is a built-in function that tells you a value's type."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Operators and Expressions",
+      "description": "Learn to perform calculations and operations in Python",
+      "learning_objectives": [
+        {"level": "apply", "description": "Use arithmetic operators to perform calculations"},
+        {"level": "apply", "description": "Use comparison operators to compare values"}
+      ],
+      "tasks": [
+        {
+          "title": "Basic Math",
+          "description": "Use Python as a calculator with arithmetic operators",
+          "acceptance_criteria": "- Use +, -, *, / operators\n- Store results in variables\n- Print the results",
+          "tutor_guidance": {
+            "teaching_approach": "Start with simple calculations they can verify mentally. Build up to combining multiple operations.",
+            "common_mistakes": ["Forgetting order of operations", "Integer division confusion"]
+          },
+          "subtasks": [
+            {
+              "title": "Calculate a sum",
+              "description": "Add two numbers together and print the result",
+              "acceptance_criteria": "- Use the + operator\n- Store result in a variable\n- Print the result",
+              "validation": {
+                "type": "python_output",
+                "expected": {
+                  "no_errors": true
+                }
+              },
+              "tutor_guidance": {
+                "teaching_approach": "Simple and straightforward. Let them see Python do math.",
+                "hints_to_give": [
+                  "Use + to add: 5 + 3",
+                  "Store it: result = 5 + 3",
+                  "Print it: print(result)"
+                ],
+                "answer_rationale": "Python evaluates the expression 5 + 3 first, getting 8, then stores that value in the variable."
+              }
+            },
+            {
+              "title": "Multiple operations",
+              "description": "Calculate the total cost of 3 items at $19.99 each, then print the result",
+              "acceptance_criteria": "- Use multiplication\n- Display the total cost",
+              "validation": {
+                "type": "python_output",
+                "expected": {
+                  "no_errors": true
+                }
+              },
+              "tutor_guidance": {
+                "teaching_approach": "A practical example they can relate to. Introduce the concept of formulas in code.",
+                "hints_to_give": [
+                  "Multiplication uses *",
+                  "price = 19.99",
+                  "quantity = 3",
+                  "total = price * quantity"
+                ],
+                "common_mistakes": [
+                  "Using x for multiplication instead of *",
+                  "Forgetting that floats give decimal results"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "title": "Comparison Operators",
+          "description": "Compare values using ==, !=, <, >, <=, >=",
+          "acceptance_criteria": "- Understand that comparisons return True or False\n- Use comparison operators correctly",
+          "tutor_guidance": {
+            "teaching_approach": "Explain that comparisons ask questions: 'Is 5 greater than 3?' Python answers True or False.",
+            "discussion_prompts": ["What's the difference between = and ==?", "When would we need to compare values?"]
+          },
+          "subtasks": [
+            {
+              "title": "Compare numbers",
+              "description": "Use comparison operators to compare two numbers, print the results",
+              "acceptance_criteria": "- Use at least 2 different comparison operators\n- Print the boolean results",
+              "validation": {
+                "type": "python_output",
+                "expected": {
+                  "output_contains": ["True"],
+                  "no_errors": true
+                }
+              },
+              "tutor_guidance": {
+                "teaching_approach": "Show multiple comparisons. Build understanding that these will be crucial for making decisions in code.",
+                "hints_to_give": [
+                  "== checks equality (not =)",
+                  "Try: print(5 > 3)",
+                  "Try: print(10 == 10)",
+                  "Try: print(7 < 2)"
+                ],
+                "common_mistakes": [
+                  "Using = instead of == for comparison",
+                  "Confusing > and <"
+                ],
+                "answer_rationale": "Comparison operators return boolean values (True/False). == checks equality, != checks inequality. These are the foundation of conditional logic."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Control Flow",
+      "description": "Make decisions in your code with if statements and loops",
+      "learning_objectives": [
+        {"level": "apply", "description": "Write conditional statements using if/elif/else"},
+        {"level": "apply", "description": "Create loops to repeat actions"}
+      ],
+      "tasks": [
+        {
+          "title": "If Statements",
+          "description": "Make decisions in code based on conditions",
+          "acceptance_criteria": "- Write if statements with proper indentation\n- Use elif and else for multiple conditions",
+          "tutor_guidance": {
+            "teaching_approach": "Use real-world decision-making as an analogy: 'If it's raining, take an umbrella'.",
+            "common_mistakes": ["Forgetting the colon", "Wrong indentation", "Using = instead of =="]
+          },
+          "subtasks": [
+            {
+              "title": "Check a condition",
+              "description": "Write an if statement that prints 'Adult' if age is 18 or over, otherwise prints 'Minor'",
+              "acceptance_criteria": "- Create an age variable\n- Use if/else to check the condition\n- Print the appropriate message",
+              "validation": {
+                "type": "python_output",
+                "expected": {
+                  "no_errors": true
+                }
+              },
+              "tutor_guidance": {
+                "teaching_approach": "Emphasize the structure: if condition: (indented block). The colon and indentation are crucial.",
+                "hints_to_give": [
+                  "Start with: if age >= 18:",
+                  "The next line must be indented",
+                  "Use else: for the other case",
+                  "Example structure:\nif condition:\n    print(\"Yes\")\nelse:\n    print(\"No\")"
+                ],
+                "common_mistakes": [
+                  "Forgetting the colon after if/else",
+                  "Not indenting the code block",
+                  "Using = instead of >= for comparison"
+                ],
+                "answer_rationale": "if statements evaluate a condition. If True, the indented block runs. else provides an alternative when the condition is False. Indentation defines what code belongs to each block."
+              }
+            },
+            {
+              "title": "Multiple conditions",
+              "description": "Write a program that grades a test score: A (90+), B (80-89), C (70-79), F (below 70)",
+              "acceptance_criteria": "- Use if/elif/else chain\n- Handle all four grade ranges\n- Print the letter grade",
+              "validation": {
+                "type": "python_output",
+                "expected": {
+                  "no_errors": true
+                }
+              },
+              "tutor_guidance": {
+                "teaching_approach": "Build up from one condition at a time. Show how elif chains create multiple branches.",
+                "hints_to_give": [
+                  "Start with the highest grade first",
+                  "Use elif for middle conditions",
+                  "Use else for the lowest (F)",
+                  "score >= 90 for A, score >= 80 for B, etc."
+                ],
+                "common_mistakes": [
+                  "Checking ranges incorrectly (overlapping conditions)",
+                  "Using == instead of >= for ranges",
+                  "Forgetting that elif is one word, not else if"
+                ],
+                "answer_rationale": "elif (else-if) allows multiple conditions. Python checks them in order and runs the first True block. Once a condition matches, it skips the rest."
+              }
+            }
+          ]
+        },
+        {
+          "title": "For Loops",
+          "description": "Repeat actions using for loops",
+          "acceptance_criteria": "- Use for loops with range()\n- Iterate over a list of items",
+          "tutor_guidance": {
+            "teaching_approach": "Explain loops as automation: instead of writing print() 10 times, use a loop.",
+            "discussion_prompts": ["When would repeating code be useful?", "What if you needed to do something 1000 times?"]
+          },
+          "subtasks": [
+            {
+              "title": "Count with a loop",
+              "description": "Use a for loop to print the numbers 1 through 5",
+              "acceptance_criteria": "- Use for loop with range()\n- Print numbers 1 to 5 (not 0 to 4)",
+              "validation": {
+                "type": "python_output",
+                "expected": {
+                  "output_contains": ["1", "2", "3", "4", "5"],
+                  "no_errors": true
+                }
+              },
+              "tutor_guidance": {
+                "teaching_approach": "Introduce range() and how it generates sequences. Note that range starts at 0 by default.",
+                "hints_to_give": [
+                  "for i in range(5): gives 0,1,2,3,4",
+                  "range(1, 6) gives 1,2,3,4,5",
+                  "The second number is exclusive (not included)"
+                ],
+                "common_mistakes": [
+                  "Off-by-one errors with range()",
+                  "Forgetting the colon after for line",
+                  "Not indenting the loop body"
+                ],
+                "answer_rationale": "range(start, stop) generates numbers from start up to (but not including) stop. The loop variable (i) takes each value in turn."
+              }
+            },
+            {
+              "title": "Loop through a list",
+              "description": "Create a list of 3 favorite foods and use a for loop to print each one",
+              "acceptance_criteria": "- Create a list with []\n- Use for loop to iterate\n- Print each item",
+              "validation": {
+                "type": "python_output",
+                "expected": {
+                  "no_errors": true
+                }
+              },
+              "tutor_guidance": {
+                "teaching_approach": "Show that loops can iterate over any sequence, not just numbers.",
+                "hints_to_give": [
+                  "Create list: foods = [\"pizza\", \"tacos\", \"sushi\"]",
+                  "Loop: for food in foods:",
+                  "Print: print(food)"
+                ],
+                "common_mistakes": [
+                  "Forgetting brackets for the list",
+                  "Using the list name instead of the loop variable"
+                ],
+                "answer_rationale": "for item in list: iterates through each element. The variable (food) holds the current item on each iteration. This is more Pythonic than using indices."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

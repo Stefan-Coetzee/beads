@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(PYTHONPATH=services/ltt-core/src uv run:*)"
+    ]
+  }
+}

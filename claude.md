@@ -44,66 +44,66 @@ LTT separates **curriculum** (what to learn) from **progress** (learner-specific
 ## Repository Structure
 
 ```
-src/ltt/
-├── models/              # Pydantic + SQLAlchemy models
-│   ├── task.py          # Core task model (template layer)
-│   ├── progress.py      # Learner progress (instance layer)
-│   ├── submission.py    # Submissions & validations
-│   ├── dependency.py    # Task relationships
-│   └── objective.py     # Learning objectives (Bloom's taxonomy)
+beadslocal/
+├── services/                    # Backend services (Python)
+│   ├── ltt-core/               # Core Learning Task Tracker engine
+│   │   ├── src/ltt/
+│   │   │   ├── models/         # Pydantic + SQLAlchemy models
+│   │   │   ├── services/       # Business logic layer
+│   │   │   ├── tools/          # Agent runtime interface
+│   │   │   ├── cli/            # Admin CLI (Typer)
+│   │   │   ├── db/             # Database & migrations
+│   │   │   └── utils/          # Utilities
+│   │   ├── tests/              # ltt-core tests
+│   │   └── pyproject.toml
+│   │
+│   ├── api-server/             # FastAPI REST API
+│   │   ├── src/api/
+│   │   ├── tests/
+│   │   └── pyproject.toml
+│   │
+│   └── agent-tutor/            # LLM tutoring agent
+│       ├── src/agent/
+│       ├── tests/
+│       └── pyproject.toml
 │
-├── services/            # Business logic layer
-│   ├── task_service.py      # Task CRUD, hierarchy traversal
-│   ├── progress_service.py  # Status transitions, validation
-│   ├── dependency_service.py # Dependencies, ready work calculation
-│   ├── submission_service.py # Submission management
-│   ├── validation_service.py # Validation logic
-│   ├── learning/            # Learning-specific services
-│   │   ├── objectives.py    # Learning objectives
-│   │   ├── progress.py      # Progress tracking
-│   │   ├── summarization.py # Hierarchical summaries
-│   │   └── content.py       # Content management
-│   ├── ingest.py            # JSON project import
-│   └── export.py            # Project export (JSON/JSONL)
+├── apps/
+│   └── web/                    # Next.js frontend
+│       ├── src/
+│       ├── package.json
+│       └── README.md
 │
-├── tools/               # Agent runtime interface (for LLM agents)
-│   ├── navigation.py    # get_ready, show_task, get_context
-│   ├── progress.py      # start_task, submit
-│   ├── feedback.py      # add_comment, get_comments
-│   ├── control.py       # go_back, request_help
-│   └── schemas.py       # Pydantic I/O models
+├── infrastructure/
+│   ├── docker/
+│   │   └── docker-compose.yml
+│   └── terraform/
 │
-├── cli/                 # Admin CLI (Typer)
-│   └── main.py          # Project management commands
+├── content/
+│   └── projects/               # Project JSON files
 │
-├── db/                  # Database
-│   ├── session.py       # Async session management
-│   └── migrations/      # Alembic migrations
+├── tools/
+│   ├── scripts/                # Dev utilities
+│   └── simulation/             # Learner simulation
 │
-└── utils/               # Utilities
-    └── ids.py           # Hierarchical ID generation
-
-tests/                   # 167 tests, all passing
-├── services/            # Service layer tests
-├── tools/               # Agent tools tests
-└── conftest.py          # Pytest fixtures (async_session, etc.)
-
-docs/
-├── SCHEMA-FOR-LLM-INGESTION.md  # Complete schema guide for LLM-based project creation
-├── CLI-USAGE-GUIDE.md           # Full CLI reference
-└── BUILD-STATUS.md              # Implementation status (167 tests)
-
-python-port/docs/        # Technical specifications
-├── PRD.md               # Product requirements
-├── 01-data-models.md    # Complete data model specs
-├── 02-task-management.md
-├── 03-dependencies.md
-├── 04-submissions-validation.md
-├── 05-learning-progress.md
-├── 07-agent-tools.md
-├── 08-admin-cli.md
-└── adr/
-    └── 001-learner-scoped-task-progress.md
+├── docs/
+│   ├── architecture/
+│   │   └── adr/                # Architecture Decision Records
+│   ├── development/
+│   ├── api/
+│   ├── cli/
+│   └── schema/
+│
+├── archive/                    # Historical code (not active)
+│
+├── .github/
+│   └── workflows/              # CI/CD
+│
+├── pyproject.toml              # Workspace root (uv workspaces)
+├── alembic.ini
+├── docker-compose.yml          # Symlink to infrastructure/docker/
+├── README.md
+├── CLAUDE.md
+└── LICENSE
 ```
 
 ---
@@ -138,7 +138,7 @@ python -m ltt.cli.main ingest project my_project.json --dry-run
 python -m ltt.cli.main ingest project my_project.json
 ```
 
-**Input Format**: See [docs/SCHEMA-FOR-LLM-INGESTION.md](docs/SCHEMA-FOR-LLM-INGESTION.md)
+**Input Format**: See [docs/schema/project-ingestion.md](docs/schema/project-ingestion.md)
 
 ### Task Management
 
@@ -211,13 +211,13 @@ python -m ltt.cli.main db init
 **Direct Alembic** (alternative):
 ```bash
 # Run migrations
-PYTHONPATH=src uv run alembic upgrade head
+PYTHONPATH=services/ltt-core/src uv run alembic upgrade head
 
 # Create new migration
-PYTHONPATH=src uv run alembic revision --autogenerate -m "Description"
+PYTHONPATH=services/ltt-core/src uv run alembic revision --autogenerate -m "Description"
 
 # Rollback
-PYTHONPATH=src uv run alembic downgrade -1
+PYTHONPATH=services/ltt-core/src uv run alembic downgrade -1
 ```
 
 ---
@@ -228,28 +228,32 @@ PYTHONPATH=src uv run alembic downgrade -1
 
 ```bash
 # All tests (167 tests)
-uv run pytest tests/ -v
+uv run pytest -v
+
+# Specific service
+uv run pytest services/ltt-core/tests/ -v
+uv run pytest services/agent-tutor/tests/ -v
 
 # Specific module
-uv run pytest tests/services/test_task_service.py -v
-uv run pytest tests/tools/ -v
+uv run pytest services/ltt-core/tests/services/test_task_service.py -v
+uv run pytest services/ltt-core/tests/tools/ -v
 
 # With coverage
-uv run pytest tests/ --cov=src/ltt --cov-report=term-missing
+uv run pytest --cov=services --cov-report=term-missing
 
 # Fast (quiet mode)
-uv run pytest tests/ -q
+uv run pytest -q
 ```
 
 ### Code Quality
 
 ```bash
 # Lint and format
-uv run ruff check src/ tests/
-uv run ruff format src/ tests/
+uv run ruff check services/ tools/
+uv run ruff format services/ tools/
 
 # Auto-fix issues
-uv run ruff check --fix src/ tests/
+uv run ruff check --fix services/ tools/
 ```
 
 ### Database Management
@@ -617,7 +621,7 @@ from sqlalchemy.orm import sessionmaker
 import os
 
 # Get database URL
-db_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://ltt:ltt@localhost:5432/ltt")
+db_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev")
 
 # Create engine
 engine = create_async_engine(db_url, echo=False)
@@ -755,7 +759,7 @@ content_id = generate_entity_id("cnt")      # cnt-xyz789
 }
 ```
 
-**See [docs/SCHEMA-FOR-LLM-INGESTION.md](docs/SCHEMA-FOR-LLM-INGESTION.md) for complete field-by-field guide.**
+**See [docs/schema/project-ingestion.md](docs/schema/project-ingestion.md) for complete field-by-field guide.**
 
 ---
 
@@ -765,7 +769,7 @@ content_id = generate_entity_id("cnt")      # cnt-xyz789
 
 ```bash
 # 1. Create or generate project.json
-#    (Use LLM with docs/SCHEMA-FOR-LLM-INGESTION.md for conversion)
+#    (Use LLM with docs/schema/project-ingestion.md for conversion)
 
 # 2. Validate structure
 python -m ltt.cli.main ingest project project.json --dry-run
@@ -834,21 +838,30 @@ else:
 
 ---
 
+## Prerequisites
+
+- **Python**: 3.12+
+- **Node.js**: 20+ (use `nvm use 24` for latest LTS)
+- **Docker**: For PostgreSQL and MySQL
+- **uv**: Python package manager
+
+---
+
 ## Environment Variables
 
 ```bash
 # Database URL
-DATABASE_URL=postgresql+asyncpg://ltt:ltt@localhost:5432/ltt
+DATABASE_URL=postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev
 
 # Required for Alembic migrations
-PYTHONPATH=src
+PYTHONPATH=services/ltt-core/src
 ```
 
 **Default database** (docker-compose):
 - Host: localhost:5432
-- Database: ltt
-- User: ltt
-- Password: ltt
+- Database: ltt_dev
+- User: ltt_user
+- Password: ltt_password
 
 ---
 
@@ -874,25 +887,25 @@ async def test_my_feature(async_session):
 ## Key Files to Know
 
 ### Configuration
-- `pyproject.toml` - Dependencies, pytest config, ruff settings
-- `docker-compose.yml` - PostgreSQL 17 setup
+- `pyproject.toml` - Workspace root, dependencies, pytest config, ruff settings
+- `infrastructure/docker/docker-compose.yml` - PostgreSQL 17 + MySQL 8.0 setup
 - `.env` - Environment variables (create from `.env.example`)
 
 ### Models
-- `src/ltt/models/__init__.py` - All models exported
-- `src/ltt/models/task.py` - Task, TaskCreate, TaskUpdate, TaskModel
-- `src/ltt/models/progress.py` - LearnerTaskProgress
-- `src/ltt/models/submission.py` - Submission, Validation
+- `services/ltt-core/src/ltt/models/__init__.py` - All models exported
+- `services/ltt-core/src/ltt/models/task.py` - Task, TaskCreate, TaskUpdate, TaskModel
+- `services/ltt-core/src/ltt/models/progress.py` - LearnerTaskProgress
+- `services/ltt-core/src/ltt/models/submission.py` - Submission, Validation
 
 ### Services
-- `src/ltt/services/task_service.py` - Most commonly used
-- `src/ltt/services/dependency_service.py` - Ready work, blocking
-- `src/ltt/services/learning/objectives.py` - Learning objectives
+- `services/ltt-core/src/ltt/services/task_service.py` - Most commonly used
+- `services/ltt-core/src/ltt/services/dependency_service.py` - Ready work, blocking
+- `services/ltt-core/src/ltt/services/learning/objectives.py` - Learning objectives
 
 ### Documentation
-- `docs/SCHEMA-FOR-LLM-INGESTION.md` - **Critical** - Complete schema guide
-- `docs/CLI-USAGE-GUIDE.md` - Full CLI reference
-- `python-port/docs/PRD.md` - System overview
+- `docs/schema/project-ingestion.md` - **Critical** - Complete schema guide
+- `docs/cli/usage.md` - Full CLI reference
+- `docs/architecture/adr/` - Architecture Decision Records
 - `BUILD-STATUS.md` - Implementation status (167 tests)
 
 ---
@@ -952,7 +965,7 @@ closed → open           ✅ Only via go_back (requires reason)
 
 ### Tests failing after model changes
 **Cause**: Migration not run
-**Fix**: `PYTHONPATH=src uv run alembic upgrade head`
+**Fix**: `PYTHONPATH=services/ltt-core/src uv run alembic upgrade head`
 
 ---
 
@@ -998,22 +1011,22 @@ LEFT JOIN learner_task_progress ltp
 
 ```bash
 # Data layer
-uv run pytest tests/test_basic.py -v
+uv run pytest services/ltt-core/tests/test_basic.py -v
 
 # Task management
-uv run pytest tests/services/test_task_service.py -v
+uv run pytest services/ltt-core/tests/services/test_task_service.py -v
 
 # Dependencies
-uv run pytest tests/services/test_dependency_service.py -v
+uv run pytest services/ltt-core/tests/services/test_dependency_service.py -v
 
 # Learning
-uv run pytest tests/services/test_learning_*.py -v
+uv run pytest services/ltt-core/tests/services/test_learning_*.py -v
 
 # Agent tools
-uv run pytest tests/tools/ -v
+uv run pytest services/ltt-core/tests/tools/ -v
 
 # Ingestion/Export
-uv run pytest tests/services/test_ingest.py tests/services/test_export.py -v
+uv run pytest services/ltt-core/tests/services/test_ingest.py services/ltt-core/tests/services/test_export.py -v
 ```
 
 ---
@@ -1054,9 +1067,8 @@ See [BUILD-STATUS.md](BUILD-STATUS.md) for detailed phase reports.
 
 ## Links
 
-- **Product Requirements**: [python-port/docs/PRD.md](python-port/docs/PRD.md)
-- **Schema Guide**: [docs/SCHEMA-FOR-LLM-INGESTION.md](docs/SCHEMA-FOR-LLM-INGESTION.md)
-- **CLI Reference**: [docs/CLI-USAGE-GUIDE.md](docs/CLI-USAGE-GUIDE.md)
+- **Schema Guide**: [docs/schema/project-ingestion.md](docs/schema/project-ingestion.md)
+- **CLI Reference**: [docs/cli/usage.md](docs/cli/usage.md)
 - **Build Status**: [BUILD-STATUS.md](BUILD-STATUS.md)
-- **Architecture Decision**: [python-port/docs/adr/001-learner-scoped-task-progress.md](python-port/docs/adr/001-learner-scoped-task-progress.md)
+- **Architecture Decisions**: [docs/architecture/adr/](docs/architecture/adr/)
 - **Beads (Original)**: https://github.com/steveyegge/beads
