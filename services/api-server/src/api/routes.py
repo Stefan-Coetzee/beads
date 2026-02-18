@@ -25,6 +25,32 @@ router = APIRouter(tags=["agent"])
 # =============================================================================
 
 
+class ExecutionResult(BaseModel):
+    """Unified execution result for SQL queries or Python code."""
+
+    success: bool = Field(..., description="Whether execution succeeded")
+    duration: float = Field(0, description="Execution time in milliseconds")
+
+    # For successful results
+    output: str | None = Field(None, description="Text output (Python stdout, or formatted SQL result)")
+    columns: list[str] | None = Field(None, description="Column names (SQL only)")
+    rows: list[list] | None = Field(None, description="Result rows (SQL only)")
+    row_count: int | None = Field(None, description="Number of rows returned (SQL only)")
+
+    # For errors
+    error: str | None = Field(None, description="Error message")
+    error_message: str | None = Field(None, description="Short error message (Python)")
+    traceback: str | None = Field(None, description="Full traceback (Python)")
+
+
+class WorkspaceContext(BaseModel):
+    """Context from the user's workspace (editor, results)."""
+
+    editor_content: str | None = Field(None, description="Current code in the editor")
+    results: ExecutionResult | None = Field(None, description="Execution results (SQL or Python)")
+    workspace_type: str | None = Field(None, description="Type of workspace: sql, python, cybersecurity")
+
+
 class ChatRequest(BaseModel):
     """Request to chat with the agent."""
 
@@ -32,6 +58,7 @@ class ChatRequest(BaseModel):
     learner_id: str = Field(..., description="The learner's ID")
     project_id: str = Field(..., description="The project ID")
     thread_id: str | None = Field(None, description="Optional thread ID for conversation continuity")
+    context: WorkspaceContext | None = Field(None, description="Workspace context (editor, results)")
 
 
 class ChatResponse(BaseModel):
@@ -65,6 +92,92 @@ class SessionResponse(BaseModel):
 
 
 # =============================================================================
+# Context Formatting
+# =============================================================================
+
+
+def format_workspace_context(context: WorkspaceContext | None) -> str:
+    """
+    Format workspace context into a string for the LLM.
+
+    Standardizes SQL and Python results into a readable format.
+    """
+    if not context:
+        return ""
+
+    parts = []
+    workspace_type = context.workspace_type or "sql"
+
+    # Add workspace type indicator
+    workspace_label = {
+        "sql": "SQL",
+        "python": "Python",
+        "cybersecurity": "Cybersecurity",
+    }.get(workspace_type, workspace_type.title())
+    parts.append(f"[Workspace: {workspace_label}]")
+
+    # Add editor content if present
+    if context.editor_content and context.editor_content.strip():
+        lang = "sql" if workspace_type == "sql" else "python"
+        parts.append(f"\n**Current Code in Editor:**\n```{lang}\n{context.editor_content.strip()}\n```")
+
+    # Format execution results (unified for SQL and Python)
+    if context.results:
+        r = context.results
+        duration = r.duration or 0
+
+        if r.success:
+            # SQL results with tabular data
+            if r.columns and r.rows is not None:
+                row_count = r.row_count or len(r.rows)
+                parts.append(f"\n**Query Results** ({row_count} rows, {duration:.0f}ms):")
+
+                if r.rows:
+                    # Format as markdown table (limit to first 10 rows)
+                    header = "| " + " | ".join(str(c) for c in r.columns) + " |"
+                    separator = "| " + " | ".join("---" for _ in r.columns) + " |"
+                    table_rows = []
+                    for row in r.rows[:10]:
+                        table_rows.append("| " + " | ".join(str(v) for v in row) + " |")
+
+                    parts.append(header)
+                    parts.append(separator)
+                    parts.extend(table_rows)
+
+                    if len(r.rows) > 10:
+                        parts.append(f"... and {len(r.rows) - 10} more rows")
+                else:
+                    parts.append("(No rows returned)")
+
+            # Text output (Python or SQL messages)
+            elif r.output:
+                label = "Output" if workspace_type == "python" else "Result"
+                parts.append(f"\n**{label}** ({duration:.0f}ms):\n```\n{r.output}\n```")
+            else:
+                parts.append(f"\n**Execution completed** ({duration:.0f}ms) - No output")
+        else:
+            # Error handling
+            error_msg = r.error_message or r.error or "Unknown error"
+            parts.append(f"\n**Error** ({duration:.0f}ms): {error_msg}")
+
+            # Include traceback if available (Python)
+            if r.traceback:
+                parts.append(f"```\n{r.traceback}\n```")
+
+    return "\n".join(parts)
+
+
+def build_message_with_context(message: str, context: WorkspaceContext | None) -> str:
+    """
+    Build the full message with workspace context prepended.
+    """
+    context_str = format_workspace_context(context)
+    if context_str:
+        return f"{context_str}\n\n**User Message:** {message}"
+    return message
+
+
+# =============================================================================
 # Endpoints
 # =============================================================================
 
@@ -86,13 +199,16 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
         thread_id = request.thread_id or f"{request.learner_id}-{request.project_id}"
 
+        # Build message with workspace context (editor content, results)
+        full_message = build_message_with_context(request.message, request.context)
+
         # Get current message count before invoke (to identify new messages)
         current_state = await agent.aget_state(thread_id=thread_id)
         # LangGraph state has .values attribute containing the dict
         state_values = getattr(current_state, "values", {}) if current_state else {}
         prev_message_count = len(state_values.get("messages", [])) if state_values else 0
 
-        result = await agent.ainvoke(request.message, thread_id=thread_id)
+        result = await agent.ainvoke(full_message, thread_id=thread_id)
 
         # Extract response text and tool calls from NEW messages only
         messages = result.get("messages", [])
@@ -141,6 +257,8 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
 
     Returns a stream of SSE events with response chunks.
     """
+    # Build the full message with workspace context prepended
+    full_message = build_message_with_context(request.message, request.context)
 
     async def generate() -> AsyncGenerator[str, None]:
         try:
@@ -152,10 +270,17 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
 
             thread_id = request.thread_id or f"{request.learner_id}-{request.project_id}"
 
-            async for event in agent.astream(request.message, thread_id=thread_id):
+            # full_message is built outside the generator now
+            async for event in agent.astream(full_message, thread_id=thread_id):
                 messages = event.get("messages", [])
                 if messages:
                     last_msg = messages[-1]
+
+                    # Skip HumanMessages - only stream AI responses and tool results
+                    # LangGraph streams ALL messages including user input
+                    msg_type = getattr(last_msg, "type", None)
+                    if msg_type == "human":
+                        continue
 
                     if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
                         for tool_call in last_msg.tool_calls:

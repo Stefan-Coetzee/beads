@@ -118,7 +118,7 @@ export interface ToolCall {
   args: Record<string, unknown>;
 }
 
-// Query result types
+// Query result types (used by SQL components)
 export interface QueryResult {
   success: boolean;
   columns?: string[];
@@ -128,7 +128,7 @@ export interface QueryResult {
   error?: string;
 }
 
-// Python result types
+// Python result types (used by Python components)
 export interface PythonResult {
   success: boolean;
   output?: string;
@@ -138,8 +138,56 @@ export interface PythonResult {
   duration: number;
 }
 
+// Unified execution result for API communication
+export interface ExecutionResult {
+  success: boolean;
+  duration: number;
+  // For successful results
+  output?: string;           // Text output (Python stdout, or messages)
+  columns?: string[];        // Column names (SQL only)
+  rows?: unknown[][];        // Result rows (SQL only)
+  row_count?: number;        // Number of rows (SQL only)
+  // For errors
+  error?: string;            // Error message
+  error_message?: string;    // Short error message (Python)
+  traceback?: string;        // Full traceback (Python)
+}
+
+// Workspace context for chat API
+export interface WorkspaceContext {
+  editor_content?: string;
+  results?: ExecutionResult;
+  workspace_type?: WorkspaceType;
+}
+
 // Workspace types
 export type WorkspaceType = "sql" | "python" | "cybersecurity";
+
+// Helper to convert QueryResult to ExecutionResult
+export function queryResultToExecutionResult(qr: QueryResult | null): ExecutionResult | undefined {
+  if (!qr) return undefined;
+  return {
+    success: qr.success,
+    duration: qr.duration,
+    columns: qr.columns,
+    rows: qr.rows,
+    row_count: qr.rowCount,
+    error: qr.error,
+  };
+}
+
+// Helper to convert PythonResult to ExecutionResult
+export function pythonResultToExecutionResult(pr: PythonResult | null): ExecutionResult | undefined {
+  if (!pr) return undefined;
+  return {
+    success: pr.success,
+    duration: pr.duration,
+    output: pr.output,
+    error: pr.error,
+    error_message: pr.errorMessage,
+    traceback: pr.traceback,
+  };
+}
 
 // API response types
 export interface ChatResponse {

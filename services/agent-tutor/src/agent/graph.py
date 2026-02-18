@@ -517,11 +517,17 @@ class AgentWrapper:
             async with self.session_factory() as session:
                 project = await get_task(session, self.project_id)
                 if project:
+                    # Get workspace_type and tutor_persona if available
+                    workspace_type = getattr(project, 'workspace_type', None)
+                    tutor_persona = getattr(project, 'tutor_persona', None)
+
                     self._project_context = ProjectContext(
                         project_id=project.id,
                         title=project.title,
                         description=project.description,
                         narrative_context=project.narrative_context,
+                        workspace_type=workspace_type,
+                        tutor_persona=tutor_persona,
                     )
         except Exception:
             pass  # Project context is optional
@@ -764,6 +770,8 @@ async def create_agent_with_context(
     project_description = None
     narrative_context = None
     project_content = None
+    workspace_type = None
+    tutor_persona = None
     current_epic_dict = None
 
     try:
@@ -776,6 +784,8 @@ async def create_agent_with_context(
                 project_description = project.description
                 narrative_context = project.narrative_context
                 project_content = project.content
+                workspace_type = getattr(project, 'workspace_type', None)
+                tutor_persona = getattr(project, 'tutor_persona', None)
 
                 # Find current epic (in-progress or first open)
                 children = await get_children(session, project_id, recursive=False)
@@ -811,6 +821,8 @@ async def create_agent_with_context(
         project_description=project_description,
         project_content=project_content,
         current_epic=current_epic_dict,
+        workspace_type=workspace_type,
+        custom_persona=tutor_persona,
     )
 
     # Create the graph
@@ -837,12 +849,14 @@ async def create_agent_with_context(
     )
 
     # Pre-populate cached context
-    if project_description or narrative_context:
+    if project_description or narrative_context or workspace_type:
         wrapper._project_context = ProjectContext(
             project_id=project_id,
             title="",  # We don't store title separately
             description=project_description or "",
             narrative_context=narrative_context,
+            workspace_type=workspace_type,
+            tutor_persona=tutor_persona,
         )
         wrapper._context_loaded = True
 

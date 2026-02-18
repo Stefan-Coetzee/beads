@@ -66,6 +66,12 @@ class TaskBase(BaseModel):
         description="Type of workspace for this project: sql, python, cybersecurity",
     )
 
+    # Custom tutor persona (primarily for projects)
+    tutor_persona: str | None = Field(
+        default=None,
+        description="Custom system prompt persona for the tutor agent. Overrides default persona.",
+    )
+
     # Learning-specific fields
     content: str | None = Field(default=None, description="Inline learning content")
     content_refs: list[str] = Field(default_factory=list, description="References to content IDs")
@@ -216,6 +222,9 @@ class TaskModel(Base, TimestampMixin):
 
     # Workspace type (primarily for projects)
     workspace_type: Mapped[str | None] = mapped_column(String(50), nullable=True, default=None)
+
+    # Custom tutor persona (primarily for projects)
+    tutor_persona: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
 
     # Relationships
     parent: Mapped[Optional["TaskModel"]] = relationship(

@@ -7,7 +7,8 @@ import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { cn, parseTaskReferences } from "@/lib/utils";
 import { streamChat } from "@/lib/api";
-import type { QueryResult } from "@/types";
+import type { QueryResult, WorkspaceType, PythonResult, WorkspaceContext } from "@/types";
+import { queryResultToExecutionResult, pythonResultToExecutionResult } from "@/types";
 
 interface Message {
   id: string;
@@ -20,24 +21,34 @@ interface ChatPanelProps {
   projectId: string;
   editorContent: string;
   queryResults: QueryResult | null;
+  pythonResults?: PythonResult | null;
   currentTaskId: string | null;
   onTaskClick: (taskId: string) => void;
+  workspaceType?: WorkspaceType;
 }
+
+// Contextual welcome messages based on workspace type
+const WELCOME_MESSAGES: Record<WorkspaceType, string> = {
+  sql: "Hello! I'm your learning assistant. I can see your SQL editor and query results. Feel free to ask me questions about SQL, your current task, or the project. What would you like to work on?",
+  python: "Hello! I'm your learning assistant. I can see your Python editor and output. You can use packages like **numpy**, **pandas**, **matplotlib**, and more - they'll be loaded automatically when you import them. Ask me about Python, data analysis, or your current task!",
+  cybersecurity: "Hello! I'm your learning assistant for cybersecurity. I can help you understand security concepts, analyze code for vulnerabilities, and guide you through security-related tasks. What would you like to explore?",
+};
 
 export function ChatPanel({
   learnerId,
   projectId,
   editorContent,
   queryResults,
+  pythonResults,
   currentTaskId,
   onTaskClick,
+  workspaceType = "sql",
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       role: "assistant",
-      content:
-        "Hello! I'm your learning assistant. I can see your SQL editor and results. Feel free to ask me questions about SQL, your current task, or the project. What would you like to work on?",
+      content: WELCOME_MESSAGES[workspaceType],
     },
   ]);
   const [input, setInput] = useState("");
@@ -76,15 +87,21 @@ export function ChatPanel({
         // Stream response
         let fullContent = "";
         let lastToolCall = "";
+        // Build unified context for the API
+        const context: WorkspaceContext = {
+          editor_content: editorContent || undefined,
+          workspace_type: workspaceType,
+          results: workspaceType === "python"
+            ? pythonResultToExecutionResult(pythonResults ?? null)
+            : queryResultToExecutionResult(queryResults),
+        };
+
         const stream = streamChat(
           userMessage.content,
           learnerId,
           projectId,
           threadId || undefined,
-          {
-            editor_content: editorContent,
-            query_results: queryResults,
-          }
+          context
         );
 
         for await (const chunk of stream) {
@@ -160,7 +177,7 @@ export function ChatPanel({
         setIsLoading(false);
       }
     },
-    [input, isLoading, learnerId, projectId, threadId, editorContent, queryResults]
+    [input, isLoading, learnerId, projectId, threadId, editorContent, queryResults, pythonResults, workspaceType]
   );
 
   const handleReset = () => {
@@ -168,8 +185,7 @@ export function ChatPanel({
       {
         id: "welcome",
         role: "assistant",
-        content:
-          "Conversation reset. How can I help you with your learning journey?",
+        content: WELCOME_MESSAGES[workspaceType],
       },
     ]);
     setThreadId(null);
@@ -313,7 +329,11 @@ export function ChatPanel({
           </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-2">
-          I can see your code and query results
+          {workspaceType === "python"
+            ? "I can see your Python code and output"
+            : workspaceType === "cybersecurity"
+            ? "I can help analyze security concepts and code"
+            : "I can see your SQL code and query results"}
         </p>
       </form>
     </div>

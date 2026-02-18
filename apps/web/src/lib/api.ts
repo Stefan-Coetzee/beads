@@ -4,6 +4,7 @@ import type {
   ChatResponse,
   SubmitResponse,
   TaskSummary,
+  WorkspaceContext,
 } from "@/types";
 
 export const API_BASE_URL =
@@ -95,7 +96,7 @@ export const api = {
     learnerId: string,
     projectId: string,
     threadId?: string,
-    context?: { editor_content?: string; query_results?: unknown }
+    context?: WorkspaceContext
   ): Promise<ChatResponse> {
     const res = await fetch(`${API_BASE_URL}/api/v1/chat`, {
       method: "POST",
@@ -118,7 +119,7 @@ export const api = {
     learnerId: string,
     projectId: string,
     threadId?: string,
-    context?: { editor_content?: string; query_results?: unknown }
+    context?: WorkspaceContext
   ): EventSource {
     // Note: For proper streaming, we'll use fetch with ReadableStream
     // EventSource doesn't support POST, so we'll handle this differently
@@ -147,18 +148,25 @@ export async function* streamChat(
   learnerId: string,
   projectId: string,
   threadId?: string,
-  context?: { editor_content?: string; query_results?: unknown }
+  context?: WorkspaceContext
 ): AsyncGenerator<{ type: string; content: unknown }> {
+  // Ensure context is properly structured for the API
+  const requestBody = {
+    message,
+    learner_id: learnerId,
+    project_id: projectId,
+    thread_id: threadId,
+    context: context ? {
+      workspace_type: context.workspace_type || "sql",
+      editor_content: context.editor_content || null,
+      results: context.results || null,
+    } : null,
+  };
+
   const res = await fetch(`${API_BASE_URL}/api/v1/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      message,
-      learner_id: learnerId,
-      project_id: projectId,
-      thread_id: threadId,
-      context,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!res.ok) throw new Error("Failed to start chat stream");

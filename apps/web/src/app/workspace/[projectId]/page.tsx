@@ -1,10 +1,10 @@
 "use client";
 
 import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
-import { ArrowLeft, BookOpen, RefreshCw } from "lucide-react";
+import { ArrowLeft, BookOpen, RefreshCw, AlertTriangle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { SqlEditor } from "@/components/workspace/SqlEditor";
@@ -14,18 +14,22 @@ import { PythonResultsPanel } from "@/components/workspace/PythonResultsPanel";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { TaskDetailDrawer } from "@/components/shared/TaskDetailDrawer";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import type { QueryResult, WorkspaceType } from "@/types";
+
+// SQL engine - only imported when needed
 import {
   executeQuery,
   isDatabaseReady,
   loadMajiNdogoDatabase,
 } from "@/lib/sql-engine";
+
+// Python engine - only imported when needed
 import {
   executePython,
   initPythonEngine,
   isPythonReady,
   resetPythonEnvironment,
 } from "@/lib/python-engine";
-import type { QueryResult, WorkspaceType } from "@/types";
 
 export default function WorkspacePage() {
   const params = useParams();
@@ -33,13 +37,11 @@ export default function WorkspacePage() {
   const projectId = params.projectId as string;
   const learnerId = searchParams.get("learnerId") || "learner-dev-001";
   const initialTaskId = searchParams.get("taskId");
-  const workspaceTypeParam = searchParams.get("type") as WorkspaceType | null;
 
-  // Use URL param directly for rendering (don't wait for useEffect)
-  const effectiveWorkspaceType: WorkspaceType = workspaceTypeParam || "sql";
+  // Workspace type MUST be explicitly set via URL param - no defaults
+  const workspaceType = searchParams.get("type") as WorkspaceType | null;
 
   const {
-    workspaceType,
     setWorkspaceType,
     sqlContent,
     setSqlContent,
@@ -60,43 +62,47 @@ export default function WorkspacePage() {
     closeDrawer,
   } = useWorkspaceStore();
 
-  // Set workspace type from URL param (always takes precedence)
+  // Set workspace type in store from URL param
   useEffect(() => {
-    if (workspaceTypeParam) {
-      setWorkspaceType(workspaceTypeParam);
+    if (workspaceType) {
+      setWorkspaceType(workspaceType);
     }
-  }, [workspaceTypeParam, setWorkspaceType]);
+  }, [workspaceType, setWorkspaceType]);
 
-  // Initialize SQL database on mount (for SQL workspace)
+  // Initialize SQL database ONLY when type=sql
   useEffect(() => {
+    if (workspaceType !== "sql") return; // Guard: only for SQL workspace
+
     async function initSql() {
-      if (effectiveWorkspaceType === "sql" && !isDatabaseReady()) {
+      if (!isDatabaseReady()) {
         try {
           await loadMajiNdogoDatabase();
-          console.log("Database initialized with Maji Ndogo data");
+          console.log("[SQL] Database initialized with Maji Ndogo data");
         } catch (e) {
-          console.error("Failed to load database:", e);
+          console.error("[SQL] Failed to load database:", e);
         }
       }
     }
     initSql();
-  }, [effectiveWorkspaceType]);
+  }, [workspaceType]);
 
-  // Initialize Python engine on mount (for Python workspace)
+  // Initialize Python engine ONLY when type=python
   useEffect(() => {
+    if (workspaceType !== "python") return; // Guard: only for Python workspace
+
     async function initPython() {
-      if (effectiveWorkspaceType === "python" && !isPythonReady()) {
+      if (!isPythonReady()) {
         try {
           await initPythonEngine();
           setIsPythonReady(true);
-          console.log("Python engine initialized");
+          console.log("[Python] Engine initialized");
         } catch (e) {
-          console.error("Failed to initialize Python:", e);
+          console.error("[Python] Failed to initialize:", e);
         }
       }
     }
     initPython();
-  }, [effectiveWorkspaceType, setIsPythonReady]);
+  }, [workspaceType, setIsPythonReady]);
 
   // Set initial task if provided
   useEffect(() => {
@@ -111,7 +117,6 @@ export default function WorkspacePage() {
 
     setIsExecuting(true);
 
-    // Small delay for UX
     setTimeout(() => {
       const result = executeQuery(sqlContent);
       setQueryResults(result as QueryResult);
@@ -149,7 +154,7 @@ export default function WorkspacePage() {
 
   // Reset SQL database
   const handleResetDatabase = useCallback(async () => {
-    await loadMajiNdogoDatabase(true); // Force fresh reload
+    await loadMajiNdogoDatabase(true);
     setQueryResults(null);
   }, [setQueryResults]);
 
@@ -160,8 +165,23 @@ export default function WorkspacePage() {
   }, [setPythonResults]);
 
   // Get current editor content for chat context
-  const currentEditorContent = effectiveWorkspaceType === "python" ? pythonContent : sqlContent;
-  const currentResults = effectiveWorkspaceType === "python" ? pythonResults : queryResults;
+  const currentEditorContent = workspaceType === "python" ? pythonContent : sqlContent;
+
+  // Error state: no workspace type specified
+  if (!workspaceType) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-background">
+        <AlertTriangle className="h-12 w-12 text-yellow-500 mb-4" />
+        <h1 className="text-xl font-semibold mb-2">Workspace Type Required</h1>
+        <p className="text-muted-foreground mb-4">
+          Please specify a workspace type in the URL: ?type=sql or ?type=python
+        </p>
+        <Link href={`/project/${projectId}?learnerId=${learnerId}`}>
+          <Button>Back to Project</Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -175,7 +195,7 @@ export default function WorkspacePage() {
           </Link>
           <div>
             <h1 className="font-semibold">
-              {effectiveWorkspaceType === "python" ? "Python Workspace" : "SQL Workspace"}
+              {workspaceType === "python" ? "Python Workspace" : "SQL Workspace"}
             </h1>
             {currentTaskId && (
               <button
@@ -188,13 +208,13 @@ export default function WorkspacePage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {effectiveWorkspaceType === "sql" && (
+          {workspaceType === "sql" && (
             <Button variant="ghost" size="sm" onClick={handleResetDatabase}>
               <RefreshCw className="h-4 w-4 mr-1" />
               Reset DB
             </Button>
           )}
-          {effectiveWorkspaceType === "python" && (
+          {workspaceType === "python" && (
             <Button variant="ghost" size="sm" onClick={handleResetPython}>
               <RefreshCw className="h-4 w-4 mr-1" />
               Reset Env
@@ -215,9 +235,9 @@ export default function WorkspacePage() {
           {/* Left Panel - Editor & Results */}
           <Panel defaultSize={55} minSize={35}>
             <div className="h-full flex flex-col p-4 gap-4">
-              {/* Editor */}
+              {/* Editor - conditionally render based on workspace type */}
               <div className="flex-1 min-h-0">
-                {effectiveWorkspaceType === "python" ? (
+                {workspaceType === "python" ? (
                   <PythonEditor
                     value={pythonContent}
                     onChange={setPythonContent}
@@ -236,9 +256,9 @@ export default function WorkspacePage() {
                 )}
               </div>
 
-              {/* Results Panel */}
+              {/* Results Panel - conditionally render based on workspace type */}
               <div className="flex-1 min-h-0">
-                {effectiveWorkspaceType === "python" ? (
+                {workspaceType === "python" ? (
                   <PythonResultsPanel result={pythonResults} isExecuting={isExecuting} />
                 ) : (
                   <ResultsPanel result={queryResults} isExecuting={isExecuting} />
@@ -257,9 +277,11 @@ export default function WorkspacePage() {
                 learnerId={learnerId}
                 projectId={projectId}
                 editorContent={currentEditorContent}
-                queryResults={currentResults as QueryResult | null}
+                queryResults={workspaceType === "sql" ? queryResults : null}
+                pythonResults={workspaceType === "python" ? pythonResults : null}
                 currentTaskId={currentTaskId}
                 onTaskClick={handleTaskClick}
+                workspaceType={workspaceType}
               />
             </div>
           </Panel>
@@ -272,7 +294,7 @@ export default function WorkspacePage() {
         learnerId={learnerId}
         open={!!drawerTaskId}
         onClose={closeDrawer}
-        workspaceType={effectiveWorkspaceType}
+        workspaceType={workspaceType}
       />
     </div>
   );

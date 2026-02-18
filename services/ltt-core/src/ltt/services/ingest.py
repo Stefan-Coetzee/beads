@@ -116,6 +116,9 @@ async def ingest_project_file(
         except ValueError:
             logger.warning(f"Invalid workspace_type: {data['workspace_type']}, defaulting to None")
 
+    # Get tutor_persona if provided (custom system prompt persona)
+    tutor_persona = data.get("tutor_persona")
+
     # Create project
     project = await create_task(
         session,
@@ -127,6 +130,7 @@ async def ingest_project_file(
             narrative_context=data.get("narrative_context"),
             requires_submission=data.get("requires_submission"),
             workspace_type=workspace_type,
+            tutor_persona=tutor_persona,
         ),
     )
 

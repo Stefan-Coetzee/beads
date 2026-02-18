@@ -67,35 +67,6 @@ export async function initPythonEngine(): Promise<void> {
       });
       console.log("[Python] WASM loaded successfully");
 
-      // Set up stdout/stderr capture
-      console.log("[Python] Setting up output capture...");
-      await pyodide.runPythonAsync(`
-import sys
-from io import StringIO
-
-class OutputCapture:
-    def __init__(self):
-        self.stdout = StringIO()
-        self.stderr = StringIO()
-        self._old_stdout = None
-        self._old_stderr = None
-
-    def start(self):
-        self._old_stdout = sys.stdout
-        self._old_stderr = sys.stderr
-        self.stdout = StringIO()
-        self.stderr = StringIO()
-        sys.stdout = self.stdout
-        sys.stderr = self.stderr
-
-    def stop(self):
-        sys.stdout = self._old_stdout
-        sys.stderr = self._old_stderr
-        return self.stdout.getvalue(), self.stderr.getvalue()
-
-_output_capture = OutputCapture()
-`);
-
       console.log("[Python] Pyodide fully initialized and ready!");
     } catch (error) {
       console.error("[Python] Initialization failed:", error);
@@ -119,7 +90,7 @@ function parseError(errorText: string): { message: string; traceback: string } {
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i].trim();
     // Python error messages typically have format "ErrorType: message"
-    if (line.match(/^[A-Z][a-zA-Z]*Error:|^[A-Z][a-zA-Z]*Exception:|^[A-Z][a-zA-Z]*Warning:/)) {
+    if (line.match(/^[A-Z][a-zA-Z]*Error:|^[A-Z][a-zA-Z]*Exception:|^SyntaxError:|^IndentationError:|^TabError:/)) {
       messageIndex = i;
       break;
     }
@@ -129,6 +100,104 @@ function parseError(errorText: string): { message: string; traceback: string } {
   const traceback = lines.slice(0, messageIndex).join('\n').trim();
 
   return { message, traceback };
+}
+
+// Packages that are pre-built for Pyodide (fast loading from CDN)
+const PYODIDE_PACKAGES: Record<string, string> = {
+  'numpy': 'numpy',
+  'pandas': 'pandas',
+  'matplotlib': 'matplotlib',
+  'scipy': 'scipy',
+  'scikit-learn': 'scikit-learn',
+  'sklearn': 'scikit-learn',
+  'sympy': 'sympy',
+  'networkx': 'networkx',
+  'pillow': 'pillow',
+  'PIL': 'pillow',
+};
+
+// Standard library modules (no need to install)
+const STDLIB_MODULES = new Set([
+  'sys', 'os', 'math', 'json', 're', 'datetime', 'collections', 'itertools',
+  'functools', 'random', 'string', 'io', 'typing', 'copy', 'time', 'calendar',
+  'csv', 'hashlib', 'base64', 'urllib', 'html', 'xml', 'email', 'sqlite3',
+  'pickle', 'struct', 'array', 'bisect', 'heapq', 'statistics', 'decimal',
+  'fractions', 'numbers', 'cmath', 'operator', 'pathlib', 'tempfile', 'glob',
+  'fnmatch', 'shutil', 'zipfile', 'tarfile', 'gzip', 'bz2', 'lzma', 'zlib',
+  'pprint', 'textwrap', 'difflib', 'enum', 'dataclasses', 'abc', 'contextlib',
+  'warnings', 'traceback', 'inspect', 'dis', 'ast', 'tokenize', 'token',
+]);
+
+// Track loaded packages
+const loadedPackages = new Set<string>();
+let micropipLoaded = false;
+
+/**
+ * Load micropip for installing packages from PyPI
+ */
+async function ensureMicropip(): Promise<boolean> {
+  if (micropipLoaded) return true;
+  try {
+    await pyodide.loadPackage('micropip');
+    micropipLoaded = true;
+    return true;
+  } catch (e) {
+    console.error('[Python] Failed to load micropip:', e);
+    return false;
+  }
+}
+
+/**
+ * Detect and load required packages from import statements
+ */
+async function loadRequiredPackages(code: string): Promise<string[]> {
+  const loaded: string[] = [];
+
+  // Match import statements: "import numpy", "from pandas import", etc.
+  const importRegex = /(?:^|\n)\s*(?:import|from)\s+([a-zA-Z_][a-zA-Z0-9_]*)/g;
+  let match;
+
+  while ((match = importRegex.exec(code)) !== null) {
+    const moduleName = match[1];
+
+    // Skip stdlib modules
+    if (STDLIB_MODULES.has(moduleName)) continue;
+
+    // Skip already loaded
+    if (loadedPackages.has(moduleName)) continue;
+
+    const pyodidePackage = PYODIDE_PACKAGES[moduleName];
+
+    if (pyodidePackage) {
+      // Use pre-built Pyodide package (fast)
+      console.log(`[Python] Loading Pyodide package: ${pyodidePackage}`);
+      try {
+        await pyodide.loadPackage(pyodidePackage);
+        loadedPackages.add(moduleName);
+        loaded.push(pyodidePackage);
+      } catch (e) {
+        console.warn(`[Python] Failed to load ${pyodidePackage}:`, e);
+      }
+    } else {
+      // Try micropip for other packages (slower, from PyPI)
+      console.log(`[Python] Trying micropip for: ${moduleName}`);
+      try {
+        if (await ensureMicropip()) {
+          await pyodide.runPythonAsync(`
+import micropip
+await micropip.install('${moduleName}')
+`);
+          loadedPackages.add(moduleName);
+          loaded.push(`${moduleName} (via pip)`);
+        }
+      } catch (e) {
+        console.warn(`[Python] Failed to install ${moduleName} via micropip:`, e);
+        // Don't throw - let the actual import fail with a clearer error
+      }
+    }
+  }
+
+  return loaded;
 }
 
 /**
@@ -147,27 +216,51 @@ export async function executePython(code: string): Promise<PythonResult> {
   const startTime = performance.now();
 
   try {
-    // Start output capture
-    await pyodide.runPythonAsync("_output_capture.start()");
+    // Auto-load any required packages
+    const packagesLoaded = await loadRequiredPackages(code);
+    if (packagesLoaded.length > 0) {
+      console.log(`[Python] Loaded packages: ${packagesLoaded.join(', ')}`);
+    }
 
-    // Execute the user's code
-    await pyodide.runPythonAsync(code);
+    // Use pyodide's built-in stdout capture
+    pyodide.setStdout({ batched: (text: string) => {} });
+    pyodide.setStderr({ batched: (text: string) => {} });
 
-    // Stop capture and get output
-    const [stdout, stderr] = await pyodide.runPythonAsync(
-      "_output_capture.stop()"
-    );
+    // Run the code and capture output using Python's approach
+    const wrappedCode = `
+import sys
+from io import StringIO
+
+_stdout_capture = StringIO()
+_stderr_capture = StringIO()
+_old_stdout = sys.stdout
+_old_stderr = sys.stderr
+sys.stdout = _stdout_capture
+sys.stderr = _stderr_capture
+
+try:
+    exec(${JSON.stringify(code)}, globals())
+finally:
+    sys.stdout = _old_stdout
+    sys.stderr = _old_stderr
+
+(_stdout_capture.getvalue(), _stderr_capture.getvalue())
+`;
+
+    const result = await pyodide.runPythonAsync(wrappedCode);
     const duration = performance.now() - startTime;
 
-    const output = stdout as string;
-    const errors = stderr as string;
+    // Result is a tuple [stdout, stderr]
+    const stdout = result.get(0) as string;
+    const stderr = result.get(1) as string;
+    result.destroy(); // Clean up the Python proxy
 
-    if (errors && errors.trim()) {
-      const { message, traceback } = parseError(errors);
+    if (stderr && stderr.trim()) {
+      const { message, traceback } = parseError(stderr);
       return {
         success: false,
-        output: output || undefined,
-        error: errors,
+        output: stdout || undefined,
+        error: stderr,
         errorMessage: message,
         traceback: traceback || undefined,
         duration,
@@ -176,18 +269,34 @@ export async function executePython(code: string): Promise<PythonResult> {
 
     return {
       success: true,
-      output: output || "(No output)",
+      output: stdout || "(No output)",
       duration,
     };
-  } catch (error) {
-    // Stop capture on error
-    try {
-      await pyodide.runPythonAsync("_output_capture.stop()");
-    } catch {
-      // Ignore cleanup errors
+  } catch (error: any) {
+    const duration = performance.now() - startTime;
+
+    // Pyodide wraps Python errors - extract the full error message
+    let errorText = "Execution failed";
+
+    if (error) {
+      // Try to get the full Python traceback from the error
+      if (error.message) {
+        errorText = error.message;
+      }
+      // Some Pyodide versions have the error as a string representation
+      if (typeof error === 'string') {
+        errorText = error;
+      }
+      // Try toString which often has the full traceback
+      if (error.toString && error.toString() !== '[object Object]') {
+        const errStr = error.toString();
+        if (errStr.length > errorText.length) {
+          errorText = errStr;
+        }
+      }
     }
 
-    const errorText = error instanceof Error ? error.message : "Execution failed";
+    console.error("[Python] Execution error:", errorText);
     const { message, traceback } = parseError(errorText);
 
     return {
@@ -195,7 +304,7 @@ export async function executePython(code: string): Promise<PythonResult> {
       error: errorText,
       errorMessage: message,
       traceback: traceback || undefined,
-      duration: performance.now() - startTime,
+      duration,
     };
   }
 }
@@ -233,11 +342,12 @@ export async function resetPythonEnvironment(): Promise<void> {
   await pyodide.runPythonAsync(`
 # Clear user-defined variables but keep system modules
 import sys
-_keep = set(sys.modules.keys())
-_keep.add('_output_capture')
 for name in list(globals().keys()):
-    if not name.startswith('_') and name not in ['sys', 'OutputCapture']:
-        del globals()[name]
+    if not name.startswith('_') and name not in ['sys', '__builtins__', '__name__', '__doc__']:
+        try:
+            del globals()[name]
+        except:
+            pass
 `);
 }
 
@@ -250,5 +360,7 @@ export async function getDefinedVariables(): Promise<string[]> {
   const result = await pyodide.runPythonAsync(`
 [name for name in dir() if not name.startswith('_')]
 `);
-  return result.toJs() as string[];
+  const vars = result.toJs() as string[];
+  result.destroy();
+  return vars;
 }
