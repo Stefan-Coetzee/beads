@@ -7,6 +7,13 @@ let SQL: SqlJsStatic | null = null;
 let db: Database | null = null;
 let loadingPromise: Promise<void> | null = null;
 
+// IndexedDB cache config
+const IDB_NAME = "ltt-sql-cache";
+const IDB_STORE = "databases";
+const IDB_VERSION = 1;
+
+export const EXECUTION_TIMEOUT_MS = 10_000;
+
 export interface QueryResult {
   success: boolean;
   columns?: string[];
@@ -14,6 +21,7 @@ export interface QueryResult {
   rowCount?: number;
   duration: number;
   error?: string;
+  timedOut?: boolean;
 }
 
 /**
@@ -55,7 +63,11 @@ export async function loadDatabase(data: Uint8Array): Promise<void> {
 }
 
 /**
- * Execute a SQL query and return results
+ * Execute a SQL query and return results.
+ *
+ * Note: db.exec() is synchronous and blocks the main thread.
+ * A Web Worker is needed to truly kill long-running queries.
+ * For now we flag queries that exceeded the timeout threshold.
  */
 export function executeQuery(sql: string): QueryResult {
   if (!db) {
@@ -72,8 +84,19 @@ export function executeQuery(sql: string): QueryResult {
     const results = db.exec(sql);
     const duration = performance.now() - startTime;
 
+    // Flag if query took longer than timeout (can't kill sync, but warn)
+    if (duration > EXECUTION_TIMEOUT_MS) {
+      return {
+        success: true,
+        columns: results.length > 0 ? results[0].columns : [],
+        rows: results.length > 0 ? results[0].values : [],
+        rowCount: results.length > 0 ? results[0].values.length : 0,
+        duration,
+        timedOut: true,
+      };
+    }
+
     if (results.length === 0) {
-      // Statement executed but returned no results (e.g., INSERT, UPDATE)
       return {
         success: true,
         columns: [],
@@ -113,6 +136,63 @@ export function exportDatabase(): Uint8Array | null {
   return db?.export() || null;
 }
 
+// =============================================================================
+// IndexedDB Cache
+// =============================================================================
+
+/**
+ * Open the IndexedDB cache database.
+ */
+function openCacheDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(IDB_NAME, IDB_VERSION);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(IDB_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * Read a cached database binary from IndexedDB.
+ * Returns null if not found or on error.
+ */
+async function readCache(key: string): Promise<Uint8Array | null> {
+  try {
+    const idb = await openCacheDB();
+    return new Promise((resolve) => {
+      const tx = idb.transaction(IDB_STORE, "readonly");
+      const req = tx.objectStore(IDB_STORE).get(key);
+      req.onsuccess = () => resolve(req.result ?? null);
+      req.onerror = () => resolve(null);
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write a database binary to IndexedDB cache.
+ */
+async function writeCache(key: string, data: Uint8Array): Promise<void> {
+  try {
+    const idb = await openCacheDB();
+    return new Promise((resolve, reject) => {
+      const tx = idb.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).put(data, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {
+    // Cache write failures are non-fatal
+  }
+}
+
+// =============================================================================
+// Database Loading
+// =============================================================================
+
 export type LoadingPhase = "downloading" | "initializing" | "ready" | "error";
 
 export interface LoadProgress {
@@ -124,8 +204,12 @@ export interface LoadProgress {
 }
 
 /**
- * Load the Maji Ndogo database from public data
- * @param force - If true, forces a reload even if database exists
+ * Load the Maji Ndogo database from public data.
+ *
+ * On first load: downloads the SQL file, executes it, then caches the built
+ * database binary in IndexedDB for instant restore on subsequent visits.
+ *
+ * @param force - If true, bypasses cache and re-downloads from source
  * @param onProgress - Callback for loading progress updates
  */
 export async function loadMajiNdogoDatabase(
@@ -152,10 +236,22 @@ export async function loadMajiNdogoDatabase(
       await initSqlEngine();
       if (!SQL) throw new Error("SQL.js not initialized");
 
-      // Create fresh database
+      // Try restoring from IndexedDB cache (skip if force refresh)
+      if (!force) {
+        report("initializing", 10, "Checking cache...");
+        const cached = await readCache("maji-ndogo");
+        if (cached) {
+          report("initializing", 50, "Restoring from cache...");
+          db = new SQL.Database(cached);
+          report("ready", 100, "Database ready (cached)");
+          console.log("[SQL] Database restored from IndexedDB cache");
+          return;
+        }
+      }
+
+      // No cache - download and build from SQL file
       db = new SQL.Database();
 
-      // Fetch the SQL file with progress tracking
       report("downloading", 5, "Downloading database (~10 MB)...");
       const response = await fetch("/data/md_water_services.sql");
       if (!response.ok) {
@@ -217,6 +313,12 @@ export async function loadMajiNdogoDatabase(
           report("initializing", percent, "Loading data...");
         }
       }
+
+      // Cache the built database binary in IndexedDB for next time
+      report("initializing", 98, "Caching database...");
+      const binary = db.export();
+      await writeCache("maji-ndogo", binary);
+      console.log(`[SQL] Database cached in IndexedDB (${(binary.length / 1024 / 1024).toFixed(1)} MB)`);
 
       report("ready", 100, "Database ready");
       console.log("[SQL] Maji Ndogo database loaded successfully");

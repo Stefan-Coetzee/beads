@@ -1,10 +1,10 @@
 "use client";
 
 import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import Link from "next/link";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
-import { ArrowLeft, BookOpen, RefreshCw, AlertTriangle } from "lucide-react";
+import { ArrowLeft, BookOpen, RefreshCw, AlertTriangle, Database, Clock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { SqlEditor } from "@/components/workspace/SqlEditor";
@@ -16,19 +16,21 @@ import { TaskDetailDrawer } from "@/components/shared/TaskDetailDrawer";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { QueryResult, WorkspaceType } from "@/types";
 
-// SQL engine - only imported when needed
+// SQL engine
 import {
   executeQuery,
   isDatabaseReady,
   loadMajiNdogoDatabase,
 } from "@/lib/sql-engine";
+import type { LoadProgress } from "@/lib/sql-engine";
 
-// Python engine - only imported when needed
+// Python engine
 import {
   executePython,
   initPythonEngine,
   isPythonReady,
   resetPythonEnvironment,
+  onReadyStateChange,
 } from "@/lib/python-engine";
 
 export default function WorkspacePage() {
@@ -40,6 +42,29 @@ export default function WorkspacePage() {
 
   // Workspace type MUST be explicitly set via URL param - no defaults
   const workspaceType = searchParams.get("type") as WorkspaceType | null;
+
+  // Loading progress state
+  const [sqlProgress, setSqlProgress] = useState<LoadProgress | null>(null);
+  const [isSqlReady, setIsSqlReady] = useState(isDatabaseReady());
+
+  // Execution timer state
+  const [execElapsed, setExecElapsed] = useState(0);
+  const execTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startExecTimer = useCallback(() => {
+    setExecElapsed(0);
+    execTimerRef.current = setInterval(() => {
+      setExecElapsed((prev) => prev + 1);
+    }, 1000);
+  }, []);
+
+  const stopExecTimer = useCallback(() => {
+    if (execTimerRef.current) {
+      clearInterval(execTimerRef.current);
+      execTimerRef.current = null;
+    }
+    setExecElapsed(0);
+  }, []);
 
   const {
     setWorkspaceType,
@@ -71,16 +96,18 @@ export default function WorkspacePage() {
 
   // Initialize SQL database ONLY when type=sql
   useEffect(() => {
-    if (workspaceType !== "sql") return; // Guard: only for SQL workspace
+    if (workspaceType !== "sql") return;
 
     async function initSql() {
       if (!isDatabaseReady()) {
         try {
-          await loadMajiNdogoDatabase();
-          console.log("[SQL] Database initialized with Maji Ndogo data");
+          await loadMajiNdogoDatabase(false, setSqlProgress);
+          setIsSqlReady(true);
         } catch (e) {
           console.error("[SQL] Failed to load database:", e);
         }
+      } else {
+        setIsSqlReady(true);
       }
     }
     initSql();
@@ -88,20 +115,24 @@ export default function WorkspacePage() {
 
   // Initialize Python engine ONLY when type=python
   useEffect(() => {
-    if (workspaceType !== "python") return; // Guard: only for Python workspace
+    if (workspaceType !== "python") return;
+
+    // Keep store in sync when worker is terminated (timeout) or re-initialized
+    onReadyStateChange(setIsPythonReady);
 
     async function initPython() {
       if (!isPythonReady()) {
         try {
           await initPythonEngine();
           setIsPythonReady(true);
-          console.log("[Python] Engine initialized");
         } catch (e) {
           console.error("[Python] Failed to initialize:", e);
         }
       }
     }
     initPython();
+
+    return () => { onReadyStateChange(null); };
   }, [workspaceType, setIsPythonReady]);
 
   // Set initial task if provided
@@ -116,19 +147,22 @@ export default function WorkspacePage() {
     if (!sqlContent.trim()) return;
 
     setIsExecuting(true);
+    startExecTimer();
 
     setTimeout(() => {
       const result = executeQuery(sqlContent);
       setQueryResults(result as QueryResult);
       setIsExecuting(false);
+      stopExecTimer();
     }, 100);
-  }, [sqlContent, setIsExecuting, setQueryResults]);
+  }, [sqlContent, setIsExecuting, setQueryResults, startExecTimer, stopExecTimer]);
 
   // Handle Python code execution
   const handleRunPython = useCallback(async () => {
     if (!pythonContent.trim()) return;
 
     setIsExecuting(true);
+    startExecTimer();
 
     try {
       const result = await executePython(pythonContent);
@@ -141,8 +175,9 @@ export default function WorkspacePage() {
       });
     } finally {
       setIsExecuting(false);
+      stopExecTimer();
     }
-  }, [pythonContent, setIsExecuting, setPythonResults]);
+  }, [pythonContent, setIsExecuting, setPythonResults, startExecTimer, stopExecTimer]);
 
   // Handle task click from chat
   const handleTaskClick = useCallback(
@@ -154,7 +189,9 @@ export default function WorkspacePage() {
 
   // Reset SQL database
   const handleResetDatabase = useCallback(async () => {
-    await loadMajiNdogoDatabase(true);
+    setIsSqlReady(false);
+    await loadMajiNdogoDatabase(true, setSqlProgress);
+    setIsSqlReady(true);
     setQueryResults(null);
   }, [setQueryResults]);
 
@@ -166,6 +203,9 @@ export default function WorkspacePage() {
 
   // Get current editor content for chat context
   const currentEditorContent = workspaceType === "python" ? pythonContent : sqlContent;
+
+  // Show loading overlay for SQL workspace while DB downloads
+  const showSqlLoading = workspaceType === "sql" && !isSqlReady;
 
   // Error state: no workspace type specified
   if (!workspaceType) {
@@ -234,8 +274,43 @@ export default function WorkspacePage() {
         <PanelGroup orientation="horizontal" className="h-full">
           {/* Left Panel - Editor & Results */}
           <Panel defaultSize={55} minSize={35}>
-            <div className="h-full flex flex-col p-4 gap-4">
-              {/* Editor - conditionally render based on workspace type */}
+            <div className="h-full flex flex-col p-4 gap-4 relative">
+              {/* SQL Loading Overlay */}
+              {showSqlLoading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/90 m-4 rounded-lg">
+                  <div className="flex flex-col items-center gap-4 max-w-sm">
+                    <Database className="h-10 w-10 text-accent" />
+                    <h2 className="text-lg font-medium">Preparing Database</h2>
+                    <p className="text-sm text-muted-foreground text-center">
+                      {sqlProgress?.message || "Initializing..."}
+                    </p>
+                    {/* Progress bar */}
+                    <div className="w-64 h-2 bg-elevated rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-accent rounded-full transition-all duration-300"
+                        style={{ width: `${sqlProgress?.percent ?? 0}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {sqlProgress?.percent ?? 0}%
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Execution timer warning */}
+              {isExecuting && execElapsed >= 1 && (
+                <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 bg-yellow-900/90 border border-yellow-600 rounded-lg px-4 py-2 flex items-center gap-3 shadow-lg">
+                  <Clock className="h-4 w-4 text-yellow-400 animate-pulse" />
+                  <span className="text-sm text-yellow-200">
+                    {execElapsed < 10
+                      ? `Running... stopping in ${10 - execElapsed}s — check your code for infinite loops`
+                      : "Timed out — execution was stopped"}
+                  </span>
+                </div>
+              )}
+
+              {/* Editor */}
               <div className="flex-1 min-h-0">
                 {workspaceType === "python" ? (
                   <PythonEditor
@@ -256,7 +331,7 @@ export default function WorkspacePage() {
                 )}
               </div>
 
-              {/* Results Panel - conditionally render based on workspace type */}
+              {/* Results Panel */}
               <div className="flex-1 min-h-0">
                 {workspaceType === "python" ? (
                   <PythonResultsPanel result={pythonResults} isExecuting={isExecuting} />

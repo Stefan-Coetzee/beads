@@ -110,11 +110,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     {
       name: "workspace-storage",
       version: EDITOR_SCHEMA_VERSION,
-      partialize: (state) => ({
+      partialize: (state): Partial<WorkspaceState> => ({
         schemaVersion: state.schemaVersion,
         sqlContent: state.sqlContent,
         pythonContent: state.pythonContent,
-        // Note: workspaceType is NOT persisted - it comes from the project/URL
+        // workspaceType intentionally NOT persisted — comes from the URL
         learnerId: state.learnerId,
         threadId: state.threadId,
       }),

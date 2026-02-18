@@ -1,366 +1,277 @@
 "use client";
 
-// Pyodide loaded via CDN script injection (bypasses Turbopack dynamic import issues)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let pyodide: any = null;
-let loadingPromise: Promise<void> | null = null;
+/**
+ * Python engine — thin wrapper around a Web Worker running Pyodide.
+ *
+ * Pattern follows https://pyodide.org/en/stable/usage/webworker.html
+ *
+ * - Worker eagerly loads Pyodide on creation (no separate init step)
+ * - `loadPackagesFromImports` auto-detects imports (no manual regex)
+ * - worker.terminate() actually kills infinite loops
+ * - Pyodide errors stay inside the worker — never bubble to the page
+ */
+
+export const EXECUTION_TIMEOUT_MS = 10_000;
 
 export interface PythonResult {
   success: boolean;
   output?: string;
   error?: string;
-  errorMessage?: string;  // Short error message (e.g., "NameError: name 'x' is not defined")
-  traceback?: string;     // Full traceback for expandable view
+  errorMessage?: string;
+  traceback?: string;
   duration: number;
+  timedOut?: boolean;
 }
 
-// CDN URL for Pyodide
-const PYODIDE_CDN = "https://cdn.jsdelivr.net/pyodide/v0.27.0/full/";
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
 
-/**
- * Load Pyodide script from CDN
- */
-function loadPyodideScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    // Check if already loaded
-    if ((window as any).loadPyodide) {
-      resolve();
-      return;
+let worker: Worker | null = null;
+let isReady = false;
+let readyPromise: Promise<void> | null = null;
+
+type ReadyCallback = (ready: boolean) => void;
+let readyCallback: ReadyCallback | null = null;
+
+/** Register a callback that fires when the engine's ready state changes. */
+export function onReadyStateChange(cb: ReadyCallback | null): void {
+  readyCallback = cb;
+}
+
+function setReady(ready: boolean) {
+  isReady = ready;
+  readyCallback?.(ready);
+}
+
+// ---------------------------------------------------------------------------
+// Request / response helper  (from Pyodide docs workerApi pattern)
+// ---------------------------------------------------------------------------
+
+let lastId = 0;
+
+function request(
+  w: Worker,
+  msg: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  return new Promise((resolve) => {
+    const id = ++lastId;
+    function listener(event: MessageEvent) {
+      if (event.data?.id !== id) return;
+      w.removeEventListener("message", listener);
+      resolve(event.data as Record<string, unknown>);
     }
-
-    const script = document.createElement("script");
-    script.src = `${PYODIDE_CDN}pyodide.js`;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Pyodide script"));
-    document.head.appendChild(script);
+    w.addEventListener("message", listener);
+    w.postMessage({ id, ...msg });
   });
 }
 
-/**
- * Initialize Pyodide with WebAssembly
- */
-export async function initPythonEngine(): Promise<void> {
-  if (pyodide) return;
+// ---------------------------------------------------------------------------
+// Error parsing
+// ---------------------------------------------------------------------------
 
-  // Prevent concurrent loading
-  if (loadingPromise) {
-    return loadingPromise;
-  }
-
-  loadingPromise = (async () => {
-    try {
-      console.log("[Python] Starting Pyodide initialization...");
-
-      // Load Pyodide script from CDN
-      await loadPyodideScript();
-      console.log("[Python] Pyodide script loaded, initializing WASM (~15MB)...");
-
-      // Load Pyodide using the global function
-      const loadPyodide = (window as any).loadPyodide;
-      if (!loadPyodide) {
-        throw new Error("loadPyodide not found on window");
-      }
-
-      pyodide = await loadPyodide({
-        indexURL: PYODIDE_CDN,
-      });
-      console.log("[Python] WASM loaded successfully");
-
-      console.log("[Python] Pyodide fully initialized and ready!");
-    } catch (error) {
-      console.error("[Python] Initialization failed:", error);
-      throw error;
-    } finally {
-      loadingPromise = null;
-    }
-  })();
-
-  return loadingPromise;
-}
-
-/**
- * Parse Python error to extract message and traceback
- */
-function parseError(errorText: string): { message: string; traceback: string } {
-  const lines = errorText.trim().split('\n');
-
-  // Find the last line that looks like an error message (e.g., "NameError: ...")
-  let messageIndex = lines.length - 1;
+function parseError(text: string): { message: string; traceback: string } {
+  const lines = text.trim().split("\n");
+  let idx = lines.length - 1;
   for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i].trim();
-    // Python error messages typically have format "ErrorType: message"
-    if (line.match(/^[A-Z][a-zA-Z]*Error:|^[A-Z][a-zA-Z]*Exception:|^SyntaxError:|^IndentationError:|^TabError:/)) {
-      messageIndex = i;
+    if (
+      /^[A-Z][a-zA-Z]*(?:Error|Exception):|^SyntaxError:|^IndentationError:|^TabError:/.test(
+        lines[i].trim(),
+      )
+    ) {
+      idx = i;
       break;
     }
   }
-
-  const message = lines[messageIndex] || errorText;
-  const traceback = lines.slice(0, messageIndex).join('\n').trim();
-
-  return { message, traceback };
+  return {
+    message: lines[idx] || text,
+    traceback: lines.slice(0, idx).join("\n").trim(),
+  };
 }
 
-// Packages that are pre-built for Pyodide (fast loading from CDN)
-const PYODIDE_PACKAGES: Record<string, string> = {
-  'numpy': 'numpy',
-  'pandas': 'pandas',
-  'matplotlib': 'matplotlib',
-  'scipy': 'scipy',
-  'scikit-learn': 'scikit-learn',
-  'sklearn': 'scikit-learn',
-  'sympy': 'sympy',
-  'networkx': 'networkx',
-  'pillow': 'pillow',
-  'PIL': 'pillow',
-};
+// ---------------------------------------------------------------------------
+// Worker lifecycle
+// ---------------------------------------------------------------------------
 
-// Standard library modules (no need to install)
-const STDLIB_MODULES = new Set([
-  'sys', 'os', 'math', 'json', 're', 'datetime', 'collections', 'itertools',
-  'functools', 'random', 'string', 'io', 'typing', 'copy', 'time', 'calendar',
-  'csv', 'hashlib', 'base64', 'urllib', 'html', 'xml', 'email', 'sqlite3',
-  'pickle', 'struct', 'array', 'bisect', 'heapq', 'statistics', 'decimal',
-  'fractions', 'numbers', 'cmath', 'operator', 'pathlib', 'tempfile', 'glob',
-  'fnmatch', 'shutil', 'zipfile', 'tarfile', 'gzip', 'bz2', 'lzma', 'zlib',
-  'pprint', 'textwrap', 'difflib', 'enum', 'dataclasses', 'abc', 'contextlib',
-  'warnings', 'traceback', 'inspect', 'dis', 'ast', 'tokenize', 'token',
-]);
+function createWorker(): Worker {
+  const w = new Worker("/python-worker.mjs", { type: "module" });
 
-// Track loaded packages
-const loadedPackages = new Set<string>();
-let micropipLoaded = false;
+  // Prevent worker-level errors from reaching the page / Next.js overlay
+  w.onerror = (e) => {
+    e.preventDefault();
+    console.warn("[Python] Worker error (caught):", e.message);
+  };
+
+  return w;
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 /**
- * Load micropip for installing packages from PyPI
+ * Boot the Web Worker and wait for Pyodide to load (~15 MB WASM).
  */
-async function ensureMicropip(): Promise<boolean> {
-  if (micropipLoaded) return true;
-  try {
-    await pyodide.loadPackage('micropip');
-    micropipLoaded = true;
-    return true;
-  } catch (e) {
-    console.error('[Python] Failed to load micropip:', e);
-    return false;
-  }
+export function initPythonEngine(): Promise<void> {
+  if (isReady) return Promise.resolve();
+  if (readyPromise) return readyPromise;
+
+  readyPromise = new Promise<void>((resolve, reject) => {
+    worker = createWorker();
+
+    function onMessage(e: MessageEvent) {
+      if (!e.data?.ready && e.data?.ready !== false) return;
+      worker!.removeEventListener("message", onMessage);
+
+      if (e.data.ready) {
+        setReady(true);
+        readyPromise = null;
+        resolve();
+      } else {
+        readyPromise = null;
+        reject(new Error(e.data.error ?? "Pyodide failed to load"));
+      }
+    }
+
+    worker.addEventListener("message", onMessage);
+  });
+
+  return readyPromise;
 }
 
 /**
- * Detect and load required packages from import statements
+ * Execute Python code. Returns a PythonResult (never throws).
+ *
+ * If execution exceeds EXECUTION_TIMEOUT_MS the worker is terminated
+ * (actually killing the code) and a new worker boots in the background.
  */
-async function loadRequiredPackages(code: string): Promise<string[]> {
-  const loaded: string[] = [];
-
-  // Match import statements: "import numpy", "from pandas import", etc.
-  const importRegex = /(?:^|\n)\s*(?:import|from)\s+([a-zA-Z_][a-zA-Z0-9_]*)/g;
-  let match;
-
-  while ((match = importRegex.exec(code)) !== null) {
-    const moduleName = match[1];
-
-    // Skip stdlib modules
-    if (STDLIB_MODULES.has(moduleName)) continue;
-
-    // Skip already loaded
-    if (loadedPackages.has(moduleName)) continue;
-
-    const pyodidePackage = PYODIDE_PACKAGES[moduleName];
-
-    if (pyodidePackage) {
-      // Use pre-built Pyodide package (fast)
-      console.log(`[Python] Loading Pyodide package: ${pyodidePackage}`);
-      try {
-        await pyodide.loadPackage(pyodidePackage);
-        loadedPackages.add(moduleName);
-        loaded.push(pyodidePackage);
-      } catch (e) {
-        console.warn(`[Python] Failed to load ${pyodidePackage}:`, e);
-      }
-    } else {
-      // Try micropip for other packages (slower, from PyPI)
-      console.log(`[Python] Trying micropip for: ${moduleName}`);
-      try {
-        if (await ensureMicropip()) {
-          await pyodide.runPythonAsync(`
-import micropip
-await micropip.install('${moduleName}')
-`);
-          loadedPackages.add(moduleName);
-          loaded.push(`${moduleName} (via pip)`);
-        }
-      } catch (e) {
-        console.warn(`[Python] Failed to install ${moduleName} via micropip:`, e);
-        // Don't throw - let the actual import fail with a clearer error
-      }
+export async function executePython(code: string): Promise<PythonResult> {
+  // If re-initialising after a timeout, wait for it
+  if (readyPromise) {
+    try {
+      await readyPromise;
+    } catch {
+      return {
+        success: false,
+        error: "Python engine failed to initialise. Please refresh the page.",
+        errorMessage: "Python engine failed to initialise",
+        duration: 0,
+      };
     }
   }
 
-  return loaded;
-}
-
-/**
- * Execute Python code and return results
- */
-export async function executePython(code: string): Promise<PythonResult> {
-  if (!pyodide) {
+  if (!worker || !isReady) {
     return {
       success: false,
-      error: "Python engine not initialized. Please wait for loading to complete.",
-      errorMessage: "Python engine not initialized",
+      error: "Python engine not initialised. Please wait for loading to complete.",
+      errorMessage: "Python engine not initialised",
       duration: 0,
     };
   }
 
+  // Race the worker response against a timeout
   const startTime = performance.now();
+  const currentWorker = worker;
 
-  try {
-    // Auto-load any required packages
-    const packagesLoaded = await loadRequiredPackages(code);
-    if (packagesLoaded.length > 0) {
-      console.log(`[Python] Loaded packages: ${packagesLoaded.join(', ')}`);
-    }
+  const resultPromise = request(currentWorker, { python: code });
+  const timeoutPromise = new Promise<"__TIMEOUT__">((resolve) =>
+    setTimeout(() => resolve("__TIMEOUT__"), EXECUTION_TIMEOUT_MS),
+  );
 
-    // Use pyodide's built-in stdout capture
-    pyodide.setStdout({ batched: (text: string) => {} });
-    pyodide.setStderr({ batched: (text: string) => {} });
+  const outcome = await Promise.race([resultPromise, timeoutPromise]);
 
-    // Run the code and capture output using Python's approach
-    const wrappedCode = `
-import sys
-from io import StringIO
+  if (outcome === "__TIMEOUT__") {
+    // Kill the worker — this actually stops the infinite loop
+    console.warn(
+      `[Python] Execution timed out after ${EXECUTION_TIMEOUT_MS / 1000}s — terminating worker`,
+    );
+    currentWorker.terminate();
+    worker = null;
+    setReady(false);
 
-_stdout_capture = StringIO()
-_stderr_capture = StringIO()
-_old_stdout = sys.stdout
-_old_stderr = sys.stderr
-sys.stdout = _stdout_capture
-sys.stderr = _stderr_capture
-
-try:
-    exec(${JSON.stringify(code)}, globals())
-finally:
-    sys.stdout = _old_stdout
-    sys.stderr = _old_stderr
-
-(_stdout_capture.getvalue(), _stderr_capture.getvalue())
-`;
-
-    const result = await pyodide.runPythonAsync(wrappedCode);
-    const duration = performance.now() - startTime;
-
-    // Result is a tuple [stdout, stderr]
-    const stdout = result.get(0) as string;
-    const stderr = result.get(1) as string;
-    result.destroy(); // Clean up the Python proxy
-
-    if (stderr && stderr.trim()) {
-      const { message, traceback } = parseError(stderr);
-      return {
-        success: false,
-        output: stdout || undefined,
-        error: stderr,
-        errorMessage: message,
-        traceback: traceback || undefined,
-        duration,
-      };
-    }
-
-    return {
-      success: true,
-      output: stdout || "(No output)",
-      duration,
-    };
-  } catch (error: any) {
-    const duration = performance.now() - startTime;
-
-    // Pyodide wraps Python errors - extract the full error message
-    let errorText = "Execution failed";
-
-    if (error) {
-      // Try to get the full Python traceback from the error
-      if (error.message) {
-        errorText = error.message;
-      }
-      // Some Pyodide versions have the error as a string representation
-      if (typeof error === 'string') {
-        errorText = error;
-      }
-      // Try toString which often has the full traceback
-      if (error.toString && error.toString() !== '[object Object]') {
-        const errStr = error.toString();
-        if (errStr.length > errorText.length) {
-          errorText = errStr;
-        }
-      }
-    }
-
-    console.error("[Python] Execution error:", errorText);
-    const { message, traceback } = parseError(errorText);
+    // Re-boot in the background
+    initPythonEngine().catch((e) =>
+      console.error("[Python] Failed to re-initialise after timeout:", e),
+    );
 
     return {
       success: false,
-      error: errorText,
+      error: `Execution timed out after ${EXECUTION_TIMEOUT_MS / 1000} seconds. Check your code for infinite loops. The Python engine is restarting…`,
+      errorMessage: `Timed out after ${EXECUTION_TIMEOUT_MS / 1000}s — possible infinite loop`,
+      duration: performance.now() - startTime,
+      timedOut: true,
+    };
+  }
+
+  // Normal result from worker
+  const data = outcome as Record<string, unknown>;
+  const duration = (data.duration as number) ?? performance.now() - startTime;
+
+  // Worker sent { error } — Python exception during execution
+  if (data.error) {
+    const { message, traceback } = parseError(data.error as string);
+    return {
+      success: false,
+      error: data.error as string,
       errorMessage: message,
       traceback: traceback || undefined,
       duration,
     };
   }
-}
 
-/**
- * Check if Python engine is initialized
- */
-export function isPythonReady(): boolean {
-  return pyodide !== null;
-}
+  const stdout = (data.stdout as string) || "";
+  const stderr = (data.stderr as string) || "";
 
-/**
- * Install a Python package using micropip
- */
-export async function installPackage(packageName: string): Promise<boolean> {
-  if (!pyodide) return false;
-
-  try {
-    await pyodide.loadPackage("micropip");
-    const micropip = pyodide.pyimport("micropip");
-    await micropip.install(packageName);
-    return true;
-  } catch (error) {
-    console.error(`Failed to install ${packageName}:`, error);
-    return false;
+  if (stderr.trim()) {
+    const { message, traceback } = parseError(stderr);
+    return {
+      success: false,
+      output: stdout || undefined,
+      error: stderr,
+      errorMessage: message,
+      traceback: traceback || undefined,
+      duration,
+    };
   }
+
+  return {
+    success: true,
+    output: stdout || "(No output)",
+    duration,
+  };
 }
 
-/**
- * Reset the Python environment (clear variables)
- */
+export function isPythonReady(): boolean {
+  return isReady && worker !== null;
+}
+
 export async function resetPythonEnvironment(): Promise<void> {
-  if (!pyodide) return;
+  if (!worker || !isReady) return;
 
-  await pyodide.runPythonAsync(`
-# Clear user-defined variables but keep system modules
+  await request(worker, {
+    python: `
 import sys
-for name in list(globals().keys()):
-    if not name.startswith('_') and name not in ['sys', '__builtins__', '__name__', '__doc__']:
-        try:
-            del globals()[name]
-        except:
-            pass
-`);
+for _n in list(globals().keys()):
+    if not _n.startswith('_') and _n not in ('sys',):
+        try: del globals()[_n]
+        except: pass
+`,
+  });
 }
 
-/**
- * Get list of defined variables in the Python namespace
- */
-export async function getDefinedVariables(): Promise<string[]> {
-  if (!pyodide) return [];
+export async function installPackage(packageName: string): Promise<boolean> {
+  const result = await executePython(
+    `import micropip\nawait micropip.install('${packageName}')`,
+  );
+  return result.success;
+}
 
-  const result = await pyodide.runPythonAsync(`
-[name for name in dir() if not name.startswith('_')]
-`);
-  const vars = result.toJs() as string[];
-  result.destroy();
-  return vars;
+export async function getDefinedVariables(): Promise<string[]> {
+  const result = await executePython(
+    `print('\\n'.join(n for n in dir() if not n.startswith('_')))`,
+  );
+  if (result.success && result.output) {
+    return result.output.trim().split("\n").filter(Boolean);
+  }
+  return [];
 }
