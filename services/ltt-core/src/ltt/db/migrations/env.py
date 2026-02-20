@@ -28,6 +28,7 @@ from ltt.models import (  # noqa: F401
     LearnerModel,
     LearnerTaskProgressModel,
     LearningObjectiveModel,
+    LTIUserMapping,
     StatusSummaryModel,
     SubmissionModel,
     TaskModel,

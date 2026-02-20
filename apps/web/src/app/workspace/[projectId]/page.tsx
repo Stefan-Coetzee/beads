@@ -15,6 +15,7 @@ import { ChatPanel } from "@/components/chat/ChatPanel";
 import { TaskDetailDrawer } from "@/components/shared/TaskDetailDrawer";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { QueryResult, WorkspaceType } from "@/types";
+import { parseLTIContext, storeLTIContext, getLTIContext } from "@/lib/lti";
 
 // SQL engine
 import {
@@ -37,11 +38,18 @@ export default function WorkspacePage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const projectId = params.projectId as string;
-  const learnerId = searchParams.get("learnerId") || "learner-dev-001";
   const initialTaskId = searchParams.get("taskId");
 
-  // Workspace type MUST be explicitly set via URL param - no defaults
-  const workspaceType = searchParams.get("type") as WorkspaceType | null;
+  // Resolve LTI context: store on first LTI landing, fall back to sessionStorage on re-navigation.
+  // Inject projectId from the URL path since it's not a search param.
+  const urlLtiCtx = parseLTIContext(searchParams);
+  if (urlLtiCtx) storeLTIContext({ ...urlLtiCtx, projectId });
+  const ltiCtx = urlLtiCtx ?? getLTIContext();
+
+  const learnerId = searchParams.get("learnerId") ?? ltiCtx?.learnerId ?? "learner-dev-001";
+
+  // Workspace type: URL param → stored LTI context → null (show error)
+  const workspaceType = (searchParams.get("type") ?? ltiCtx?.workspaceType ?? null) as WorkspaceType | null;
 
   // Loading progress state
   const [sqlProgress, setSqlProgress] = useState<LoadProgress | null>(null);

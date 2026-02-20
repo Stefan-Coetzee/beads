@@ -6,9 +6,33 @@ import type {
   TaskSummary,
   WorkspaceContext,
 } from "@/types";
+import { getLTIContext } from "./lti";
 
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Empty string = relative URLs → proxied through Next.js → FastAPI.
+// Set NEXT_PUBLIC_API_URL to override (e.g. direct FastAPI for local dev without proxy).
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
+
+/**
+ * Thin fetch wrapper that attaches LTI headers when running inside
+ * an LTI session and the ngrok skip-browser-warning header.
+ */
+export function lttFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> {
+  const headers = new Headers(init?.headers);
+
+  // Attach LTI launch ID so the backend can resolve the launch context
+  const lti = getLTIContext();
+  if (lti?.isLTI && lti.launchId) {
+    headers.set("X-LTI-Launch-Id", lti.launchId);
+  }
+
+  // Skip the ngrok browser interstitial page
+  headers.set("ngrok-skip-browser-warning", "1");
+
+  return fetch(input, { ...init, headers });
+}
 
 /**
  * Type-safe API client
@@ -16,7 +40,7 @@ export const API_BASE_URL =
 export const api = {
   // Project list
   async getProjects(): Promise<{ id: string; title: string; workspace_type: string | null }[]> {
-    const res = await fetch(`${API_BASE_URL}/api/v1/projects`);
+    const res = await lttFetch(`${API_BASE_URL}/api/v1/projects`);
     if (!res.ok) throw new Error("Failed to fetch projects");
     return res.json();
   },
@@ -62,7 +86,7 @@ export const api = {
     taskId: string,
     learnerId: string
   ): Promise<{ success: boolean; status: string; message: string }> {
-    const res = await fetch(`${API_BASE_URL}/api/v1/task/${taskId}/start`, {
+    const res = await lttFetch(`${API_BASE_URL}/api/v1/task/${taskId}/start`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ learner_id: learnerId }),
@@ -77,7 +101,7 @@ export const api = {
     content: string,
     submissionType: string = "sql"
   ): Promise<SubmitResponse> {
-    const res = await fetch(`${API_BASE_URL}/api/v1/task/${taskId}/submit`, {
+    const res = await lttFetch(`${API_BASE_URL}/api/v1/task/${taskId}/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -98,7 +122,7 @@ export const api = {
     threadId?: string,
     context?: WorkspaceContext
   ): Promise<ChatResponse> {
-    const res = await fetch(`${API_BASE_URL}/api/v1/chat`, {
+    const res = await lttFetch(`${API_BASE_URL}/api/v1/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -163,7 +187,7 @@ export async function* streamChat(
     } : null,
   };
 
-  const res = await fetch(`${API_BASE_URL}/api/v1/chat/stream`, {
+  const res = await lttFetch(`${API_BASE_URL}/api/v1/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(requestBody),

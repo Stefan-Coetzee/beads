@@ -11,17 +11,24 @@ from dotenv import load_dotenv
 # Load .env file before any other imports that might need env vars
 load_dotenv()
 
+import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from api.database import init_database, close_database, get_session_factory
 from api.routes import router
 from api.frontend_routes import router as frontend_router
+from api.lti.routes import router as lti_router, init_lti_storage, is_lti_enabled
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 # Default project to ingest if no projects exist
@@ -68,6 +75,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await init_database()
     print("Database pool initialized in event loop")
 
+    # Initialize LTI storage if Redis URL is configured
+    lti_redis_url = os.getenv("LTI_REDIS_URL")
+    if lti_redis_url:
+        init_lti_storage(lti_redis_url)
+        print("LTI storage initialized (Redis)")
+    else:
+        logger.info("LTI_REDIS_URL not set — LTI endpoints disabled")
+
     # Ensure at least one project exists
     await ensure_projects_exist()
 
@@ -87,6 +102,23 @@ def get_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # CSP middleware for LTI iframe embedding
+    class CSPMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request: Request, call_next):
+            response: Response = await call_next(request)
+            lti_platform = os.getenv(
+                "LTI_PLATFORM_URL", "https://imbizo.alx-ai-tools.com"
+            )
+            response.headers["Content-Security-Policy"] = (
+                "frame-ancestors *"
+            )
+            # Remove X-Frame-Options so CSP frame-ancestors takes precedence
+            if "X-Frame-Options" in response.headers:
+                del response.headers["X-Frame-Options"]
+            return response
+
+    app.add_middleware(CSPMiddleware)
+
     # CORS middleware for frontend access
     app.add_middleware(
         CORSMiddleware,
@@ -99,11 +131,12 @@ def get_app() -> FastAPI:
     # Include routes
     app.include_router(router, prefix="/api/v1")
     app.include_router(frontend_router)  # Frontend routes already have /api/v1 prefix
+    app.include_router(lti_router)  # LTI routes at /lti/*
 
     # Health check at root
     @app.get("/health")
     async def health_check():
-        return {"status": "healthy"}
+        return {"status": "healthy", "lti_enabled": is_lti_enabled()}
 
     return app
 

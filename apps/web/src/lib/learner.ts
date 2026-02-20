@@ -1,6 +1,12 @@
 /**
- * Learner ID management with cookie storage
+ * Learner ID management with cookie storage.
+ *
+ * In LTI sessions the learner ID comes from the platform (via the launch
+ * redirect URL) and is stored in sessionStorage by lti.ts.  In standalone
+ * mode the ID is auto-generated and persisted in a cookie.
  */
+
+import { getLTIContext } from "./lti";
 
 const LEARNER_ID_COOKIE = "ltt_learner_id";
 const COOKIE_MAX_AGE = 365 * 24 * 60 * 60; // 1 year
@@ -18,9 +24,13 @@ export function generateLearnerId(): string {
 }
 
 /**
- * Get learner ID from cookie, or generate and store a new one
+ * Get learner ID — LTI sessions take priority over cookie-based IDs.
  */
 export function getOrCreateLearnerId(): string {
+  // LTI session takes priority
+  const lti = getLTIContext();
+  if (lti?.isLTI && lti.learnerId) return lti.learnerId;
+
   // Check cookie first
   const stored = getLearnerId();
   if (stored) return stored;
