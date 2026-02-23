@@ -35,7 +35,8 @@ from .content import (
 # Context
 from .context import TaskContext
 
-# LTI Mapping
+# LTI
+from .lti_launch import LTILaunch
 from .lti_mapping import LTIUserMapping
 
 # Dependency
@@ -208,6 +209,7 @@ __all__ = [
     "EventModel",
     # Context
     "TaskContext",
-    # LTI Mapping
+    # LTI
+    "LTILaunch",
     "LTIUserMapping",
 ]

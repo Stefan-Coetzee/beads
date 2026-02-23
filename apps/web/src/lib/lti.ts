@@ -17,6 +17,7 @@ export interface LTIContext {
   learnerId: string;
   projectId: string;
   workspaceType: string;
+  isInstructor: boolean;
 }
 
 /**
@@ -38,6 +39,7 @@ export function parseLTIContext(
     learnerId,
     projectId: searchParams.get("project_id") || "",
     workspaceType: searchParams.get("type") || "sql",
+    isInstructor: searchParams.get("instructor") === "1",
   };
 }
 

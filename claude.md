@@ -24,6 +24,27 @@ LTT separates **curriculum** (what to learn) from **progress** (learner-specific
 
 **Key Insight**: 1,000 learners can work on the same project with independent progress tracking.
 
+### LTI 1.3 Access Model
+
+**LTI is the only entry point for learners.** There is no standalone mode. Every session starts from Open edX via LTI 1.3.
+
+```
+Open edX → POST /lti/login → OIDC redirect → POST /lti/launch → JWT validation
+  → map LTI user to LTT learner → persist launch → 302 to /workspace/{project_id}
+```
+
+Key components:
+- `services/api-server/src/api/lti/` — All LTI backend code (adapter, config, storage, routes, users, grades, middleware)
+- `configs/lti/` — Platform config (`platform.json`), RSA keys (`private.key`, `public.key`)
+- `apps/web/src/lib/lti.ts` — Frontend LTI context (sessionStorage, iframe detection)
+- `lti_user_mappings` table — Maps `(lti_sub, lti_iss)` to `learner_id`
+- `lti_launches` table — Persists active launches for grade passback
+- Redis — Caches launch data, nonces, state (TTL-based)
+
+**Environment**: `LTI_REDIS_URL` must be set for LTI to work. If unset, LTI endpoints are disabled.
+
+**Documentation**: See `docs/lti/` for full spec, architecture, and production checklist. See `docs/lti/cleanup/` for code that must be removed before production.
+
 ### Status State Machine
 
 ```
@@ -43,10 +64,12 @@ LTT separates **curriculum** (what to learn) from **progress** (learner-specific
 
 ## Repository Structure
 
+Each major directory has its own README with setup instructions and details.
+
 ```
 beadslocal/
 ├── services/                    # Backend services (Python)
-│   ├── ltt-core/               # Core Learning Task Tracker engine
+│   ├── ltt-core/               # Core Learning Task Tracker engine (→ README.md)
 │   │   ├── src/ltt/
 │   │   │   ├── models/         # Pydantic + SQLAlchemy models
 │   │   │   ├── services/       # Business logic layer
@@ -57,28 +80,43 @@ beadslocal/
 │   │   ├── tests/              # ltt-core tests
 │   │   └── pyproject.toml
 │   │
-│   ├── api-server/             # FastAPI REST API
+│   ├── api-server/             # FastAPI REST API (→ README.md)
 │   │   ├── src/api/
+│   │   │   ├── lti/            # LTI 1.3 integration
+│   │   │   │   ├── adapter.py  # PyLTI1p3 FastAPI adapter
+│   │   │   │   ├── config.py   # Platform config loader
+│   │   │   │   ├── storage.py  # Redis launch data storage
+│   │   │   │   ├── routes.py   # /lti/login, /lti/launch, /lti/jwks
+│   │   │   │   ├── users.py    # LTI user → LTT learner mapping
+│   │   │   │   ├── grades.py   # AGS grade passback
+│   │   │   │   └── middleware.py # LTI context resolution
+│   │   │   └── ...
 │   │   ├── tests/
 │   │   └── pyproject.toml
 │   │
-│   └── agent-tutor/            # LLM tutoring agent
+│   └── agent-tutor/            # LLM tutoring agent (→ src/agent/README.md)
 │       ├── src/agent/
 │       ├── tests/
 │       └── pyproject.toml
 │
 ├── apps/
-│   └── web/                    # Next.js frontend
+│   └── web/                    # Next.js frontend (→ README.md)
 │       ├── src/
 │       ├── package.json
 │       └── README.md
 │
-├── infrastructure/
+├── infrastructure/             # (→ README.md)
 │   ├── docker/
 │   │   └── docker-compose.yml
 │   └── terraform/
 │
-├── content/
+├── configs/
+│   └── lti/                    # LTI 1.3 configuration
+│       ├── platform.json       # Platform registration (issuer, client_id, endpoints)
+│       ├── private.key         # RSA private key (gitignored)
+│       └── public.key          # RSA public key
+│
+├── content/                    # (→ README.md)
 │   └── projects/               # Project JSON files
 │
 ├── tools/
@@ -86,11 +124,10 @@ beadslocal/
 │   └── simulation/             # Learner simulation
 │
 ├── docs/
-│   ├── architecture/
-│   │   └── adr/                # Architecture Decision Records
-│   ├── development/
-│   ├── api/
-│   ├── cli/
+│   ├── lti/                    # LTI 1.3 spec & implementation docs
+│   │   ├── cleanup/            # Code to remove for production
+│   │   └── *.md                # Protocol, implementation, config, testing
+│   ├── adr/                    # Architecture Decision Records
 │   └── schema/
 │
 ├── archive/                    # Historical code (not active)
@@ -223,6 +260,20 @@ PYTHONPATH=services/ltt-core/src uv run alembic downgrade -1
 ---
 
 ## Development Workflows
+
+### Starting the LTI Dev Environment
+
+```bash
+# Option 1: Convenience script
+./tools/scripts/start-lti-dev.sh
+
+# Option 2: Manual (each in a separate terminal)
+docker compose up -d postgres redis
+PYTHONPATH=services/ltt-core/src uv run --package ltt-core python -m alembic upgrade head
+LTI_REDIS_URL=redis://localhost:6379/0 uv run uvicorn api.app:app --host 0.0.0.0 --port 8000 --app-dir services/api-server/src --reload
+cd apps/web && npm run dev
+cloudflared tunnel --url http://localhost:3000  # free tunnel, random URL
+```
 
 ### Running Tests
 
@@ -850,8 +901,22 @@ else:
 ## Environment Variables
 
 ```bash
-# Database URL
+# Database
 DATABASE_URL=postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev
+
+# LTI (required for LTI to work — if unset, LTI endpoints are disabled)
+LTI_REDIS_URL=redis://localhost:6379/0
+LTT_FRONTEND_URL=http://localhost:3000          # Where /lti/launch redirects to
+LTI_PLATFORM_URL=https://imbizo.alx-ai-tools.com  # CSP frame-ancestors
+
+# Optional LTI overrides
+LTI_PLATFORM_CONFIG=configs/lti/platform.json   # Platform registration
+LTI_PRIVATE_KEY=configs/lti/private.key          # RSA private key
+LTI_PUBLIC_KEY=configs/lti/public.key            # RSA public key
+
+# Debug (enables /lti/debug/* and debug button in frontend)
+DEBUG=true
+NEXT_PUBLIC_DEBUG=true
 
 # Required for Alembic migrations
 PYTHONPATH=services/ltt-core/src
@@ -862,6 +927,10 @@ PYTHONPATH=services/ltt-core/src
 - Database: ltt_dev
 - User: ltt_user
 - Password: ltt_password
+
+**Redis** (docker-compose):
+- Host: localhost:6379
+- Database: 0
 
 ---
 
@@ -888,7 +957,9 @@ async def test_my_feature(async_session):
 
 ### Configuration
 - `pyproject.toml` - Workspace root, dependencies, pytest config, ruff settings
-- `infrastructure/docker/docker-compose.yml` - PostgreSQL 17 + MySQL 8.0 setup
+- `infrastructure/docker/docker-compose.yml` - PostgreSQL 17 + MySQL 8.0 + Redis 7 setup
+- `configs/lti/platform.json` - LTI platform registration (issuer, client_id, endpoints)
+- `configs/lti/private.key` / `public.key` - RSA keys for JWT (private key gitignored)
 - `.env` - Environment variables (create from `.env.example`)
 
 ### Models
@@ -896,6 +967,16 @@ async def test_my_feature(async_session):
 - `services/ltt-core/src/ltt/models/task.py` - Task, TaskCreate, TaskUpdate, TaskModel
 - `services/ltt-core/src/ltt/models/progress.py` - LearnerTaskProgress
 - `services/ltt-core/src/ltt/models/submission.py` - Submission, Validation
+- `services/ltt-core/src/ltt/models/lti_mapping.py` - LTIUserMapping (lti_sub/iss → learner_id)
+- `services/ltt-core/src/ltt/models/lti_launch.py` - LTILaunch (persisted launch data)
+
+### LTI Integration
+- `services/api-server/src/api/lti/routes.py` - `/lti/login`, `/lti/launch`, `/lti/jwks` endpoints
+- `services/api-server/src/api/lti/adapter.py` - PyLTI1p3 FastAPI adapter classes
+- `services/api-server/src/api/lti/users.py` - `get_or_create_lti_learner()` user mapping
+- `services/api-server/src/api/lti/grades.py` - AGS grade passback to Open edX
+- `services/api-server/src/api/lti/storage.py` - Redis-backed launch data storage
+- `apps/web/src/lib/lti.ts` - Frontend LTI context (parse, store, iframe detection)
 
 ### Services
 - `services/ltt-core/src/ltt/services/task_service.py` - Most commonly used
@@ -903,10 +984,11 @@ async def test_my_feature(async_session):
 - `services/ltt-core/src/ltt/services/learning/objectives.py` - Learning objectives
 
 ### Documentation
-- `docs/schema/project-ingestion.md` - **Critical** - Complete schema guide
+- `docs/lti/` - **Critical** - Full LTI spec, architecture, cleanup plan
+- `docs/lti/cleanup/` - Code to remove for production (standalone mode artifacts)
+- `docs/schema/project-ingestion.md` - Complete schema guide
 - `docs/cli/usage.md` - Full CLI reference
-- `docs/architecture/adr/` - Architecture Decision Records
-- `BUILD-STATUS.md` - Implementation status (167 tests)
+- `docs/adr/` - Architecture Decision Records (ADR-001, ADR-002, ADR-003)
 
 ---
 

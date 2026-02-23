@@ -178,7 +178,25 @@ async def lti_launch(request: Request):
     project_id = custom.get("project_id", "")
     workspace_type = custom.get("workspace_type", "sql")
 
-    # Store active launch mapping for grade passback
+    # Persist active launch for grade passback to DB (survives Redis expiry/restart)
+    import json as _json
+    from ltt.models.lti_launch import LTILaunch
+    from ltt.utils.ids import generate_entity_id
+    ags_claim_for_persist = launch_data.get("https://purl.imsglobal.org/spec/lti-ags/claim/endpoint", {})
+    async with get_session() as session:
+        existing = await session.get(LTILaunch, launch_id)
+        if not existing:
+            session.add(LTILaunch(
+                id=launch_id,
+                learner_id=learner_id,
+                project_id=project_id,
+                lti_sub=sub,
+                ags_lineitems=ags_claim_for_persist.get("lineitems"),
+                ags_scope=_json.dumps(ags_claim_for_persist.get("scope", [])),
+            ))
+            await session.commit()
+
+    # Also cache in Redis for fast lookup (2h hot cache)
     storage.set_value(
         f"active:{learner_id}:{project_id}",
         {"launch_id": launch_id, "sub": sub},
@@ -243,6 +261,17 @@ async def lti_launch(request: Request):
         list(launch_data.keys()),
     )
 
+    # Detect instructor/admin role for frontend privilege gating
+    instructor_role_prefixes = (
+        "http://purl.imsglobal.org/vocab/lis/v2/membership#Instructor",
+        "http://purl.imsglobal.org/vocab/lis/v2/membership#Administrator",
+        "http://purl.imsglobal.org/vocab/lis/v2/institution/person#Administrator",
+    )
+    is_instructor = any(
+        any(r.startswith(p) for p in instructor_role_prefixes)
+        for r in roles_claim
+    )
+
     # Build frontend URL with launch context
     frontend_base = os.getenv("LTT_FRONTEND_URL", "http://localhost:3000")
     redirect_url = (
@@ -251,6 +280,7 @@ async def lti_launch(request: Request):
         f"&learnerId={learner_id}"
         f"&type={workspace_type}"
         f"&lti=1"
+        f"&instructor={1 if is_instructor else 0}"
     )
 
     return RedirectResponse(url=redirect_url, status_code=302)
@@ -275,6 +305,127 @@ async def lti_debug_context(request: Request):
         return JSONResponse(content={"error": f"No launch data found for launch_id={launch_id}"})
 
     return JSONResponse(content={"launch_id": launch_id, "data": data})
+
+
+@router.get("/debug/health")
+async def lti_debug_health(request: Request):
+    """
+    Check all LTI-related subsystems and surface misconfigurations.
+    Only available when DEBUG=true env var is set.
+    """
+    if not os.getenv("DEBUG"):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    checks: dict = {}
+
+    # Redis
+    try:
+        storage = get_launch_data_storage()
+        storage.set_value("health:ping", {"ok": True}, exp=10)
+        val = storage.get_value("health:ping")
+        checks["redis"] = {"ok": bool(val), "detail": "ping ok" if val else "set/get mismatch"}
+    except Exception as exc:
+        checks["redis"] = {"ok": False, "detail": str(exc)}
+
+    # Database
+    try:
+        from api.database import get_session
+        from sqlalchemy import text
+        async with get_session() as session:
+            await session.execute(text("SELECT 1"))
+        checks["database"] = {"ok": True, "detail": "connected"}
+    except Exception as exc:
+        checks["database"] = {"ok": False, "detail": str(exc)}
+
+    # Platform config
+    try:
+        tool_conf = get_tool_config()
+        jwks = tool_conf.get_jwks()
+        key_count = len(jwks.get("keys", []))
+        checks["platform_config"] = {"ok": key_count > 0, "detail": f"{key_count} key(s) loaded"}
+    except Exception as exc:
+        checks["platform_config"] = {"ok": False, "detail": str(exc)}
+
+    # Per-session checks (require X-LTI-Launch-Id header)
+    launch_id = request.headers.get("x-lti-launch-id")
+    if launch_id:
+        try:
+            storage = get_launch_data_storage()
+            info = storage.get_value(f"launch_info:{launch_id}")
+            if info:
+                ags = info.get("ags", {})
+                checks["ags"] = {
+                    "ok": bool(ags.get("lineitems")),
+                    "detail": f"lineitems={'present' if ags.get('lineitems') else 'missing'}, "
+                              f"scopes={len(ags.get('scope', []))}",
+                }
+                has_nrps = "https://purl.imsglobal.org/spec/lti-nrps/claim/namesroleservice" in info.get("all_keys", [])
+                checks["nrps"] = {
+                    "ok": has_nrps,
+                    "detail": "claim present in JWT" if has_nrps else "not in JWT — enable NRPS in Studio",
+                }
+                has_pii = bool(info.get("name")) or bool(info.get("email"))
+                checks["pii"] = {
+                    "ok": has_pii,
+                    "detail": (
+                        f"name={'✓' if info.get('name') else '✗'}, email={'✓' if info.get('email') else '✗'}"
+                        if has_pii else
+                        "null — enable PII sharing flag in Django admin for this course"
+                    ),
+                }
+            else:
+                checks["session"] = {"ok": False, "detail": f"launch_id={launch_id} not found in Redis (expired?)"}
+        except Exception as exc:
+            checks["session"] = {"ok": False, "detail": str(exc)}
+    else:
+        checks["ags"] = {"ok": None, "detail": "no launch session — send X-LTI-Launch-Id header"}
+        checks["nrps"] = {"ok": None, "detail": "no launch session"}
+        checks["pii"] = {"ok": None, "detail": "no launch session"}
+
+    all_ok = all(v["ok"] is not False for v in checks.values())
+    return JSONResponse(content={"ok": all_ok, "checks": checks})
+
+
+@router.post("/debug/grade-test")
+async def lti_debug_grade_test(request: Request):
+    """
+    Send a test grade (0.5 / 1.0) via AGS for the current session.
+    Only available when DEBUG=true env var is set.
+    """
+    if not os.getenv("DEBUG"):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    launch_id = request.headers.get("x-lti-launch-id")
+    if not launch_id:
+        return JSONResponse(content={"ok": False, "error": "Missing X-LTI-Launch-Id header"})
+
+    storage = get_launch_data_storage()
+    info = storage.get_value(f"launch_info:{launch_id}")
+    if not info:
+        return JSONResponse(content={"ok": False, "error": f"No launch data for launch_id={launch_id}"})
+
+    sub = info.get("sub")
+    if not sub:
+        return JSONResponse(content={"ok": False, "error": "No sub in launch data"})
+
+    from .grades import send_grade
+    import asyncio
+
+    ok = await asyncio.to_thread(
+        send_grade,
+        launch_id=launch_id,
+        storage=storage,
+        learner_sub=sub,
+        score=0.5,
+        max_score=1.0,
+        activity_progress="InProgress",
+        grading_progress="Pending",
+        comment="LTT debug test grade (0.5/1.0)",
+    )
+
+    if ok:
+        return JSONResponse(content={"ok": True, "score": 0.5, "max_score": 1.0})
+    return JSONResponse(content={"ok": False, "error": "AGS call failed — check server logs"})
 
 
 @router.get("/jwks")
