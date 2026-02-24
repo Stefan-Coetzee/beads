@@ -12,14 +12,15 @@ Provides endpoints for:
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from ltt.models import TaskStatus
+from ltt.services.dependency_service import get_ready_work, is_task_blocked
+from ltt.services.progress_service import get_or_create_progress, update_status
+from ltt.services.task_service import TaskNotFoundError, get_children, get_task
 from pydantic import BaseModel, Field
 
 from api.auth import LearnerContext, get_learner_context
 from api.database import get_session_factory
-from ltt.models import TaskStatus
-from ltt.services.task_service import get_task, get_children, TaskNotFoundError
-from ltt.services.progress_service import get_or_create_progress, update_status
-from ltt.services.dependency_service import get_ready_work, is_task_blocked
+
 # Disabled: direct submit (see ADR-004). Uncomment when custom validators exist.
 # from ltt.models import SubmissionType
 # from ltt.services.submission_service import create_submission
@@ -163,7 +164,7 @@ async def list_projects() -> list[dict]:
 
     Returns basic project info for selection.
     """
-    from sqlalchemy import select, text
+    from sqlalchemy import text
 
     session_factory = get_session_factory()
 
@@ -171,7 +172,9 @@ async def list_projects() -> list[dict]:
         try:
             # Get all projects (task_type = 'project')
             result = await session.execute(
-                text("SELECT id, title, workspace_type FROM tasks WHERE task_type = 'project' ORDER BY created_at DESC")
+                text(
+                    "SELECT id, title, workspace_type FROM tasks WHERE task_type = 'project' ORDER BY created_at DESC"
+                )
             )
             projects = [
                 {"id": row[0], "title": row[1], "workspace_type": row[2]}
@@ -197,13 +200,14 @@ async def get_project_tree(
 
     async with session_factory() as session:
         try:
-
             # Get project (root task)
             project = await get_task(session, project_id)
 
             # Recursively build tree with progress
             # parent_blocked: if True, this task is blocked because an ancestor is blocked
-            async def build_tree(task_id: str, parent_blocked: bool = False) -> tuple[TaskNode, dict]:
+            async def build_tree(
+                task_id: str, parent_blocked: bool = False
+            ) -> tuple[TaskNode, dict]:
                 task = await get_task(session, task_id)
                 progress = await get_or_create_progress(session, task_id, learner_id)
 
@@ -315,8 +319,8 @@ async def is_ancestor_blocked(session, task_id: str, learner_id: str) -> bool:
 
 async def get_tasks_blocked_by(session, task_id: str, learner_id: str) -> list:
     """Get tasks that are blocked by this task (reverse of get_blocking_tasks)."""
-    from sqlalchemy import text
     from ltt.models import Task
+    from sqlalchemy import text
 
     query = text("""
         SELECT t.*

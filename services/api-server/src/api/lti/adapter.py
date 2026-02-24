@@ -11,8 +11,6 @@ Implements the framework-specific interfaces that the library needs:
 
 from __future__ import annotations
 
-from typing import Optional, Union
-
 from pylti1p3.cookie import CookieService
 from pylti1p3.launch_data_storage.base import LaunchDataStorage
 from pylti1p3.message_launch import MessageLaunch
@@ -43,10 +41,10 @@ class FastAPIRequest(Request):
     def session(self) -> dict:
         return self._session
 
-    def get_param(self, key: str) -> Optional[str]:
+    def get_param(self, key: str) -> str | None:
         return self._request_data.get(key)
 
-    def get_cookie(self, key: str) -> Optional[str]:
+    def get_cookie(self, key: str) -> str | None:
         return self._cookies.get(key)
 
     def is_secure(self) -> bool:
@@ -63,10 +61,10 @@ class FastAPICookieService(CookieService):
     def _get_key(self, key: str) -> str:
         return self._cookie_prefix + "-" + key
 
-    def get_cookie(self, name: str) -> Optional[str]:
+    def get_cookie(self, name: str) -> str | None:
         return self._request.get_cookie(self._get_key(name))
 
-    def set_cookie(self, name: str, value: Union[str, int], exp: int = 3600):
+    def set_cookie(self, name: str, value: str | int, exp: int = 3600):
         self._cookie_data_to_set[self._get_key(name)] = {
             "value": str(value),
             "exp": exp,
@@ -89,9 +87,7 @@ class FastAPICookieService(CookieService):
 class FastAPIRedirect(Redirect):
     """Handles redirects with cookie propagation."""
 
-    def __init__(
-        self, location: str, cookie_service: Optional[FastAPICookieService] = None
-    ):
+    def __init__(self, location: str, cookie_service: FastAPICookieService | None = None):
         super().__init__()
         self._location = location
         self._cookie_service = cookie_service
@@ -131,13 +127,11 @@ class FastAPIOIDCLogin(OIDCLogin):
         tool_config,
         session_service=None,
         cookie_service=None,
-        launch_data_storage: Optional[LaunchDataStorage] = None,
+        launch_data_storage: LaunchDataStorage | None = None,
     ):
         cookie_service = cookie_service or FastAPICookieService(request)
         session_service = session_service or SessionService(request)
-        super().__init__(
-            request, tool_config, session_service, cookie_service, launch_data_storage
-        )
+        super().__init__(request, tool_config, session_service, cookie_service, launch_data_storage)
 
     def get_redirect(self, url: str) -> FastAPIRedirect:
         return FastAPIRedirect(url, self._cookie_service)
@@ -155,7 +149,7 @@ class FastAPIMessageLaunch(MessageLaunch):
         tool_config,
         session_service=None,
         cookie_service=None,
-        launch_data_storage: Optional[LaunchDataStorage] = None,
+        launch_data_storage: LaunchDataStorage | None = None,
         requests_session=None,
     ):
         cookie_service = cookie_service or FastAPICookieService(request)
@@ -169,5 +163,5 @@ class FastAPIMessageLaunch(MessageLaunch):
             requests_session,
         )
 
-    def _get_request_param(self, key: str) -> Optional[str]:
+    def _get_request_param(self, key: str) -> str | None:
         return self._request.get_param(key)

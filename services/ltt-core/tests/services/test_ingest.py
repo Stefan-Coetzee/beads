@@ -5,7 +5,6 @@ Tests for ingestion service.
 import json
 
 import pytest
-
 from ltt.models import TaskType
 from ltt.services.ingest import (
     count_objectives,
@@ -193,9 +192,8 @@ async def test_ingest_dry_run(async_session, tmp_path):
     assert result.errors == []
 
     # Verify nothing created
-    from sqlalchemy import select
-
     from ltt.models import TaskModel
+    from sqlalchemy import select
 
     db_result = await async_session.execute(select(TaskModel))
     tasks = db_result.scalars().all()

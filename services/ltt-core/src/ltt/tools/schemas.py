@@ -142,7 +142,9 @@ class StartTaskContextOutput(BaseModel):
     narrative_context: str | None = None
 
     # Pedagogical
-    learning_objectives: list[dict]  # Include Bloom levels: {"level": "apply", "description": "..."}
+    learning_objectives: list[
+        dict
+    ]  # Include Bloom levels: {"level": "apply", "description": "..."}
     tutor_guidance: dict | None = None
 
 

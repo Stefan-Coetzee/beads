@@ -4,7 +4,6 @@ import json
 
 
 class TestRedisLaunchDataStorage:
-
     def test_set_and_get_value(self, lti_storage):
         """set_value stores JSON, get_value deserializes it."""
         lti_storage.set_value("test-key", {"foo": "bar"}, exp=60)

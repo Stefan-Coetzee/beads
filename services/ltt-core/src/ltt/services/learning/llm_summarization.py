@@ -174,12 +174,16 @@ async def _generate_summary(state: SummarizationState) -> SummarizationState:
 
     # Call LLM
     messages = [
-        SystemMessage(content="You are a helpful assistant that writes concise, informative summaries for educational content."),
+        SystemMessage(
+            content="You are a helpful assistant that writes concise, informative summaries for educational content."
+        ),
         HumanMessage(content=prompt),
     ]
 
     response = await llm.ainvoke(messages)
-    summary = response.content.strip() if isinstance(response.content, str) else str(response.content)
+    summary = (
+        response.content.strip() if isinstance(response.content, str) else str(response.content)
+    )
 
     state["summary"] = summary
     return state
@@ -234,7 +238,9 @@ async def summarize_item(request: SummarizationRequest) -> SummarizationResult:
     return SummarizationResult(item_id=request.item_id, summary=summary)
 
 
-async def summarize_items_parallel(requests: list[SummarizationRequest]) -> list[SummarizationResult]:
+async def summarize_items_parallel(
+    requests: list[SummarizationRequest],
+) -> list[SummarizationResult]:
     """
     Summarize multiple items in parallel.
 

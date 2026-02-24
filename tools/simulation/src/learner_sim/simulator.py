@@ -9,6 +9,8 @@ import os
 from contextlib import contextmanager
 from typing import Annotated, Literal
 
+from agent.config import Config, get_config
+from agent.mysql_tools import create_learner_mysql_tools
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
@@ -18,8 +20,6 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, ConfigDict, Field
 
-from agent.config import Config, get_config
-from agent.mysql_tools import create_learner_mysql_tools
 from learner_sim.prompts import LEARNER_GREETING, build_learner_prompt
 
 

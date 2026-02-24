@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from pylti1p3.launch_data_storage.base import LaunchDataStorage
 
@@ -27,7 +27,7 @@ class RedisLaunchDataStorage(LaunchDataStorage):
         self._redis = redis_client
 
     @classmethod
-    def from_url(cls, redis_url: str = "redis://localhost:6379/0") -> "RedisLaunchDataStorage":
+    def from_url(cls, redis_url: str = "redis://localhost:6379/0") -> RedisLaunchDataStorage:
         """Create storage from Redis URL using sync client (PyLTI1p3 is sync)."""
         import redis as sync_redis
 
@@ -40,7 +40,7 @@ class RedisLaunchDataStorage(LaunchDataStorage):
     def _prepare_key(self, key: str) -> str:
         return f"{self._PREFIX}{key}"
 
-    def get_value(self, key: str) -> Optional[dict]:
+    def get_value(self, key: str) -> dict | None:
         prepared_key = self._prepare_key(key)
         value = self._redis.get(prepared_key)
         if value:
@@ -50,7 +50,7 @@ class RedisLaunchDataStorage(LaunchDataStorage):
                 return None
         return None
 
-    def set_value(self, key: str, value: Any, exp: Optional[int] = None) -> None:
+    def set_value(self, key: str, value: Any, exp: int | None = None) -> None:
         prepared_key = self._prepare_key(key)
         serialized = json.dumps(value)
         ttl = exp or self._DEFAULT_TTL

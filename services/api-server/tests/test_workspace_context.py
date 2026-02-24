@@ -16,9 +16,7 @@ import types as _types
 # api.routes imports api.agents at module level, so we stub it before import.
 # ---------------------------------------------------------------------------
 if "api" not in sys.modules:
-    _api_src = str(
-        __import__("pathlib").Path(__file__).resolve().parents[1] / "src" / "api"
-    )
+    _api_src = str(__import__("pathlib").Path(__file__).resolve().parents[1] / "src" / "api")
     sys.modules["api"] = _types.ModuleType("api")
     sys.modules["api"].__path__ = [_api_src]  # type: ignore[attr-defined]
 
@@ -33,7 +31,6 @@ from api.routes import (  # noqa: E402
     build_message_with_context,
     format_workspace_context,
 )
-
 
 # =========================================================================
 # format_workspace_context — SQL workspace
@@ -100,7 +97,7 @@ class TestFormatWorkspaceContextSQL:
             results=ExecutionResult(
                 success=False,
                 duration=1.0,
-                error="syntax error at or near \"SELEC\"",
+                error='syntax error at or near "SELEC"',
             ),
         )
         out = format_workspace_context(ctx)

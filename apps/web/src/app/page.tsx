@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 import { getLTIContext } from "@/lib/lti";
 
 export default function Home() {
-  const [projectId, setProjectId] = useState<string>("");
+  const [userSelectedProjectId, setUserSelectedProjectId] = useState<string>("");
 
   const ltiCtx = getLTIContext();
 
@@ -22,14 +22,10 @@ export default function Home() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Set default project when projects load (prefer LTI context project)
-  useEffect(() => {
-    if (ltiCtx?.projectId) {
-      setProjectId(ltiCtx.projectId);
-    } else if (projects && projects.length > 0 && !projectId) {
-      setProjectId(projects[0].id);
-    }
-  }, [projects, projectId, ltiCtx?.projectId]);
+  // Derive project ID: user selection > LTI context > first project
+  const defaultProjectId = ltiCtx?.projectId || projects?.[0]?.id || "";
+  const projectId = userSelectedProjectId || defaultProjectId;
+  const setProjectId = setUserSelectedProjectId;
 
   // Get selected project's workspace type
   const selectedProject = projects?.find(p => p.id === projectId);

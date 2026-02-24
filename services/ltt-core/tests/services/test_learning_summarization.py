@@ -3,7 +3,6 @@ Tests for learning summarization service.
 """
 
 import pytest
-
 from ltt.models import BloomLevel, LearnerModel, SubmissionType, TaskCreate, TaskStatus, TaskType
 from ltt.services.learning import (
     TaskNotClosedError,

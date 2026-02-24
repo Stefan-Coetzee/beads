@@ -5,7 +5,7 @@ Learning materials that can be attached to tasks.
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import DateTime, String, Text
@@ -15,7 +15,7 @@ from sqlalchemy.sql import func
 from .base import Base
 
 
-class ContentType(str, Enum):
+class ContentType(StrEnum):
     """Type of learning content."""
 
     MARKDOWN = "markdown"

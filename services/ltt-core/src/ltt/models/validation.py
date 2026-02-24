@@ -5,7 +5,7 @@ Pass/fail result for a submission.
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
@@ -15,7 +15,7 @@ from sqlalchemy.sql import func
 from .base import Base
 
 
-class ValidatorType(str, Enum):
+class ValidatorType(StrEnum):
     """Type of validator that checked the submission."""
 
     AUTOMATED = "automated"  # System/test runner

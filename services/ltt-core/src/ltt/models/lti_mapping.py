@@ -22,14 +22,10 @@ class LTIUserMapping(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     lti_sub: Mapped[str] = mapped_column(String, nullable=False)
     lti_iss: Mapped[str] = mapped_column(String, nullable=False)
-    learner_id: Mapped[str] = mapped_column(
-        String, ForeignKey("learners.id"), nullable=False
-    )
+    learner_id: Mapped[str] = mapped_column(String, ForeignKey("learners.id"), nullable=False)
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
     email: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

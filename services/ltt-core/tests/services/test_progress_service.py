@@ -3,7 +3,6 @@ Tests for progress and status management service.
 """
 
 import pytest
-
 from ltt.models import LearnerModel, TaskCreate, TaskStatus, TaskType
 from ltt.services.progress_service import (
     InvalidStatusTransitionError,

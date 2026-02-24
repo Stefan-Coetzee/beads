@@ -6,7 +6,6 @@ were still showing as "ready" work even though their parent epic was blocked.
 """
 
 import pytest
-
 from ltt.models import DependencyType, LearnerModel, TaskCreate, TaskStatus, TaskType
 from ltt.services.dependency_service import add_dependency, get_ready_work
 from ltt.services.progress_service import close_task, update_status

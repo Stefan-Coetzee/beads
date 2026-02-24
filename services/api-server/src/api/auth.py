@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fastapi import HTTPException, Request, Depends
+from fastapi import HTTPException, Request
 
 from api.settings import get_settings
 
@@ -43,10 +43,7 @@ _INSTRUCTOR_ROLE_PREFIXES = (
 
 
 def _check_instructor(roles: list[str]) -> bool:
-    return any(
-        any(r.startswith(p) for p in _INSTRUCTOR_ROLE_PREFIXES)
-        for r in roles
-    )
+    return any(any(r.startswith(p) for p in _INSTRUCTOR_ROLE_PREFIXES) for r in roles)
 
 
 async def get_learner_context(request: Request) -> LearnerContext:
@@ -66,9 +63,7 @@ async def get_learner_context(request: Request) -> LearnerContext:
                     learner_id=info["learner_id"],
                     project_id=info.get("project_id") or None,
                     launch_id=launch_id,
-                    is_instructor=_check_instructor(
-                        info.get("roles", [])
-                    ),
+                    is_instructor=_check_instructor(info.get("roles", [])),
                     source="lti",
                 )
         except RuntimeError:

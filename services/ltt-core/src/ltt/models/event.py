@@ -5,7 +5,7 @@ Record of all changes for debugging and history (audit trail).
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import DateTime, Index, Integer, String, Text
@@ -15,7 +15,7 @@ from sqlalchemy.sql import func
 from .base import Base
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     """Types of audit events."""
 
     CREATED = "created"

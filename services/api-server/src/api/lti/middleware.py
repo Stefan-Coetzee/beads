@@ -7,7 +7,6 @@ Resolves launch_id to LTI context for API requests after the initial launch.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from .adapter import FastAPIMessageLaunch, FastAPIRequest
 from .config import get_tool_config
@@ -21,14 +20,12 @@ class LTIContext:
     launch_id: str
     learner_sub: str
     learner_id: str  # Resolved from mapping table
-    project_id: Optional[str]
+    project_id: str | None
     has_ags: bool
     is_instructor: bool
 
 
-def resolve_launch(
-    launch_id: str, storage: RedisLaunchDataStorage
-) -> Optional[LTIContext]:
+def resolve_launch(launch_id: str, storage: RedisLaunchDataStorage) -> LTIContext | None:
     """
     Resolve a launch_id to LTI context.
 
@@ -36,9 +33,7 @@ def resolve_launch(
     """
     tool_conf = get_tool_config()
 
-    dummy_request = FastAPIRequest(
-        cookies={}, session={}, request_data={}, request_is_secure=True
-    )
+    dummy_request = FastAPIRequest(cookies={}, session={}, request_data={}, request_is_secure=True)
 
     try:
         message_launch = FastAPIMessageLaunch.from_cache(
@@ -51,9 +46,7 @@ def resolve_launch(
         return None
 
     launch_data = message_launch.get_launch_data()
-    custom = launch_data.get(
-        "https://purl.imsglobal.org/spec/lti/claim/custom", {}
-    )
+    custom = launch_data.get("https://purl.imsglobal.org/spec/lti/claim/custom", {})
 
     return LTIContext(
         launch_id=launch_id,

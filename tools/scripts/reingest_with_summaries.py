@@ -5,10 +5,6 @@ import asyncio
 import logging
 from pathlib import Path
 
-from sqlalchemy import delete, text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
-
 from ltt.models import (
     CommentModel,
     DependencyModel,
@@ -20,6 +16,9 @@ from ltt.models import (
     ValidationModel,
 )
 from ltt.services.ingest import ingest_project_file
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -69,7 +68,7 @@ async def main() -> None:
             use_llm_summaries=True,  # Enable LLM summarization
         )
 
-        logger.info(f"Ingestion complete!")
+        logger.info("Ingestion complete!")
         logger.info(f"  Project ID: {result.project_id}")
         logger.info(f"  Tasks created: {result.task_count}")
         logger.info(f"  Objectives created: {result.objective_count}")

@@ -35,9 +35,7 @@ class Settings(BaseSettings):
     env: Literal["local", "dev", "prod"] = "local"
 
     # ── Database ─────────────────────────────────────────────────────
-    database_url: str = (
-        "postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev"
-    )
+    database_url: str = "postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev"
 
     # ── Checkpoint DB ────────────────────────────────────────────────
     # Separate database for LangGraph conversation checkpoints (psycopg).
@@ -81,22 +79,17 @@ class Settings(BaseSettings):
 
     # ── Prod safety checks ───────────────────────────────────────────
     @model_validator(mode="after")
-    def _validate_prod(self) -> "Settings":
+    def _validate_prod(self) -> Settings:
         if self.env == "prod":
             errors: list[str] = []
             if not self.auth_enabled:
                 errors.append("LTT_AUTH_ENABLED must be true in prod")
             if self.cors_origins == ["*"]:
-                errors.append(
-                    "LTT_CORS_ORIGINS must not be ['*'] in prod"
-                )
+                errors.append("LTT_CORS_ORIGINS must not be ['*'] in prod")
             if not self.redis_url:
                 errors.append("LTT_REDIS_URL is required in prod")
             if errors:
-                raise ValueError(
-                    "Production configuration errors:\n  - "
-                    + "\n  - ".join(errors)
-                )
+                raise ValueError("Production configuration errors:\n  - " + "\n  - ".join(errors))
         return self
 
 

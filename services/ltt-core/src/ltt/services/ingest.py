@@ -5,7 +5,6 @@ Handles recursive project structure creation with dependency resolution.
 Uses LLM-based hierarchical summarization for tasks and epics.
 """
 
-import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
@@ -376,10 +375,12 @@ async def ingest_task(
         )
         task_count += count
         obj_count += obj_count_child
-        subtask_infos.append({
-            "title": subtask_info.title,
-            "description": subtask_info.description,
-        })
+        subtask_infos.append(
+            {
+                "title": subtask_info.title,
+                "description": subtask_info.description,
+            }
+        )
 
     # Generate task summary from subtasks using LLM (only for tasks with subtasks)
     task_summary: str | None = None

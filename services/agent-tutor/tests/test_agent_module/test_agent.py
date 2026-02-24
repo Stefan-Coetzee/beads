@@ -12,14 +12,11 @@ These tests verify:
 import os
 
 import pytest
-from langchain_core.messages import HumanMessage
-
-from agent.config import Config, get_config
+from agent.config import get_config
 from agent.graph import create_agent, create_custom_graph
 from agent.prompts import OPERATIONAL_INSTRUCTIONS, SYSTEM_PROMPT, build_system_prompt
 from agent.state import AgentState, LearnerProgress, TaskContext
 from agent.tools import create_tools, get_tool_descriptions
-
 
 # All tools that should be available
 EXPECTED_TOOLS = {
@@ -322,9 +319,7 @@ class TestToolsMounted:
         )
 
         for tool in tools:
-            assert tool.args_schema is not None, (
-                f"Tool {tool.name} missing args_schema"
-            )
+            assert tool.args_schema is not None, f"Tool {tool.name} missing args_schema"
 
 
 class TestEnvironmentConfig:
@@ -367,6 +362,4 @@ class TestEnvironmentConfig:
         config = get_config()
 
         assert config.database_url, "Missing database_url in config"
-        assert "postgresql" in config.database_url, (
-            "database_url should be a PostgreSQL URL"
-        )
+        assert "postgresql" in config.database_url, "database_url should be a PostgreSQL URL"

@@ -3,7 +3,6 @@ Tests for learning content service.
 """
 
 import pytest
-
 from ltt.models import ContentType, TaskCreate, TaskType
 from ltt.services.learning import (
     ContentNotFoundError,

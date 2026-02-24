@@ -1,14 +1,12 @@
 """Tests for api.lti.users (LTI user -> LTT learner mapping)."""
 
-from sqlalchemy import select
-
-from api.lti.users import get_or_create_lti_learner, get_learner_by_lti
+from api.lti.users import get_learner_by_lti, get_or_create_lti_learner
 from ltt.models.learner import LearnerModel
 from ltt.models.lti_mapping import LTIUserMapping
+from sqlalchemy import select
 
 
 class TestGetOrCreateLtiLearner:
-
     async def test_creates_new_learner_on_first_launch(self, async_session):
         """First LTI launch creates a new learner and mapping."""
         learner_id = await get_or_create_lti_learner(
@@ -118,7 +116,6 @@ class TestGetOrCreateLtiLearner:
 
 
 class TestGetLearnerByLti:
-
     async def test_returns_none_for_unknown(self, async_session):
         """Unknown sub+iss returns None."""
         result = await get_learner_by_lti(

@@ -3,8 +3,6 @@ Tests for task management service.
 """
 
 import pytest
-from sqlalchemy import select
-
 from ltt.models import CommentCreate, TaskCreate, TaskModel, TaskType, TaskUpdate
 from ltt.services.task_service import (
     InvalidTaskHierarchyError,
@@ -19,6 +17,7 @@ from ltt.services.task_service import (
     get_task_count,
     update_task,
 )
+from sqlalchemy import select
 
 
 @pytest.mark.asyncio

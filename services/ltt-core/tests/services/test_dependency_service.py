@@ -3,8 +3,6 @@ Tests for dependency management service.
 """
 
 import pytest
-from sqlalchemy import select
-
 from ltt.models import (
     DependencyModel,
     DependencyType,
@@ -32,6 +30,7 @@ from ltt.services.dependency_service import (
 from ltt.services.progress_service import update_status
 from ltt.services.task_service import create_task
 from ltt.utils.ids import PREFIX_LEARNER, generate_entity_id
+from sqlalchemy import select
 
 
 @pytest.mark.asyncio

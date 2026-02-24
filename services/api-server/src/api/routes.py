@@ -7,18 +7,17 @@ Provides endpoints for:
 - Session management: Create/manage agent sessions
 """
 
-import json
 import logging
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
+from api.agents import get_or_create_agent
 from api.auth import LearnerContext, get_learner_context
 from api.database import get_session_factory
-from api.agents import get_or_create_agent
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,9 @@ class ExecutionResult(BaseModel):
     duration: float = Field(0, description="Execution time in milliseconds")
 
     # For successful results
-    output: str | None = Field(None, description="Text output (Python stdout, or formatted SQL result)")
+    output: str | None = Field(
+        None, description="Text output (Python stdout, or formatted SQL result)"
+    )
     columns: list[str] | None = Field(None, description="Column names (SQL only)")
     rows: list[list] | None = Field(None, description="Result rows (SQL only)")
     row_count: int | None = Field(None, description="Number of rows returned (SQL only)")
@@ -53,15 +54,21 @@ class WorkspaceContext(BaseModel):
 
     editor_content: str | None = Field(None, description="Current code in the editor")
     results: ExecutionResult | None = Field(None, description="Execution results (SQL or Python)")
-    workspace_type: str | None = Field(None, description="Type of workspace: sql, python, cybersecurity")
+    workspace_type: str | None = Field(
+        None, description="Type of workspace: sql, python, cybersecurity"
+    )
 
 
 class ChatRequest(BaseModel):
     """Request to chat with the agent."""
 
     message: str = Field(..., description="The user's message")
-    thread_id: str | None = Field(None, description="Optional thread ID for conversation continuity")
-    context: WorkspaceContext | None = Field(None, description="Workspace context (editor, results)")
+    thread_id: str | None = Field(
+        None, description="Optional thread ID for conversation continuity"
+    )
+    context: WorkspaceContext | None = Field(
+        None, description="Workspace context (editor, results)"
+    )
 
 
 class ChatResponse(BaseModel):
@@ -121,7 +128,9 @@ def format_workspace_context(context: WorkspaceContext | None) -> str:
     # Add editor content if present
     if context.editor_content and context.editor_content.strip():
         lang = "sql" if workspace_type == "sql" else "python"
-        parts.append(f"\n**Current Code in Editor:**\n```{lang}\n{context.editor_content.strip()}\n```")
+        parts.append(
+            f"\n**Current Code in Editor:**\n```{lang}\n{context.editor_content.strip()}\n```"
+        )
 
     # Format execution results (unified for SQL and Python)
     if context.results:
@@ -248,7 +257,9 @@ async def chat(
         all_tool_calls = []
 
         # Only collect tool calls from messages added in this turn
-        new_messages = messages[prev_message_count:] if prev_message_count < len(messages) else messages
+        new_messages = (
+            messages[prev_message_count:] if prev_message_count < len(messages) else messages
+        )
         for msg in new_messages:
             if hasattr(msg, "tool_calls") and msg.tool_calls:
                 for tc in msg.tool_calls:
@@ -368,7 +379,7 @@ async def create_session(
     learner_id = ctx.learner_id
     project_id = ctx.project_id or ""
 
-    agent = get_or_create_agent(
+    get_or_create_agent(
         learner_id=learner_id,
         project_id=project_id,
         session_factory=get_session_factory(),

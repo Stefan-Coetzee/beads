@@ -12,20 +12,21 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from api.agents import init_checkpointer, close_checkpointer
-from api.database import init_database, close_database, get_session_factory
-from api.routes import router
+from api.agents import close_checkpointer, init_checkpointer
+from api.database import close_database, get_session_factory, init_database
 from api.frontend_routes import router as frontend_router
-from api.lti.routes import router as lti_router, init_lti_storage, is_lti_enabled
+from api.lti.routes import init_lti_storage
+from api.lti.routes import router as lti_router
+from api.routes import router
 from api.settings import get_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -33,7 +34,15 @@ logger = logging.getLogger(__name__)
 
 
 # Default project to ingest if no projects exist
-DEFAULT_PROJECT_PATH = Path(__file__).parent.parent.parent.parent.parent / "content" / "projects" / "DA" / "MN_Part1" / "structured" / "water_analysis_project.json"
+DEFAULT_PROJECT_PATH = (
+    Path(__file__).parent.parent.parent.parent.parent
+    / "content"
+    / "projects"
+    / "DA"
+    / "MN_Part1"
+    / "structured"
+    / "water_analysis_project.json"
+)
 
 
 async def ensure_projects_exist() -> None:

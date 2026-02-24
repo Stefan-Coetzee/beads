@@ -3,7 +3,6 @@ Tests for navigation tools (get_ready, show_task, get_context).
 """
 
 import pytest
-
 from ltt.models import (
     BloomLevel,
     DependencyType,

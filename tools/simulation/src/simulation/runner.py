@@ -11,13 +11,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from rich.console import Console
-from rich.markdown import Markdown
-from rich.panel import Panel
-
 from agent.config import Config, get_config
 from api.client import AgentClient, ChatResponse
 from learner_sim.simulator import create_learner_simulator
+from rich.console import Console
+from rich.markdown import Markdown
+from rich.panel import Panel
 
 
 @dataclass

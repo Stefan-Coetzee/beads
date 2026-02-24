@@ -302,7 +302,9 @@ async def try_auto_close_ancestors(
 
         # Try to auto-close this parent
         try:
-            await close_task(session, current_parent_id, learner_id, "Auto-closed: all children complete")
+            await close_task(
+                session, current_parent_id, learner_id, "Auto-closed: all children complete"
+            )
             auto_closed.append(current_parent_id)
             current_parent_id = parent.parent_id  # Continue climbing
         except InvalidStatusTransitionError:

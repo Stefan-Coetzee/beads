@@ -14,19 +14,14 @@ Requirements:
 Run with: pytest -m integration
 """
 
-import asyncio
-import os
 from pathlib import Path
 
 import pytest
 
 # Mark all tests in this module as integration tests (skipped by default)
 pytestmark = pytest.mark.integration
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from ltt.models import LearnerModel, TaskStatus
-from ltt.services.dependency_service import get_ready_work, is_task_blocked
+from ltt.models import LearnerModel
+from ltt.services.dependency_service import is_task_blocked
 from ltt.services.ingest import ingest_project_file
 from ltt.services.learning import get_progress
 from ltt.services.progress_service import (
@@ -41,12 +36,13 @@ from ltt.tools import (
     StartTaskInput,
     SubmitInput,
     add_comment,
-    get_context,
     get_ready,
     start_task,
     submit,
 )
 from ltt.utils.ids import PREFIX_LEARNER, generate_entity_id
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture
@@ -164,9 +160,7 @@ async def test_e2e_submission_and_validation(async_session, ingested_project, le
 
     # Submit work
     result = await submit(
-        SubmitInput(
-            task_id=subtask.id, content="Test submission content", submission_type="text"
-        ),
+        SubmitInput(task_id=subtask.id, content="Test submission content", submission_type="text"),
         learner_a,
         async_session,
     )
@@ -182,7 +176,7 @@ async def test_e2e_hierarchical_closure(async_session, ingested_project, learner
     project_id = ingested_project
 
     # Get first epic
-    project = await get_task(async_session, project_id)
+    await get_task(async_session, project_id)
     epics = await get_children(async_session, project_id, recursive=False)
     epic = epics[0]
 
@@ -250,9 +244,7 @@ async def test_e2e_epic_blocking_propagation(async_session, ingested_project, le
         pass
 
     # Now Epic 2 tasks should become available (if Epic 1 fully closed)
-    ready_after = await get_ready(
-        GetReadyInput(project_id=project_id), learner_a, async_session
-    )
+    ready_after = await get_ready(GetReadyInput(project_id=project_id), learner_a, async_session)
     epic_2_tasks_after = [t for t in ready_after.tasks if t.id.startswith(f"{project_id}.2.")]
 
     # If Epic 1 is closed, Epic 2 should be unblocked
@@ -361,7 +353,9 @@ async def test_e2e_multi_learner_isolation_progress(
     progress_b = await get_progress(async_session, learner_b, project_id)
 
     # Learner A should have 1 in_progress task
-    assert progress_a.in_progress_tasks == 1, f"Expected 1 in_progress, got {progress_a.in_progress_tasks}"
+    assert progress_a.in_progress_tasks == 1, (
+        f"Expected 1 in_progress, got {progress_a.in_progress_tasks}"
+    )
 
     # Learner B should have 0 in_progress
     assert progress_b.in_progress_tasks == 0, "Learner B progress should be independent"
@@ -447,7 +441,9 @@ async def test_e2e_single_in_progress_enforcement(async_session, ingested_projec
     project_id = ingested_project
 
     # Get ready work
-    ready = await get_ready(GetReadyInput(project_id=project_id, limit=10), learner_a, async_session)
+    ready = await get_ready(
+        GetReadyInput(project_id=project_id, limit=10), learner_a, async_session
+    )
 
     # Find two different tasks to start
     task_ids = [t.id for t in ready.tasks if t.task_type in ["task", "subtask"]][:2]
@@ -590,7 +586,7 @@ async def test_e2e_full_workflow_summary(async_session, ingested_project, learne
 
     # Progress should be independent (each test uses fresh fixtures)
     # Both may have 0 completed if tests ran in isolation
-    print(f"\n--- E2E Test Summary ---")
+    print("\n--- E2E Test Summary ---")
     print(f"Learner A: {progress_a.completed_tasks}/{progress_a.total_tasks} completed")
     print(f"Learner B: {progress_b.completed_tasks}/{progress_b.total_tasks} completed")
     print(f"Project: {project_id}")
