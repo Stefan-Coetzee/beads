@@ -7,7 +7,7 @@ is tracked in LearnerTaskProgress.
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -18,7 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, TimestampMixin
 
 
-class TaskType(str, Enum):
+class TaskType(StrEnum):
     """Type of task in the hierarchy."""
 
     PROJECT = "project"
@@ -27,7 +27,7 @@ class TaskType(str, Enum):
     SUBTASK = "subtask"
 
 
-class WorkspaceType(str, Enum):
+class WorkspaceType(StrEnum):
     """Type of workspace for executing code/tasks."""
 
     SQL = "sql"
@@ -35,7 +35,7 @@ class WorkspaceType(str, Enum):
     CYBERSECURITY = "cybersecurity"
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     """Task workflow status."""
 
     OPEN = "open"

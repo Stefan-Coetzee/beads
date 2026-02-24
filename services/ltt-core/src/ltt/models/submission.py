@@ -5,7 +5,7 @@ Learner's proof of work for a task.
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -16,7 +16,7 @@ from sqlalchemy.sql import func
 from .base import Base
 
 
-class SubmissionType(str, Enum):
+class SubmissionType(StrEnum):
     """Type of submission content."""
 
     CODE = "code"

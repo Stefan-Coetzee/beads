@@ -5,7 +5,7 @@ Structured validation rules for tasks.
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import DateTime, ForeignKey, String, Text
@@ -15,7 +15,7 @@ from sqlalchemy.sql import func
 from .base import Base
 
 
-class CriterionType(str, Enum):
+class CriterionType(StrEnum):
     """Type of acceptance criterion."""
 
     CODE_TEST = "code_test"  # Automated code test

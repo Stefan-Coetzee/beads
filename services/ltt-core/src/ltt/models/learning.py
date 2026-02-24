@@ -5,7 +5,7 @@ Pedagogical goals attached to tasks.
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import DateTime, ForeignKey, String, Text
@@ -15,7 +15,7 @@ from sqlalchemy.sql import func
 from .base import Base
 
 
-class BloomLevel(str, Enum):
+class BloomLevel(StrEnum):
     """Bloom's Taxonomy cognitive levels."""
 
     REMEMBER = "remember"
@@ -26,7 +26,7 @@ class BloomLevel(str, Enum):
     CREATE = "create"
 
 
-class ObjectiveTaxonomy(str, Enum):
+class ObjectiveTaxonomy(StrEnum):
     """Supported learning taxonomies."""
 
     BLOOM = "bloom"

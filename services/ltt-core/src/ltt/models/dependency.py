@@ -5,7 +5,7 @@ Relationships between tasks that control workflow.
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import DateTime, ForeignKey, String, Text
@@ -15,7 +15,7 @@ from sqlalchemy.sql import func
 from .base import Base
 
 
-class DependencyType(str, Enum):
+class DependencyType(StrEnum):
     """Type of dependency relationship."""
 
     BLOCKS = "blocks"  # Task cannot start until dependency closes
