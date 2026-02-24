@@ -307,7 +307,7 @@ DATABASE_URL=postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev
 LTI_PLATFORM_CONFIG=configs/lti/platform.json
 LTI_PRIVATE_KEY=configs/lti/private.key
 LTI_PUBLIC_KEY=configs/lti/public.key
-LTI_REDIS_URL=redis://localhost:6379/0
+LTT_REDIS_URL=redis://localhost:6379/0
 
 # Frontend URL (the ngrok URL)
 LTT_FRONTEND_URL=https://ltt-dev.ngrok-free.app

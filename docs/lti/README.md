@@ -113,6 +113,8 @@ Open edX (imbizo.alx-ai-tools.com)
 
 ## Documents
 
+### Specification (pre-implementation)
+
 | Doc | Description |
 |---|---|
 | [01-lti-protocol.md](01-lti-protocol.md) | LTI 1.3 OIDC flow, JWT claims, security model |
@@ -124,46 +126,50 @@ Open edX (imbizo.alx-ai-tools.com)
 | [07-openedx-config.md](07-openedx-config.md) | Studio LTI component configuration |
 | [08-testing.md](08-testing.md) | End-to-end testing checklist |
 
+### Architecture & production
+
+| Doc | Description |
+|---|---|
+| [09-architecture-overview.md](09-architecture-overview.md) | How everything fits together — component map, env vars, security model |
+| [10-production-checklist.md](10-production-checklist.md) | What must be done before going live |
+| [cleanup/](cleanup/) | **Code outside the LTI path that must be removed or locked down** |
+
 ---
 
 ## Quick Start (Dev)
 
 ```bash
-# 1. Generate RSA keys
+# 1. Generate RSA keys (if not already present)
 openssl genrsa -out configs/lti/private.key 2048
 openssl rsa -in configs/lti/private.key -pubout -out configs/lti/public.key
 
 # 2. Start infrastructure
 docker-compose up -d  # postgres, mysql, redis
 
-# 3. Start API server
-PYTHONPATH=services/ltt-core/src:services/api-server/src \
-  uv run uvicorn api.app:app --host 0.0.0.0 --port 8000
+# 3. Run migrations
+PYTHONPATH=services/ltt-core/src uv run --package ltt-core python -m alembic upgrade head
 
-# 4. Start frontend
+# 4. Start API server
+LTT_REDIS_URL=redis://localhost:6379/0 \
+  uv run uvicorn api.app:app --host 0.0.0.0 --port 8000 \
+  --app-dir services/api-server/src
+
+# 5. Start frontend
 cd apps/web && npm run dev  # localhost:3000
 
-# 5. Start ngrok tunnel
-ngrok http 3000 --domain your-reserved.ngrok-free.app
+# 6. Start tunnel (pick one)
+cloudflared tunnel --url http://localhost:3000  # free, random URL
+# or
+ngrok http 3000 --domain your-reserved.ngrok-free.app  # stable URL
 
-# 6. Configure LTI in Open edX Studio (see 07-openedx-config.md)
+# 7. Configure LTI in Open edX Studio (see 07-openedx-config.md)
 
-# 7. Launch from Open edX course
+# 8. Launch from Open edX course
 ```
 
----
-
-## Dependencies to Add
-
-```toml
-# services/api-server/pyproject.toml
-[project.dependencies]
-PyLTI1p3 = ">=2.0.0"
-redis = ">=5.0.0"
-cryptography = ">=42.0.0"  # RSA key handling
-```
+Or use the convenience script:
 
 ```bash
-# Frontend (apps/web)
-npm install lti-iframe-autoresizer
+./tools/scripts/start-lti-dev.sh          # without tunnel
+./tools/scripts/start-lti-dev.sh --ngrok  # with ngrok
 ```

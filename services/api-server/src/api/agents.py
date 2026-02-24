@@ -1,71 +1,120 @@
 """
-Agent management for the API.
+Stateless agent management for the API.
 
-Manages agent instances per learner/project combination.
-Agents are created lazily and cached for reuse.
+Agents are created per-request (cheap — just object construction, no LLM calls).
+Conversation state is persisted in a separate PostgreSQL database via
+LangGraph's ``AsyncPostgresSaver``.  When no checkpoint DB is configured
+**and** the environment is ``local``, falls back to in-memory ``MemorySaver``.
+In ``dev``/``prod`` the checkpoint DB is required — startup fails hard if it
+cannot connect.
+
+Thread IDs are recorded in the ``conversation_threads`` table in the main
+database so we can correlate learners, projects, and their chat history.
 """
 
-from typing import Dict
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING
+
+from langgraph.checkpoint.memory import MemorySaver
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
 from agent.graph import create_agent, AgentWrapper
 from agent.config import get_config
+from api.settings import get_settings
+
+if TYPE_CHECKING:
+    from langgraph.checkpoint.base import BaseCheckpointSaver
+
+logger = logging.getLogger(__name__)
+
+# ── Module-level state (initialised during FastAPI lifespan) ─────────
+_checkpointer: BaseCheckpointSaver | None = None
+_checkpoint_pool = None  # psycopg AsyncConnectionPool
 
 
-class AgentManager:
+async def init_checkpointer() -> None:
     """
-    Manages agent instances.
+    Initialise the shared LangGraph checkpointer.
 
-    Caches agents by (learner_id, project_id) for reuse across requests.
+    Called during FastAPI lifespan startup.
+
+    - If ``LTT_CHECKPOINT_DATABASE_URL`` is set, connects to PostgreSQL.
+      Failure raises in dev/prod (hard crash) and logs a warning in local.
+    - If the URL is empty **and** env is ``local``, uses ``MemorySaver``.
+    - If the URL is empty in ``dev``/``prod``, raises immediately.
     """
+    global _checkpointer, _checkpoint_pool
 
-    def __init__(self):
-        self._agents: Dict[str, AgentWrapper] = {}
+    settings = get_settings()
 
-    def get_or_create(
-        self,
-        learner_id: str,
-        project_id: str,
-        session_factory: async_sessionmaker[AsyncSession],
-    ) -> AgentWrapper:
-        """
-        Get an existing agent or create a new one.
+    if settings.checkpoint_database_url:
+        from psycopg_pool import AsyncConnectionPool
+        from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-        Args:
-            learner_id: The learner's ID
-            project_id: The project ID
-            session_factory: Database session factory
-
-        Returns:
-            AgentWrapper instance
-        """
-        key = f"{learner_id}:{project_id}"
-
-        if key not in self._agents:
-            self._agents[key] = create_agent(
-                learner_id=learner_id,
-                project_id=project_id,
-                session_factory=session_factory,
-                config=get_config(),
+        try:
+            _checkpoint_pool = AsyncConnectionPool(
+                conninfo=settings.checkpoint_database_url,
+                min_size=2,
+                max_size=10,
+                open=False,
             )
+            await _checkpoint_pool.open()
 
-        return self._agents[key]
+            _checkpointer = AsyncPostgresSaver(_checkpoint_pool)
+            await _checkpointer.setup()  # creates checkpoint tables if needed
 
-    def remove(self, learner_id: str, project_id: str) -> bool:
-        """Remove an agent from the cache."""
-        key = f"{learner_id}:{project_id}"
-        if key in self._agents:
-            del self._agents[key]
-            return True
-        return False
+            logger.info(
+                "Agent checkpointer initialised (PostgresSaver → %s)",
+                settings.checkpoint_database_url.rsplit("/", 1)[-1],
+            )
+        except Exception:
+            if settings.env != "local":
+                # dev/prod: fail hard — no silent fallback
+                raise
+            # local: warn and degrade
+            logger.exception(
+                "Failed to initialise PostgresSaver — falling back to MemorySaver (local only)"
+            )
+            _checkpointer = MemorySaver()
+            _checkpoint_pool = None
 
-    def clear(self) -> None:
-        """Clear all cached agents."""
-        self._agents.clear()
+    elif settings.env == "local":
+        _checkpointer = MemorySaver()
+        logger.info(
+            "LTT_CHECKPOINT_DATABASE_URL not set — using in-memory MemorySaver (local only)"
+        )
+    else:
+        raise RuntimeError(
+            f"LTT_CHECKPOINT_DATABASE_URL is required in {settings.env} environment. "
+            "Set it to a psycopg-format PostgreSQL URL "
+            "(e.g. postgresql://user:pass@host:5432/ltt_checkpoints)."
+        )
 
 
-# Global agent manager
-_agent_manager = AgentManager()
+async def close_checkpointer() -> None:
+    """Close the checkpoint connection pool (called during shutdown)."""
+    global _checkpointer, _checkpoint_pool
+
+    if _checkpoint_pool is not None:
+        await _checkpoint_pool.close()
+        _checkpoint_pool = None
+
+    _checkpointer = None
+
+
+def get_checkpointer() -> BaseCheckpointSaver:
+    """Return the active checkpointer.
+
+    Raises if called before ``init_checkpointer()`` (shouldn't happen
+    in normal FastAPI flow since lifespan runs first).
+    """
+    if _checkpointer is None:
+        raise RuntimeError(
+            "Checkpointer not initialised. Call init_checkpointer() first."
+        )
+    return _checkpointer
 
 
 def get_or_create_agent(
@@ -74,13 +123,16 @@ def get_or_create_agent(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> AgentWrapper:
     """
-    Get or create an agent for the learner/project.
+    Create a fresh agent for a single request.
 
-    This is the main entry point for getting agents in the API.
+    Agent construction is cheap (binds model + tools + prompt).
+    Conversation state is persisted by the shared checkpointer so it
+    survives across requests and even across multiple API server instances.
     """
-    return _agent_manager.get_or_create(learner_id, project_id, session_factory)
-
-
-def get_agent_manager() -> AgentManager:
-    """Get the global agent manager."""
-    return _agent_manager
+    return create_agent(
+        learner_id=learner_id,
+        project_id=project_id,
+        session_factory=session_factory,
+        config=get_config(),
+        checkpointer=get_checkpointer(),
+    )

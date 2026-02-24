@@ -35,6 +35,13 @@ from .content import (
 # Context
 from .context import TaskContext
 
+# Conversation
+from .conversation_thread import ConversationThread
+
+# LTI
+from .lti_launch import LTILaunch
+from .lti_mapping import LTIUserMapping
+
 # Dependency
 from .dependency import (
     Dependency,
@@ -205,4 +212,9 @@ __all__ = [
     "EventModel",
     # Context
     "TaskContext",
+    # Conversation
+    "ConversationThread",
+    # LTI
+    "LTILaunch",
+    "LTIUserMapping",
 ]

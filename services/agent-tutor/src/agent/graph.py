@@ -18,6 +18,7 @@ from typing import Literal
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -77,7 +78,7 @@ def create_react_tutor_agent(
     session: AsyncSession,
     model: ChatAnthropic,
     tools: list,
-    checkpointer: MemorySaver | None = None,
+    checkpointer: BaseCheckpointSaver | None = None,
     system_prompt: str | None = None,
 ) -> CompiledStateGraph:
     """
@@ -390,7 +391,7 @@ def create_agent(
     project_id: str,
     session_factory: Callable[[], AsyncSession] | None = None,
     model_name: str | None = None,
-    checkpointer: MemorySaver | None = None,
+    checkpointer: BaseCheckpointSaver | None = None,
     config: Config | None = None,
     *,
     session: AsyncSession | None = None,  # Deprecated, use session_factory
@@ -732,7 +733,7 @@ async def create_agent_with_context(
     project_id: str,
     session_factory: Callable[[], AsyncSession] | None = None,
     model_name: str | None = None,
-    checkpointer: MemorySaver | None = None,
+    checkpointer: BaseCheckpointSaver | None = None,
     config: Config | None = None,
 ) -> "AgentWrapper":
     """

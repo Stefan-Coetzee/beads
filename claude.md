@@ -24,6 +24,27 @@ LTT separates **curriculum** (what to learn) from **progress** (learner-specific
 
 **Key Insight**: 1,000 learners can work on the same project with independent progress tracking.
 
+### LTI 1.3 Access Model
+
+**LTI is the only entry point for learners.** There is no standalone mode. Every session starts from Open edX via LTI 1.3.
+
+```
+Open edX → POST /lti/login → OIDC redirect → POST /lti/launch → JWT validation
+  → map LTI user to LTT learner → persist launch → 302 to /workspace/{project_id}
+```
+
+Key components:
+- `services/api-server/src/api/lti/` — All LTI backend code (adapter, config, storage, routes, users, grades, middleware)
+- `configs/lti/` — Platform config (`platform.json`), RSA keys (`private.key`, `public.key`)
+- `apps/web/src/lib/lti.ts` — Frontend LTI context (sessionStorage, iframe detection)
+- `lti_user_mappings` table — Maps `(lti_sub, lti_iss)` to `learner_id`
+- `lti_launches` table — Persists active launches for grade passback
+- Redis — Caches launch data, nonces, state (TTL-based)
+
+**Environment**: `LTT_REDIS_URL` must be set for LTI to work. If unset, LTI endpoints are disabled.
+
+**Documentation**: See `docs/lti/` for full spec, architecture, and production checklist. See `docs/lti/cleanup/` for code that must be removed before production.
+
 ### Status State Machine
 
 ```
@@ -43,10 +64,12 @@ LTT separates **curriculum** (what to learn) from **progress** (learner-specific
 
 ## Repository Structure
 
+Each major directory has its own README with setup instructions and details.
+
 ```
 beadslocal/
 ├── services/                    # Backend services (Python)
-│   ├── ltt-core/               # Core Learning Task Tracker engine
+│   ├── ltt-core/               # Core Learning Task Tracker engine (→ README.md)
 │   │   ├── src/ltt/
 │   │   │   ├── models/         # Pydantic + SQLAlchemy models
 │   │   │   ├── services/       # Business logic layer
@@ -57,28 +80,43 @@ beadslocal/
 │   │   ├── tests/              # ltt-core tests
 │   │   └── pyproject.toml
 │   │
-│   ├── api-server/             # FastAPI REST API
+│   ├── api-server/             # FastAPI REST API (→ README.md)
 │   │   ├── src/api/
+│   │   │   ├── lti/            # LTI 1.3 integration
+│   │   │   │   ├── adapter.py  # PyLTI1p3 FastAPI adapter
+│   │   │   │   ├── config.py   # Platform config loader
+│   │   │   │   ├── storage.py  # Redis launch data storage
+│   │   │   │   ├── routes.py   # /lti/login, /lti/launch, /lti/jwks
+│   │   │   │   ├── users.py    # LTI user → LTT learner mapping
+│   │   │   │   ├── grades.py   # AGS grade passback
+│   │   │   │   └── middleware.py # LTI context resolution
+│   │   │   └── ...
 │   │   ├── tests/
 │   │   └── pyproject.toml
 │   │
-│   └── agent-tutor/            # LLM tutoring agent
+│   └── agent-tutor/            # LLM tutoring agent (→ src/agent/README.md)
 │       ├── src/agent/
 │       ├── tests/
 │       └── pyproject.toml
 │
 ├── apps/
-│   └── web/                    # Next.js frontend
+│   └── web/                    # Next.js frontend (→ README.md)
 │       ├── src/
 │       ├── package.json
 │       └── README.md
 │
-├── infrastructure/
+├── infrastructure/             # (→ README.md)
 │   ├── docker/
 │   │   └── docker-compose.yml
 │   └── terraform/
 │
-├── content/
+├── configs/
+│   └── lti/                    # LTI 1.3 configuration
+│       ├── platform.json       # Platform registration (issuer, client_id, endpoints)
+│       ├── private.key         # RSA private key (gitignored)
+│       └── public.key          # RSA public key
+│
+├── content/                    # (→ README.md)
 │   └── projects/               # Project JSON files
 │
 ├── tools/
@@ -86,11 +124,10 @@ beadslocal/
 │   └── simulation/             # Learner simulation
 │
 ├── docs/
-│   ├── architecture/
-│   │   └── adr/                # Architecture Decision Records
-│   ├── development/
-│   ├── api/
-│   ├── cli/
+│   ├── lti/                    # LTI 1.3 spec & implementation docs
+│   │   ├── cleanup/            # Code to remove for production
+│   │   └── *.md                # Protocol, implementation, config, testing
+│   ├── adr/                    # Architecture Decision Records
 │   └── schema/
 │
 ├── archive/                    # Historical code (not active)
@@ -224,14 +261,29 @@ PYTHONPATH=services/ltt-core/src uv run alembic downgrade -1
 
 ## Development Workflows
 
+### Starting the LTI Dev Environment
+
+```bash
+# Option 1: Convenience script
+./tools/scripts/start-lti-dev.sh
+
+# Option 2: Manual (each in a separate terminal)
+docker compose up -d postgres redis
+PYTHONPATH=services/ltt-core/src uv run --package ltt-core python -m alembic upgrade head
+LTT_REDIS_URL=redis://localhost:6379/0 uv run uvicorn api.app:app --host 0.0.0.0 --port 8000 --app-dir services/api-server/src --reload
+cd apps/web && npm run dev
+cloudflared tunnel --url http://localhost:3000  # free tunnel, random URL
+```
+
 ### Running Tests
 
 ```bash
-# All tests (167 tests)
+# All backend tests (Python — ltt-core + api-server + agent-tutor)
 uv run pytest -v
 
-# Specific service
+# Specific backend service
 uv run pytest services/ltt-core/tests/ -v
+uv run pytest services/api-server/tests/ -v
 uv run pytest services/agent-tutor/tests/ -v
 
 # Specific module
@@ -243,6 +295,12 @@ uv run pytest --cov=services --cov-report=term-missing
 
 # Fast (quiet mode)
 uv run pytest -q
+
+# Frontend tests (Vitest + React Testing Library)
+# IMPORTANT: Must run from apps/web/ — vitest.config.ts (jsdom, @/ alias,
+# setup file) lives there. Running from the repo root will fail.
+cd apps/web && npm test            # Single run
+cd apps/web && npm run test:watch  # Watch mode
 ```
 
 ### Code Quality
@@ -850,8 +908,22 @@ else:
 ## Environment Variables
 
 ```bash
-# Database URL
+# Database
 DATABASE_URL=postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev
+
+# LTI (required for LTI to work — if unset, LTI endpoints are disabled)
+LTT_REDIS_URL=redis://localhost:6379/0
+LTT_FRONTEND_URL=http://localhost:3000          # Where /lti/launch redirects to
+LTI_PLATFORM_URL=https://imbizo.alx-ai-tools.com  # CSP frame-ancestors
+
+# Optional LTI overrides
+LTI_PLATFORM_CONFIG=configs/lti/platform.json   # Platform registration
+LTI_PRIVATE_KEY=configs/lti/private.key          # RSA private key
+LTI_PUBLIC_KEY=configs/lti/public.key            # RSA public key
+
+# Debug (enables /lti/debug/* and debug button in frontend)
+DEBUG=true
+NEXT_PUBLIC_DEBUG=true
 
 # Required for Alembic migrations
 PYTHONPATH=services/ltt-core/src
@@ -863,9 +935,15 @@ PYTHONPATH=services/ltt-core/src
 - User: ltt_user
 - Password: ltt_password
 
+**Redis** (docker-compose):
+- Host: localhost:6379
+- Database: 0
+
 ---
 
 ## Testing Fixtures
+
+### Backend (pytest)
 
 Available in tests via `conftest.py`:
 
@@ -878,9 +956,26 @@ async def test_my_feature(async_session):
     assert task.id is not None
 ```
 
-**Fixtures**:
+**ltt-core fixtures** (`services/ltt-core/tests/conftest.py`):
 - `async_session` - Fresh async database session (rolled back after test)
 - `tmp_path` - Temporary directory (pytest built-in)
+
+**api-server fixtures** (`services/api-server/tests/conftest.py`):
+- `test_settings` / `test_settings_auth` - Settings with auth_enabled=False/True
+- `async_engine` / `async_session` / `session_factory` - Test DB (create_all/drop_all per test)
+- `fake_redis_client` / `lti_storage` - fakeredis-backed Redis + LTI storage
+- `app` / `client` - FastAPI test app + httpx AsyncClient (auth_enabled=False)
+- `app_auth` / `client_auth` - Same with auth_enabled=True
+- `seed_launch` - Factory to populate launch sessions in fake Redis
+
+### Frontend (Vitest)
+
+Test infrastructure in `apps/web/`:
+- `vitest.config.ts` - Vitest config (jsdom, `@/` path alias, setup file)
+- `src/test/setup.ts` - jest-dom matchers + jsdom polyfills (scrollIntoView)
+- `src/test/helpers.tsx` - `renderWithProviders()` wrapper (QueryClientProvider)
+
+Tests co-located with source: `src/**/*.test.{ts,tsx}`
 
 ---
 
@@ -888,7 +983,11 @@ async def test_my_feature(async_session):
 
 ### Configuration
 - `pyproject.toml` - Workspace root, dependencies, pytest config, ruff settings
-- `infrastructure/docker/docker-compose.yml` - PostgreSQL 17 + MySQL 8.0 setup
+- `apps/web/package.json` - Frontend dependencies, scripts (dev, build, test)
+- `apps/web/vitest.config.ts` - Frontend test config (jsdom, path aliases)
+- `infrastructure/docker/docker-compose.yml` - PostgreSQL 17 + MySQL 8.0 + Redis 7 setup
+- `configs/lti/platform.json` - LTI platform registration (issuer, client_id, endpoints)
+- `configs/lti/private.key` / `public.key` - RSA keys for JWT (private key gitignored)
 - `.env` - Environment variables (create from `.env.example`)
 
 ### Models
@@ -896,6 +995,16 @@ async def test_my_feature(async_session):
 - `services/ltt-core/src/ltt/models/task.py` - Task, TaskCreate, TaskUpdate, TaskModel
 - `services/ltt-core/src/ltt/models/progress.py` - LearnerTaskProgress
 - `services/ltt-core/src/ltt/models/submission.py` - Submission, Validation
+- `services/ltt-core/src/ltt/models/lti_mapping.py` - LTIUserMapping (lti_sub/iss → learner_id)
+- `services/ltt-core/src/ltt/models/lti_launch.py` - LTILaunch (persisted launch data)
+
+### LTI Integration
+- `services/api-server/src/api/lti/routes.py` - `/lti/login`, `/lti/launch`, `/lti/jwks` endpoints
+- `services/api-server/src/api/lti/adapter.py` - PyLTI1p3 FastAPI adapter classes
+- `services/api-server/src/api/lti/users.py` - `get_or_create_lti_learner()` user mapping
+- `services/api-server/src/api/lti/grades.py` - AGS grade passback to Open edX
+- `services/api-server/src/api/lti/storage.py` - Redis-backed launch data storage
+- `apps/web/src/lib/lti.ts` - Frontend LTI context (parse, store, iframe detection)
 
 ### Services
 - `services/ltt-core/src/ltt/services/task_service.py` - Most commonly used
@@ -903,10 +1012,11 @@ async def test_my_feature(async_session):
 - `services/ltt-core/src/ltt/services/learning/objectives.py` - Learning objectives
 
 ### Documentation
-- `docs/schema/project-ingestion.md` - **Critical** - Complete schema guide
+- `docs/lti/` - **Critical** - Full LTI spec, architecture, cleanup plan
+- `docs/lti/cleanup/` - Code to remove for production (standalone mode artifacts)
+- `docs/schema/project-ingestion.md` - Complete schema guide
 - `docs/cli/usage.md` - Full CLI reference
-- `docs/architecture/adr/` - Architecture Decision Records
-- `BUILD-STATUS.md` - Implementation status (167 tests)
+- `docs/adr/` - Architecture Decision Records (ADR-001, ADR-002, ADR-003)
 
 ---
 
@@ -1001,32 +1111,37 @@ LEFT JOIN learner_task_progress ltp
 
 ## Test Coverage
 
-- **Total Tests**: 167 (all passing)
-- **Coverage**: 98% overall
-  - Models: 99%
-  - Services: 95%
-  - Utils: 100%
+### Backend (Python — pytest)
+
+- **ltt-core**: 153 tests (models, services, tools, CLI, ingestion/export)
+- **api-server**: 75 tests (LTI auth, dev login, OIDC launch, JWKS, protected endpoints, workspace context)
+- **agent-tutor**: 50 tests
+
+### Frontend (TypeScript — Vitest + React Testing Library)
+
+- **Type converters**: 8 tests — `queryResultToExecutionResult`, `pythonResultToExecutionResult`
+- **API layer**: 12 tests — `lttFetch` headers, `streamChat` payload shape + SSE parsing
+- **ChatPanel**: 10 tests — workspace context assembly (SQL/Python), form behavior, streaming
+- **LTI context**: 14 tests — parse/store/get, `devLogin`/`devLogout`
+- **Utilities**: 21 tests — `parseTaskReferences`, `formatDuration`, status helpers
+- **Workspace store**: 18 tests — Zustand state, setters, drawer, legacy alias
 
 ### Run Specific Test Suites
 
 ```bash
-# Data layer
+# Backend: ltt-core
 uv run pytest services/ltt-core/tests/test_basic.py -v
-
-# Task management
 uv run pytest services/ltt-core/tests/services/test_task_service.py -v
-
-# Dependencies
 uv run pytest services/ltt-core/tests/services/test_dependency_service.py -v
-
-# Learning
 uv run pytest services/ltt-core/tests/services/test_learning_*.py -v
-
-# Agent tools
 uv run pytest services/ltt-core/tests/tools/ -v
-
-# Ingestion/Export
 uv run pytest services/ltt-core/tests/services/test_ingest.py services/ltt-core/tests/services/test_export.py -v
+
+# Backend: api-server (LTI + auth + workspace context)
+uv run --package api-server pytest services/api-server/tests/ -v
+
+# Frontend (must run from apps/web/ — not the repo root)
+cd apps/web && npm test
 ```
 
 ---
@@ -1035,16 +1150,34 @@ uv run pytest services/ltt-core/tests/services/test_ingest.py services/ltt-core/
 
 **All Core Phases Complete** ✅
 
-| Phase | Status | Tests |
-|-------|--------|-------|
-| 1. Data Layer | ✅ | 3 |
-| 2. Task Management | ✅ | 36 |
-| 3. Dependencies | ✅ | 23 |
-| 4. Submissions & Validation | ✅ | 22 |
-| 5. Learning & Progress | ✅ | 34 |
-| 7. Agent Tools | ✅ | 26 |
-| 8. Admin CLI & Ingestion | ✅ | 23 |
-| **Total** | **167** | **All Passing** |
+| Area | Status | Tests |
+|------|--------|-------|
+| **Backend: ltt-core** | | |
+| Data Layer | ✅ | 3 |
+| Task Management | ✅ | 36 |
+| Dependencies | ✅ | 23 |
+| Submissions & Validation | ✅ | 22 |
+| Learning & Progress | ✅ | 34 |
+| Agent Tools | ✅ | 26 |
+| Admin CLI & Ingestion | ✅ | 23 |
+| **Backend: api-server** | | |
+| LTI Storage | ✅ | 8 |
+| LTI User Mapping | ✅ | 8 |
+| Auth Middleware | ✅ | 7 |
+| Dev Login/Logout | ✅ | 9 |
+| OIDC Launch Flow | ✅ | 9 |
+| JWKS Endpoint | ✅ | 3 |
+| Debug Endpoints | ✅ | 6 |
+| Protected Endpoints | ✅ | 8 |
+| Workspace Context (LLM) | ✅ | 17 |
+| **Frontend** | | |
+| Type Converters | ✅ | 8 |
+| API Layer (streamChat) | ✅ | 12 |
+| ChatPanel Integration | ✅ | 10 |
+| LTI Context | ✅ | 14 |
+| Utilities | ✅ | 21 |
+| Workspace Store | ✅ | 18 |
+| **Total** | | **~325** |
 
 See [BUILD-STATUS.md](BUILD-STATUS.md) for detailed phase reports.
 
@@ -1053,7 +1186,6 @@ See [BUILD-STATUS.md](BUILD-STATUS.md) for detailed phase reports.
 ## Future Development
 
 ### Ready for Implementation
-- FastAPI REST endpoints (Phase 9)
 - MCP server integration (expose agent tools)
 - Custom validation rules (code execution, SQL checks)
 - Project versioning

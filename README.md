@@ -1,123 +1,79 @@
 # Learning Task Tracker (LTT)
 
-> A Python-based learning task management system adapted from [beads](https://github.com/steveyegge/beads), designed to power AI tutoring agents at scale.
+> AI-powered tutoring system that runs inside Open edX via LTI 1.3. Adapted from [beads](https://github.com/steveyegge/beads).
 
-[![Tests](https://img.shields.io/badge/tests-231%20passing-brightgreen)]() [![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)]() [![Python](https://img.shields.io/badge/python-3.12%2B-blue)]() [![PostgreSQL](https://img.shields.io/badge/postgresql-17-blue)]()
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue)]() [![PostgreSQL](https://img.shields.io/badge/postgresql-17-blue)]() [![Next.js](https://img.shields.io/badge/next.js-16-black)]()
 
 ---
 
 ## What is LTT?
 
 LTT provides a **data tooling layer** that enables AI tutoring agents to:
-- 📚 Guide learners through structured, hierarchical projects
-- 📊 Track progress per learner using a two-layer architecture
-- ✅ Validate submissions as proof of work
-- 🎯 Provide pedagogically-aware context at every level
-- 🤖 Support stateless LLM agents with rich runtime tools
+- Guide learners through structured, hierarchical projects
+- Track progress per learner using a two-layer architecture
+- Validate submissions as proof of work
+- Provide pedagogically-aware context at every level
+- Support stateless LLM agents with rich runtime tools
 
 **Key Insight**: At any point in a learning journey, an LLM tutor should have enough **broad context** (what we're building) and **specific guidance** (what to do now) to effectively teach.
 
 ---
 
+## Components
+
+| Component | README | Code | Description |
+|-----------|--------|------|-------------|
+| **LTT Core Engine** | [services/ltt-core/](services/ltt-core/README.md) | `services/ltt-core/` | Models, services, agent tools, CLI, migrations |
+| **API Server** | [services/api-server/](services/api-server/README.md) | `services/api-server/` | FastAPI REST API, LTI 1.3 endpoints |
+| **AI Tutor Agent** | [services/agent-tutor/](services/agent-tutor/src/agent/README.md) | `services/agent-tutor/` | LangGraph Socratic tutoring agent |
+| **Frontend** | [apps/web/](apps/web/README.md) | `apps/web/` | Next.js workspace UI (editor, chat, task tree) |
+| **Infrastructure** | [infrastructure/](infrastructure/README.md) | `infrastructure/` | Docker services (Postgres, MySQL, Redis) |
+| **Content** | [content/](content/README.md) | `content/` | Learning project JSON files |
+| **LTI 1.3 Integration** | [docs/lti/](docs/lti/) | `services/api-server/src/api/lti/` | Full LTI spec, implementation, Open edX config |
+| **Architecture Decisions** | [docs/adr/](docs/adr/) | — | ADR-001 (two-layer), ADR-002 (submissions), ADR-003 (LTI-first) |
+| **Production Cleanup** | [docs/lti/cleanup/](docs/lti/cleanup/) | — | Code to remove/lock down before production |
+
+**Full developer/LLM API reference**: [CLAUDE.md](CLAUDE.md)
+
+---
+
 ## Architecture
 
-### Two-Layer Architecture (ADR-001)
+### Two-Layer Design ([ADR-001](docs/adr/001-learner-scoped-task-progress.md))
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │  Template Layer (Shared Curriculum)                 │
-│  • tasks (project/epic/task/subtask)                │
-│  • learning_objectives (Bloom's taxonomy)           │
-│  • dependencies (blocking relationships)            │
-│  • content (tutorials, examples)                    │
+│  tasks, learning_objectives, dependencies, content  │
 └──────────────────┬──────────────────────────────────┘
                    │
                    ▼
 ┌─────────────────────────────────────────────────────┐
 │  Instance Layer (Per-Learner)                       │
-│  • learner_task_progress (status, timestamps)       │
-│  • submissions (proof of work)                      │
-│  • validations (pass/fail checks)                   │
-│  • status_summaries (progress notes)                │
+│  learner_task_progress, submissions, validations    │
 └─────────────────────────────────────────────────────┘
 ```
 
-This separation allows:
-- **One curriculum** used by thousands of learners
-- **Independent progress** tracking per learner
-- **Pedagogical enrichment** (objectives, guidance) separated from execution (status, submissions)
+One curriculum shared by thousands of learners with independent progress tracking. See [services/ltt-core/README.md](services/ltt-core/README.md) for details.
 
-See [ADR-001](python-port/docs/adr/001-learner-scoped-task-progress.md) for detailed rationale.
+### LTI 1.3 Access Model ([ADR-003](docs/adr/003-lti-first-access-model.md))
 
----
+**LTI is the only entry point for learners.** Every session starts from Open edX.
 
-## Features
+```
+Open edX → POST /lti/login → OIDC redirect → POST /lti/launch → JWT validation
+  → map user → persist launch → 302 /workspace/{project_id}?launch_id=...&lti=1
+```
 
-### ✅ Implemented (Phases 1-5, 7-8)
+See [docs/lti/](docs/lti/) for the full spec and [docs/lti/09-architecture-overview.md](docs/lti/09-architecture-overview.md) for the component map.
 
-#### Data Layer (Phase 1)
-- 14 Pydantic models with validation
-- 14 SQLAlchemy async models
-- PostgreSQL 17 database
-- Alembic migrations
-- Hierarchical ID generation
+### Submission-Driven Completion ([ADR-002](docs/adr/002-submission-driven-task-completion.md))
 
-#### Task Management (Phase 2)
-- CRUD for tasks at all levels (project → epic → task → subtask)
-- Status transitions with validation (open → in_progress → closed)
-- Hierarchy traversal (ancestors, children)
-- Comments (shared and private)
-- Status state machine
+```
+submit() → validate → pass? → close_task() → auto-close ancestors
+```
 
-#### Dependencies (Phase 3)
-- Blocking relationships (BLOCKS, PARENT_CHILD, RELATED)
-- Cycle detection (prevents circular dependencies)
-- Ready work calculation (what should I do next?)
-- Learner-scoped blocking (per ADR-001)
-- Transitive blocking with recursive CTEs
-
-#### Submissions & Validation (Phase 4)
-- Submission types: code, SQL, text, Jupyter cells, result sets
-- Automatic validation on submission
-- Attempt tracking
-- Validation gates for task closure
-- SimpleValidator (MVP: non-empty check)
-
-#### Learning & Progress (Phase 5)
-- Learning objectives (Bloom's taxonomy)
-- Progress tracking per learner
-- Hierarchical summarization
-- Content management
-- Bloom level distribution
-- Objective achievement (derived from validations)
-
-#### Agent Tools (Phase 7)
-- **Navigation**: `get_ready`, `show_task`, `get_context`
-- **Progress**: `start_task`, `submit` (auto-closes on validation pass)
-- **Feedback**: `add_comment`, `get_comments`
-- **Control**: `go_back`, `request_help`
-- Tool registry for MCP/function calling
-- Stateless design (LangGraph manages sessions)
-- Submission-driven task completion (ADR-002)
-- **Hierarchical auto-close**: When all children complete, parent tasks/epics auto-close
-
-#### Admin CLI & Ingestion (Phase 8)
-- **Project management**: create, list, show, export
-- **Ingestion**: Import projects from JSON
-- **Task management**: create, add objectives
-- **Content management**: create, attach
-- **Learner management**: create, list, progress
-- **Export**: JSON/JSONL formats with roundtrip support
-- **Pedagogical fields**: `tutor_guidance`, `narrative_context`
-
-### 🔜 Future Enhancements
-
-- FastAPI REST endpoints
-- MCP server integration
-- LLM-powered project conversion
-- Real-time validation with custom rules
-- Analytics dashboard
-- Project versioning
+Tasks auto-close when validation passes. Parent tasks/epics auto-close when all children complete.
 
 ---
 
@@ -125,163 +81,50 @@ See [ADR-001](python-port/docs/adr/001-learner-scoped-task-progress.md) for deta
 
 ### Prerequisites
 
-- Python 3.12+
-- PostgreSQL 17
-- uv package manager
+Python 3.12+, Node.js 20+, Docker, [uv](https://docs.astral.sh/uv/)
 
-### Installation
+### Setup
 
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/beadslocal.git
-cd beadslocal
-
-# Install dependencies
 uv sync
+cd apps/web && npm install && cd ../..
 
-# Start PostgreSQL
-docker-compose up -d
+# Generate RSA keys for LTI (one-time)
+openssl genrsa -out configs/lti/private.key 2048
+openssl rsa -in configs/lti/private.key -pubout -out configs/lti/public.key
+
+# Start infrastructure
+docker compose up -d
 
 # Run migrations
-PYTHONPATH=src uv run alembic upgrade head
+PYTHONPATH=services/ltt-core/src uv run --package ltt-core python -m alembic upgrade head
 ```
 
-### Verify Installation
+### Run
 
 ```bash
-# Run all tests (should see 167 passing)
-uv run pytest tests/ -v
+# All-in-one
+./tools/scripts/start-lti-dev.sh
 
-# Check code quality
-uv run ruff check src/
+# Or manually (each in a separate terminal)
+LTT_REDIS_URL=redis://localhost:6379/0 \
+  uv run uvicorn api.app:app --host 0.0.0.0 --port 8000 \
+  --app-dir services/api-server/src --reload
+
+cd apps/web && npm run dev
+
+cloudflared tunnel --url http://localhost:3000  # tunnel for LTI testing
 ```
 
-### Setup MySQL Database (Maji Ndogo Project)
+Then configure LTI in Open edX Studio — see [docs/lti/07-openedx-config.md](docs/lti/07-openedx-config.md).
 
-For the Maji Ndogo water services project, set up the MySQL database:
+### Verify
 
 ```bash
-# Run the setup script
-./scripts/setup_mysql.sh
+curl http://localhost:8000/health         # API health
+curl http://localhost:8000/lti/jwks        # LTI public keys
+uv run pytest services/ltt-core/tests/ -q  # Core tests
 ```
-
-Or manually:
-
-```bash
-# Start MySQL container
-docker-compose up -d mysql
-
-# Wait for MySQL to be ready, then ingest data
-docker-compose exec -T mysql mysql -u root -proot_password < project_data/DA/MN_Part1/MD_water_services_stu_v2.sql
-```
-
-**Connection details:**
-- Host: `localhost`
-- Port: `3306`
-- Database: `md_water_services`
-- User: `learner`
-- Password: `learner_password`
-
-**Tables available:**
-- `column_legend` - Column descriptions
-- `employee` - Survey employees
-- `visits` - Visit records (60k+ rows)
-- `water_source` - Water sources (39k+ rows)
-- `location` - Locations
-- `quality_score` - Quality assessments
-- `well_pollution` - Pollution data
-- `global_water_access` - Global statistics
-
-### Run the API Server
-
-```bash
-# Start the API server
-PYTHONPATH=src uv run uvicorn api.app:app --host 0.0.0.0 --port 8000
-
-# Test health endpoint
-curl http://localhost:8000/health
-
-# Chat with the tutor (use actual project ID)
-curl -X POST http://localhost:8000/api/v1/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Hello", "learner_id": "learner-1", "project_id": "proj-9b46"}'
-```
-
-**Current Project ID:** `proj-9b46` (Maji Ndogo Water Crisis - Part 1)
-
-### Run Tutor-Learner Simulation
-
-```bash
-# Run simulation with auto-created learner
-PYTHONPATH=src uv run python -m simulation.main run -p proj-9b46
-
-# Run with existing learner
-PYTHONPATH=src uv run python -m simulation.main run -l learner-123 -p proj-9b46
-
-# With options
-PYTHONPATH=src uv run python -m simulation.main run -p proj-9b46 --max-turns 20 --show-tools
-```
-
----
-
-## Usage
-
-### Admin CLI
-
-```bash
-# Create a project manually
-python -m ltt.cli.main project create "My Learning Project"
-
-# Import a structured project from JSON
-python -m ltt.cli.main ingest project path/to/project.json --dry-run
-python -m ltt.cli.main ingest project path/to/project.json
-
-# Export for backup
-python -m ltt.cli.main project export proj-abc123 --output backup.json
-
-# Create learner and track progress
-python -m ltt.cli.main learner create
-python -m ltt.cli.main learner progress learner-123 proj-abc123
-```
-
-See [CLI-USAGE-GUIDE.md](docs/CLI-USAGE-GUIDE.md) for complete command reference.
-
-### Agent Tools (Python API)
-
-```python
-from ltt.tools import execute_tool, get_tool_schemas
-
-# Get available tools for LLM agents
-schemas = get_tool_schemas()  # OpenAI-compatible
-
-# Execute a tool
-async with get_async_session() as session:
-    result = await execute_tool(
-        "get_ready",
-        {"project_id": "proj-abc123"},
-        learner_id="learner-456",
-        session=session
-    )
-
-    # result.tasks → List of ready tasks (in_progress first)
-```
-
-### Creating Projects with LLMs
-
-LTT includes comprehensive schema documentation designed for LLM-based project creation:
-
-**Workflow**:
-1. Have unstructured learning content (tutorials, course outlines)
-2. Use an LLM with [SCHEMA-FOR-LLM-INGESTION.md](docs/SCHEMA-FOR-LLM-INGESTION.md)
-3. LLM converts to structured JSON with:
-   - Hierarchical breakdown (project → epic → task → subtask)
-   - Learning objectives (Bloom's taxonomy)
-   - Acceptance criteria (validation rules)
-   - Tutor guidance (teaching strategies, hints, common mistakes)
-   - Narrative context (real-world motivation)
-4. Import with `ltt ingest project generated.json`
-
-See [SCHEMA-FOR-LLM-INGESTION.md](docs/SCHEMA-FOR-LLM-INGESTION.md) for complete guide.
 
 ---
 
@@ -289,66 +132,29 @@ See [SCHEMA-FOR-LLM-INGESTION.md](docs/SCHEMA-FOR-LLM-INGESTION.md) for complete
 
 ```
 beadslocal/
-├── src/ltt/
-│   ├── models/              # Pydantic + SQLAlchemy models
-│   │   ├── task.py          # Core task model (template layer)
-│   │   ├── progress.py      # Learner progress (instance layer)
-│   │   ├── submission.py    # Submissions & validations
-│   │   ├── dependency.py    # Task relationships
-│   │   ├── objective.py     # Learning objectives
-│   │   └── ...
-│   │
-│   ├── services/            # Business logic layer
-│   │   ├── task_service.py      # Task CRUD, hierarchy
-│   │   ├── progress_service.py  # Status transitions
-│   │   ├── dependency_service.py # Dependencies, ready work
-│   │   ├── submission_service.py # Submissions
-│   │   ├── validation_service.py # Validation logic
-│   │   ├── learning/            # Learning services
-│   │   │   ├── objectives.py    # Learning objectives
-│   │   │   ├── progress.py      # Progress tracking
-│   │   │   ├── summarization.py # Hierarchical summaries
-│   │   │   └── content.py       # Content management
-│   │   ├── ingest.py            # JSON ingestion
-│   │   └── export.py            # Project export
-│   │
-│   ├── tools/               # Agent runtime interface
-│   │   ├── navigation.py    # get_ready, show_task, get_context
-│   │   ├── progress.py      # start_task, submit
-│   │   ├── feedback.py      # add_comment, get_comments
-│   │   ├── control.py       # go_back, request_help
-│   │   └── schemas.py       # Pydantic I/O models
-│   │
-│   ├── cli/                 # Admin CLI
-│   │   └── main.py          # Typer commands
-│   │
-│   ├── db/                  # Database
-│   │   ├── session.py       # Async session management
-│   │   └── migrations/      # Alembic migrations
-│   │
-│   └── utils/               # Utilities
-│       └── ids.py           # Hierarchical ID generation
+├── services/
+│   ├── ltt-core/               # Core engine — README inside
+│   ├── api-server/             # FastAPI API — README inside
+│   └── agent-tutor/            # AI tutor — README inside
 │
-├── tests/                   # Test suite (167 tests)
-│   ├── services/            # Service layer tests
-│   ├── tools/               # Agent tools tests
-│   └── conftest.py          # Pytest fixtures
+├── apps/web/                   # Next.js frontend — README inside
 │
-├── docs/                    # Documentation
-│   ├── SCHEMA-FOR-LLM-INGESTION.md  # LLM project conversion guide
-│   ├── CLI-USAGE-GUIDE.md           # Admin CLI reference
-│   └── BUILD-STATUS.md              # Implementation status
+├── infrastructure/             # Docker services — README inside
+│   └── docker/docker-compose.yml
 │
-└── python-port/docs/        # Technical specifications
-    ├── PRD.md               # Product requirements
-    ├── 01-data-models.md    # Model specs
-    ├── 02-task-management.md
-    ├── 03-dependencies.md
-    ├── 04-submissions-validation.md
-    ├── 05-learning-progress.md
-    ├── 07-agent-tools.md
-    ├── 08-admin-cli.md
-    └── adr/                 # Architecture decisions
+├── content/                    # Learning projects — README inside
+│   └── projects/
+│
+├── configs/lti/                # Platform config + RSA keys
+│
+├── docs/
+│   ├── lti/                    # LTI 1.3 spec (10 docs + cleanup audit)
+│   ├── adr/                    # Architecture Decision Records
+│   └── schema/                 # Project ingestion JSON schema
+│
+├── tools/scripts/              # start-lti-dev.sh, utilities
+├── CLAUDE.md                   # Full developer/LLM API reference
+└── BUILD-STATUS.md             # Test results by phase
 ```
 
 ---
@@ -358,548 +164,101 @@ beadslocal/
 ### Hierarchical Tasks
 
 ```
-Project: "Build E-commerce Site"
-  │
-  ├── Epic: "Backend API"
-  │   ├── Task: "User Authentication"
-  │   │   ├── Subtask: "Create JWT token function"
-  │   │   ├── Subtask: "Build login endpoint"
-  │   │   └── Subtask: "Add password hashing"
-  │   └── Task: "Product Catalog"
-  │
-  └── Epic: "Frontend UI"
-      └── Task: "Shopping Cart"
+Project → Epic → Task → Subtask
+proj-a1b2  .1     .1.1   .1.1.1
 ```
 
-- **Unlimited nesting** via `parent_id`
-- **Hierarchical IDs**: `proj-a1b2.1.2.1`
-- **Context at every level**: broad (project) → specific (subtask)
-
-### Learner-Scoped Progress
-
-**Template Layer** (shared):
-- Task definition: title, description, acceptance criteria
-- Learning objectives, content, dependencies
-
-**Instance Layer** (per-learner):
-- Status: open → in_progress → blocked → closed
-- Submissions and validations
-- Progress timestamps
-- Status summaries
-
-**Result**: 1,000 learners can work on same project independently.
-
-### Learning Objectives (Bloom's Taxonomy)
-
-```python
-{
-  "level": "apply",
-  "description": "Implement JWT authentication in FastAPI"
-}
-```
-
-**Levels**: remember → understand → apply → analyze → evaluate → create
-
-**Achievement**: Derived from passing validations, not stored separately.
+Unlimited nesting. Context flows from broad (project narrative) to specific (subtask acceptance criteria). See [services/ltt-core/README.md](services/ltt-core/README.md).
 
 ### Pedagogical Guidance
 
-**`tutor_guidance`** (Task/Subtask level):
 ```json
 {
-  "teaching_approach": "Start with real-world context before SQL",
-  "discussion_prompts": ["What does 500 minutes mean in real life?"],
-  "common_mistakes": ["Using = instead of LIKE"],
-  "hints_to_give": ["Try SHOW TABLES first", "Check column names"]
+  "tutor_guidance": {
+    "teaching_approach": "Start with real-world context before SQL",
+    "common_mistakes": ["Using = instead of >"],
+    "hints_to_give": ["Which operator means 'greater than'?"]
+  },
+  "narrative_context": "You are analyzing water quality data from rural communities..."
 }
 ```
 
-**`narrative_context`** (Project level):
-```
-"This data comes from President Naledi's water quality initiative. You are
-helping analyze survey data that will impact real communities..."
-```
+These fields guide **HOW** LLM tutors teach, not just **WHAT** they teach. `content` is learner-facing material; `tutor_guidance` is meta-guidance for the AI agent.
 
-These fields guide **HOW** LLM tutors teach, not just **WHAT** they teach.
+### Learning Objectives (Bloom's Taxonomy)
 
----
-
-## Documentation
-
-### User Documentation
-- **[CLI-USAGE-GUIDE.md](docs/CLI-USAGE-GUIDE.md)** - Complete CLI command reference with examples
-- **[SCHEMA-FOR-LLM-INGESTION.md](docs/SCHEMA-FOR-LLM-INGESTION.md)** - Comprehensive guide for structuring projects (designed for LLMs)
-
-### Technical Documentation
-- **[PRD.md](python-port/docs/PRD.md)** - Product requirements and system architecture
-- **[BUILD-STATUS.md](BUILD-STATUS.md)** - Implementation status, test counts, phase completion
-- **Module Specs**: [02-task-management.md](python-port/docs/02-task-management.md), [03-dependencies.md](python-port/docs/03-dependencies.md), [04-submissions-validation.md](python-port/docs/04-submissions-validation.md), etc.
-
-### Architecture Decision Records
-- **[ADR-001](python-port/docs/adr/001-learner-scoped-task-progress.md)** - Two-layer architecture (template + instance)
-- **[ADR-002](python-port/docs/adr/002-submission-driven-task-completion.md)** - Submission-driven task completion (auto-close on validation)
-
-### Implementation Notes
-- **Phase Completion Reports**: [src/ltt/tempdocs/](src/ltt/tempdocs/) - Detailed reports for each phase
-
----
-
-## Implementation Status
-
-**All Core Phases Complete** ✅
-
-| Phase | Module | Tests | Status |
-|-------|--------|-------|--------|
-| **1** | Data Layer | 3 | ✅ Complete |
-| **2** | Task Management | 36 | ✅ Complete |
-| **3** | Dependencies | 23 | ✅ Complete |
-| **4** | Submissions & Validation | 22 | ✅ Complete |
-| **5** | Learning & Progress | 34 | ✅ Complete |
-| **7** | Agent Tools | 26 | ✅ Complete |
-| **8** | Admin CLI & Ingestion | 23 | ✅ Complete |
-| **E2E** | End-to-End Integration | 15 | ✅ Complete |
-| **Agent** | Agent & Learner Sim | 31 | ✅ Complete |
-| | **Total** | **231** | **All Passing** ✅ |
-
-**Coverage**: 98% overall (services), 100% models
-
-See [BUILD-STATUS.md](BUILD-STATUS.md) for detailed implementation status.
-
----
-
-## Quick Start
-
-### 1. Setup
-
-```bash
-# Install dependencies
-uv sync
-
-# Start PostgreSQL 17
-docker-compose up -d
-
-# Run migrations
-PYTHONPATH=src uv run alembic upgrade head
-```
-
-### 2. Create Your First Project
-
-**Option A: Manual Creation**
-```bash
-python -m ltt.cli.main project create "Build Todo API" \
-  --description "Learn FastAPI by building a REST API"
-
-python -m ltt.cli.main task create "Set up FastAPI" \
-  --parent proj-abc123 \
-  --type task
-```
-
-**Option B: Import from JSON** (Recommended)
-```bash
-# Create project.json (see docs/SCHEMA-FOR-LLM-INGESTION.md)
-# Or use an LLM to convert your tutorial/course outline
-
-# Validate
-python -m ltt.cli.main ingest project project.json --dry-run
-
-# Import
-python -m ltt.cli.main ingest project project.json
-```
-
-### 3. Create Learners and Track Progress
-
-```bash
-# Create learner
-python -m ltt.cli.main learner create
-
-# Check progress
-python -m ltt.cli.main learner progress learner-abc123 proj-xyz789
-```
-
-### 4. Use Agent Tools (Python)
-
-```python
-from ltt.tools import get_ready, start_task, submit
-
-# Get ready work for learner
-result = await get_ready(
-    GetReadyInput(project_id="proj-123"),
-    learner_id="learner-456",
-    session
-)
-
-# Start a task
-result = await start_task(
-    StartTaskInput(task_id="proj-123.1.1"),
-    learner_id="learner-456",
-    session
-)
-
-# Submit work (auto-closes on validation pass)
-result = await submit(
-    SubmitInput(
-        task_id="proj-123.1.1",
-        content="def hello(): return 'world'",
-        submission_type="code"
-    ),
-    learner_id="learner-456",
-    session
-)
-# result.status == "closed" if validation passed
-# result.message == "Validation successful, task complete!"
-# result.auto_closed == [parent_task, epic, ...] if ancestors were auto-closed
-```
+Levels: remember → understand → apply → analyze → evaluate → create. Achievement is derived from passing validations, not stored separately.
 
 ---
 
 ## Development
 
-### Running Tests
+### Tests
 
 ```bash
-# All tests
-uv run pytest tests/ -v
-
-# Specific module
-uv run pytest tests/services/test_task_service.py -v
-
-# With coverage
-uv run pytest tests/ --cov=src/ltt --cov-report=term-missing
-
-# Fast (quiet mode)
-uv run pytest tests/ -q
+uv run pytest services/ltt-core/tests/ -v   # Core (167 tests)
+uv run pytest services/agent-tutor/tests/ -v # Agent (31 tests)
+uv run pytest -v                             # All (231 tests)
 ```
+
+98% coverage. See [BUILD-STATUS.md](BUILD-STATUS.md).
 
 ### Code Quality
 
 ```bash
-# Lint
-uv run ruff check src/ tests/
-
-# Format
-uv run ruff format src/ tests/
-
-# Type checking
-uv run mypy src/
+uv run ruff check services/ tools/
+uv run ruff format services/ tools/
 ```
 
-### Database Management
+### Migrations
 
 ```bash
-# Create new migration
-PYTHONPATH=src uv run alembic revision --autogenerate -m "Description"
-
-# Run migrations
-PYTHONPATH=src uv run alembic upgrade head
-
-# Rollback
-PYTHONPATH=src uv run alembic downgrade -1
-
-# View history
-PYTHONPATH=src uv run alembic history
+PYTHONPATH=services/ltt-core/src uv run --package ltt-core python -m alembic upgrade head
+PYTHONPATH=services/ltt-core/src uv run --package ltt-core python -m alembic revision --autogenerate -m "description"
 ```
-
----
-
-## Tech Stack
-
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| **Language** | Python 3.12+ | Modern Python with type hints |
-| **Type Safety** | Pydantic v2 | Validation, serialization |
-| **Database** | PostgreSQL 17 | JSONB, ARRAY, recursive CTEs |
-| **ORM** | SQLAlchemy 2.0 | Async support, type hints |
-| **Migrations** | Alembic | Schema versioning |
-| **CLI** | Typer | Auto-docs, Pydantic integration |
-| **Testing** | pytest + pytest-asyncio | Async test support |
-| **Linting** | Ruff | Fast Python linter |
-
----
-
-## Core Features
-
-### Status State Machine
-
-```
-     ┌──────────┐
-     │ blocked  │←────┐
-     └────┬─────┘     │
-          │           │
-          ▼           │
-  ┌──────────┐  ┌──────────┐  ┌──────────┐
-  │   open   │─→│in_progress│─→│ closed   │
-  └──────────┘  └──────────┘  └────┬─────┘
-       ▲                           │
-       └───────────────────────────┘
-              go_back (reopen)
-```
-
-### Dependency Types
-
-- **`BLOCKS`**: Task B waits for Task A to close
-- **`PARENT_CHILD`**: Parent can't close until children close
-- **`RELATED`**: Informational link, no blocking
-
-### Validation Flow (ADR-002)
-
-```
-submit()
-   │
-   ├── Create Submission
-   │
-   ├── Validate (automated)
-   │
-   └── If PASS ──────────────────┐
-       │                         │
-       ▼                         ▼
-   close_task()            If FAIL
-   (auto-close)                  │
-       │                         ▼
-       ▼                    Return error
-   try_auto_close_ancestors()    message
-       │
-       ▼
-   For each parent:
-   - All children closed? → auto-close parent
-   - Continue up hierarchy
-       │
-       ▼
-   status: "closed"
-   message: "task complete"
-   auto_closed: [parent, epic, ...]
-```
-
-**Key behaviors**:
-- Tasks auto-close when validation passes (no separate close step needed)
-- Parent tasks/epics auto-close when all children complete
-- `requires_submission` flag controls which tasks need explicit submissions
-- Default: subtasks require submission, tasks/epics/projects don't
-
-See [ADR-002](python-port/docs/adr/002-submission-driven-task-completion.md) for details.
-
----
-
-## Examples
-
-### Example 1: Simple Project Structure
-
-```json
-{
-  "title": "Learn SQL Basics",
-  "narrative_context": "Help analyze real water quality data from rural communities.",
-  "epics": [
-    {
-      "title": "Fundamentals",
-      "tasks": [
-        {
-          "title": "SELECT Queries",
-          "subtasks": [
-            {"title": "Select all columns"},
-            {"title": "Select specific columns"},
-            {"title": "Use WHERE clause"}
-          ]
-        }
-      ]
-    }
-  ]
-}
-```
-
-### Example 2: Subtask with Tutor Guidance
-
-```json
-{
-  "title": "Filter long queue times",
-  "description": "Write WHERE clause to find surveys where wait time > 500 minutes",
-  "acceptance_criteria": "- Query returns only queue_time > 500\n- Uses correct column name",
-  "tutor_guidance": {
-    "teaching_approach": "Start with human impact before SQL",
-    "discussion_prompts": [
-      "500 minutes is over 8 hours. What does waiting that long mean?"
-    ],
-    "common_mistakes": [
-      "Using = instead of >",
-      "Putting numbers in quotes"
-    ],
-    "hints_to_give": [
-      "Which operator means 'greater than'?",
-      "Numbers don't need quotes in SQL"
-    ]
-  }
-}
-```
-
----
-
-## Database Schema Highlights
-
-### Template Layer
-- `tasks` - Work item definitions (shared)
-- `learning_objectives` - Bloom's taxonomy objectives
-- `dependencies` - Blocking relationships
-- `content` - Learning materials
-- `acceptance_criteria` - Validation rules
-- `requires_submission` - Controls auto-close behavior (default: true for subtasks)
-
-### Instance Layer
-- `learner_task_progress` - Per-learner status
-- `submissions` - Proof of work
-- `validations` - Pass/fail results
-- `status_summaries` - Versioned progress notes
-
-### Shared
-- `learners` - User profiles
-- `comments` - Task feedback (shared or private)
-- `events` - Audit trail
-
-See [01-data-models.md](python-port/docs/01-data-models.md) for complete schema.
-
----
-
-## Testing
-
-**231 tests across all phases, all passing**
-
-```bash
-# Run all tests
-PYTHONPATH=src uv run pytest tests/ -v
-
-# Fast run
-PYTHONPATH=src uv run pytest tests/ -q
-
-# Specific module
-PYTHONPATH=src uv run pytest tests/services/test_dependency_service.py -v
-PYTHONPATH=src uv run pytest tests/tools/ -v
-```
-
-### End-to-End Integration Tests
-
-Run comprehensive integration tests that validate the full agentic workflow:
-
-```bash
-PYTHONPATH=src uv run pytest tests/test_e2e_agentic_workflow.py -v
-```
-
-**What's Tested** (15 test cases):
-- ✅ **Database connectivity** - Verifies PostgreSQL is running
-- ✅ **Project ingestion** - Imports from `project_data/DA/MN_Part1/structured/water_analysis_project.json`
-- ✅ **Initial state** - Ready work shows only unblocked tasks
-- ✅ **Task lifecycle** - start_task, submit, validation, auto-close
-- ✅ **Hierarchical closure** - Parent closes only after children
-- ✅ **Epic blocking propagation** - Epic dependencies block child tasks
-- ✅ **Multi-learner isolation**:
-  - Status changes (Learner A's progress doesn't affect Learner B)
-  - Comments (private comments are learner-scoped)
-  - Progress tracking (independent completion counts)
-  - Blocking (dependencies resolved per-learner)
-- ✅ **Go back** - Reopening closed tasks
-- ✅ **Submission attempts** - Attempt numbers increment correctly
-- ✅ **Error handling** - Invalid submission types, blocked tasks
-
-**Test Coverage**:
-- Data models: 99%
-- Services: 95%
-- Utils: 100%
-- Overall: 98%
-
----
-
-## Contributing
-
-### Code Style
-
-- Modern Python 3.12+ (type hints, match statements)
-- Async-first (all database operations async)
-- Pydantic for validation
-- Ruff for linting/formatting
-
-### Testing Requirements
-
-- All new features must have tests
-- Maintain >95% coverage
-- Use pytest-asyncio for async tests
-- Follow existing test patterns
-
-### Commit Convention
-
-Follow conventional commits:
-- `feat:` New features
-- `fix:` Bug fixes
-- `docs:` Documentation updates
-- `test:` Test additions/changes
-- `refactor:` Code refactoring
 
 ---
 
 ## Environment Variables
 
-```bash
-# Database
-DATABASE_URL=postgresql+asyncpg://ltt:ltt@localhost:5432/ltt
-
-# Required for Alembic
-PYTHONPATH=src
-```
-
----
-
-## FAQ
-
-**Q: What's the difference between Agent Tools and Admin CLI?**
-- **Agent Tools**: Runtime interface for LLM agents (read operations, submissions)
-- **Admin CLI**: Setup interface for instructors (create projects, manage content)
-
-**Q: How do learning objectives work?**
-- Attached to tasks at any level using Bloom's taxonomy
-- Achievement is *derived* from passing validations
-- Tracked via `get_progress()` and `get_bloom_distribution()`
-
-**Q: Can dependencies cross epics?**
-- Yes! Dependencies are unconstrained (any task can depend on any other task in same project)
-- Common pattern: Frontend epic depends on Backend epic tasks
-- Title-based resolution during ingestion
-
-**Q: What's the difference between `content` and `tutor_guidance`?**
-- **`content`**: Tutorial material for learners (code examples, explanations)
-- **`tutor_guidance`**: Meta-guidance for LLM tutors (teaching strategies, common mistakes, hints)
-
-**Q: How does validation work?**
-- Currently: SimpleValidator (non-empty check)
-- Future: Custom validators (code tests, SQL result checks, etc.)
-- Subtasks require passing validation to close
-
-**Q: How does hierarchical auto-close work?**
-- When a subtask passes validation, it auto-closes
-- System then checks: are all siblings closed?
-- If yes, parent task auto-closes (unless it requires explicit submission)
-- Process continues up: task → epic → project
-- Use `requires_submission: true` on a task to require explicit submission instead of auto-close
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `DATABASE_URL` | Yes | PostgreSQL connection (default: dev credentials) |
+| `LTT_REDIS_URL` | For LTI | Redis URL. If unset, LTI is disabled. |
+| `LTT_FRONTEND_URL` | No | Where `/lti/launch` redirects (default: `http://localhost:3000`) |
+| `LTI_PLATFORM_URL` | No | CSP `frame-ancestors` (default: `https://imbizo.alx-ai-tools.com`) |
+| `DEBUG` | No | Enables `/lti/debug/*` endpoints |
+| `NEXT_PUBLIC_DEBUG` | No | Enables debug button in frontend |
+| `ANTHROPIC_API_KEY` | For agent | Claude API key for tutoring agent |
 
 ---
 
-## Roadmap
+## Implementation Status
 
-### ✅ Completed
-- [x] Data layer with two-tier architecture
-- [x] Task management with hierarchy
-- [x] Dependency resolution and ready work
-- [x] Submissions and validation
-- [x] Learning objectives and progress tracking
-- [x] Agent tools for LLM runtime
-- [x] Admin CLI and JSON ingestion
-- [x] Pedagogical guidance fields
-- [x] Comprehensive documentation
-- [x] Hierarchical auto-close (tasks/epics auto-close when children complete)
-- [x] Agent and learner simulation testing
+**All Core Phases Complete** — 231 tests, all passing.
 
-### 🔜 Next Steps
-- [ ] Integration testing (multi-learner scenarios)
-- [ ] Fix datetime deprecation warnings
-- [ ] FastAPI REST endpoints
-- [ ] MCP server implementation
-- [ ] Custom validation rules
-- [ ] Project versioning
-- [ ] LLM-powered project conversion
+| Phase | Module | Tests |
+|-------|--------|-------|
+| 1-5 | Core Engine (data, tasks, deps, submissions, learning) | 118 |
+| 7-8 | Agent Tools + CLI/Ingestion | 49 |
+| E2E | End-to-End Integration | 15 |
+| Agent | AI Tutor + Learner Simulation | 31 |
+| LTI | OIDC login, JWT launch, AGS grades | Manual |
+
+### Next Steps
+
+- [ ] LTI auth middleware on API endpoints ([cleanup plan](docs/lti/cleanup/))
+- [ ] Remove standalone mode code (home page, cookie learners)
+- [ ] Custom validation rules (SQL result checks, code tests)
+- [ ] Production deployment (static domain, tighten CORS/CSP)
+
+---
+
+## Contributing
+
+- Modern Python 3.12+, async-first, Pydantic for validation, Ruff for linting
+- All new features must have tests (maintain >95% coverage)
+- Conventional commits: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`
 
 ---
 
@@ -911,6 +270,4 @@ MIT
 
 ## Acknowledgments
 
-Adapted from [beads](https://github.com/steveyegge/beads) by Steve Yegge.
-
-Core architectural patterns (hierarchical IDs, dependency resolution, ready work calculation) borrowed from beads with gratitude.
+Adapted from [beads](https://github.com/steveyegge/beads) by Steve Yegge. Core architectural patterns (hierarchical IDs, dependency resolution, ready work calculation) borrowed with gratitude.

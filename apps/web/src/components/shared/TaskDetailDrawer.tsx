@@ -15,7 +15,6 @@ import type { TaskDetail, BloomLevel, WorkspaceType } from "@/types";
 
 interface TaskDetailDrawerProps {
   taskId: string | null;
-  learnerId: string;
   open: boolean;
   onClose: () => void;
   workspaceType?: WorkspaceType;
@@ -69,17 +68,16 @@ function BloomBadge({ level }: { level: BloomLevel }) {
 
 export function TaskDetailDrawer({
   taskId,
-  learnerId,
   open,
   onClose,
   workspaceType,
 }: TaskDetailDrawerProps) {
   const { data: task, isLoading } = useQuery({
-    queryKey: ["taskDetail", taskId, learnerId],
+    queryKey: ["taskDetail", taskId],
     queryFn: async () => {
       if (!taskId) return null;
       try {
-        return await api.getTaskDetails(taskId, learnerId);
+        return await api.getTaskDetails(taskId);
       } catch {
         // Fall back to mock data
         return mockTaskDetail;
@@ -250,7 +248,7 @@ export function TaskDetailDrawer({
           {task && (
             <div className="border-t border-border p-4">
               <Button className="w-full" asChild>
-                <a href={`/workspace/${task.id.split(".")[0]}?learnerId=${learnerId}&taskId=${task.id}${workspaceType ? `&type=${workspaceType}` : ''}`}>
+                <a href={`/workspace/${task.id.split(".")[0]}?taskId=${task.id}&type=${workspaceType || 'sql'}`}>
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Open in Workspace
                 </a>
