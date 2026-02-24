@@ -9,10 +9,12 @@ dependencies = [
     "uvicorn",
     "httpx",
     "python-dotenv",
+    "pydantic-settings>=2.0.0",
     "PyLTI1p3>=2.0.0",
     "redis>=5.0.0",
     "cryptography>=42.0.0",
     "python-multipart>=0.0.9",
+    "langgraph-checkpoint-postgres>=2.0.0",
 ]
 
 [build-system]

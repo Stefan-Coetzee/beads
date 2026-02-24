@@ -17,8 +17,6 @@ interface Message {
 }
 
 interface ChatPanelProps {
-  learnerId: string;
-  projectId: string;
   editorContent: string;
   queryResults: QueryResult | null;
   pythonResults?: PythonResult | null;
@@ -35,8 +33,6 @@ const WELCOME_MESSAGES: Record<WorkspaceType, string> = {
 };
 
 export function ChatPanel({
-  learnerId,
-  projectId,
   editorContent,
   queryResults,
   pythonResults,
@@ -98,8 +94,6 @@ export function ChatPanel({
 
         const stream = streamChat(
           userMessage.content,
-          learnerId,
-          projectId,
           threadId || undefined,
           context
         );
@@ -157,8 +151,9 @@ export function ChatPanel({
         }
 
         // Set thread ID for conversation continuity
+        // (server generates the canonical ID; we just need a stable local reference)
         if (!threadId) {
-          setThreadId(`${learnerId}-${projectId}`);
+          setThreadId(`chat-${Date.now()}`);
         }
       } catch (error) {
         console.error("Chat error:", error);
@@ -177,7 +172,7 @@ export function ChatPanel({
         setIsLoading(false);
       }
     },
-    [input, isLoading, learnerId, projectId, threadId, editorContent, queryResults, pythonResults, workspaceType]
+    [input, isLoading, threadId, editorContent, queryResults, pythonResults, workspaceType]
   );
 
   const handleReset = () => {
@@ -324,7 +319,7 @@ export function ChatPanel({
             disabled={isLoading}
             className="flex-1 bg-elevated border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
           />
-          <Button type="submit" disabled={isLoading || !input.trim()}>
+          <Button type="submit" disabled={isLoading || !input.trim()} aria-label="Send message">
             <Send className="h-4 w-4" />
           </Button>
         </div>

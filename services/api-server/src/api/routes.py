@@ -8,14 +8,19 @@ Provides endpoints for:
 """
 
 import json
+import logging
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 
+from api.auth import LearnerContext, get_learner_context
 from api.database import get_session_factory
-from api.agents import get_or_create_agent, AgentManager
+from api.agents import get_or_create_agent
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["agent"])
 
@@ -55,8 +60,6 @@ class ChatRequest(BaseModel):
     """Request to chat with the agent."""
 
     message: str = Field(..., description="The user's message")
-    learner_id: str = Field(..., description="The learner's ID")
-    project_id: str = Field(..., description="The project ID")
     thread_id: str | None = Field(None, description="Optional thread ID for conversation continuity")
     context: WorkspaceContext | None = Field(None, description="Workspace context (editor, results)")
 
@@ -79,8 +82,7 @@ class StreamChunk(BaseModel):
 class SessionRequest(BaseModel):
     """Request to create a new session."""
 
-    learner_id: str = Field(..., description="The learner's ID")
-    project_id: str = Field(..., description="The project ID")
+    pass
 
 
 class SessionResponse(BaseModel):
@@ -178,12 +180,39 @@ def build_message_with_context(message: str, context: WorkspaceContext | None) -
 
 
 # =============================================================================
+# Thread Tracking
+# =============================================================================
+
+
+async def _register_thread(thread_id: str, learner_id: str, project_id: str) -> None:
+    """Upsert a record in conversation_threads so threads map to learners."""
+    try:
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            await session.execute(
+                text("""
+                    INSERT INTO conversation_threads (thread_id, learner_id, project_id, created_at, updated_at)
+                    VALUES (:tid, :lid, :pid, now(), now())
+                    ON CONFLICT (thread_id)
+                    DO UPDATE SET updated_at = now()
+                """),
+                {"tid": thread_id, "lid": learner_id, "pid": project_id},
+            )
+            await session.commit()
+    except Exception:
+        logger.debug("Failed to register thread %s (table may not exist yet)", thread_id)
+
+
+# =============================================================================
 # Endpoints
 # =============================================================================
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest) -> ChatResponse:
+async def chat(
+    request: ChatRequest,
+    ctx: LearnerContext = Depends(get_learner_context),
+) -> ChatResponse:
     """
     Send a message to the agent and get a response.
 
@@ -192,12 +221,15 @@ async def chat(request: ChatRequest) -> ChatResponse:
     """
     try:
         agent = get_or_create_agent(
-            learner_id=request.learner_id,
-            project_id=request.project_id,
+            learner_id=ctx.learner_id,
+            project_id=ctx.project_id or "",
             session_factory=get_session_factory(),
         )
 
-        thread_id = request.thread_id or f"{request.learner_id}-{request.project_id}"
+        thread_id = request.thread_id or f"{ctx.learner_id}-{ctx.project_id}"
+
+        # Record thread → learner mapping for correlation queries
+        await _register_thread(thread_id, ctx.learner_id, ctx.project_id or "")
 
         # Build message with workspace context (editor content, results)
         full_message = build_message_with_context(request.message, request.context)
@@ -251,7 +283,10 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
 
 @router.post("/chat/stream")
-async def chat_stream(request: ChatRequest) -> StreamingResponse:
+async def chat_stream(
+    request: ChatRequest,
+    ctx: LearnerContext = Depends(get_learner_context),
+) -> StreamingResponse:
     """
     Send a message and stream the response.
 
@@ -260,17 +295,23 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
     # Build the full message with workspace context prepended
     full_message = build_message_with_context(request.message, request.context)
 
+    # Capture ctx values for the generator closure
+    learner_id = ctx.learner_id
+    project_id = ctx.project_id or ""
+    thread_id = request.thread_id or f"{learner_id}-{project_id}"
+
+    # Record thread → learner mapping for correlation queries
+    await _register_thread(thread_id, learner_id, project_id)
+
     async def generate() -> AsyncGenerator[str, None]:
         try:
             agent = get_or_create_agent(
-                learner_id=request.learner_id,
-                project_id=request.project_id,
+                learner_id=learner_id,
+                project_id=project_id,
                 session_factory=get_session_factory(),
             )
 
-            thread_id = request.thread_id or f"{request.learner_id}-{request.project_id}"
-
-            # full_message is built outside the generator now
+            # full_message and thread_id are built outside the generator
             async for event in agent.astream(full_message, thread_id=thread_id):
                 messages = event.get("messages", [])
                 if messages:
@@ -316,24 +357,29 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
 
 
 @router.post("/session", response_model=SessionResponse)
-async def create_session(request: SessionRequest) -> SessionResponse:
+async def create_session(
+    ctx: LearnerContext = Depends(get_learner_context),
+) -> SessionResponse:
     """
     Create a new agent session.
 
     This pre-initializes an agent for the learner/project combination.
     """
+    learner_id = ctx.learner_id
+    project_id = ctx.project_id or ""
+
     agent = get_or_create_agent(
-        learner_id=request.learner_id,
-        project_id=request.project_id,
+        learner_id=learner_id,
+        project_id=project_id,
         session_factory=get_session_factory(),
     )
 
-    session_id = f"{request.learner_id}-{request.project_id}"
+    session_id = f"{learner_id}-{project_id}"
 
     return SessionResponse(
         session_id=session_id,
-        learner_id=request.learner_id,
-        project_id=request.project_id,
+        learner_id=learner_id,
+        project_id=project_id,
     )
 
 

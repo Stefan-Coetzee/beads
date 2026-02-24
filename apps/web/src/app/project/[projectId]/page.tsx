@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowLeft, Code, RefreshCw } from "lucide-react";
@@ -106,18 +106,16 @@ const mockProjectTree: ProjectTree = {
 
 export default function ProjectPage() {
   const params = useParams();
-  const searchParams = useSearchParams();
   const projectId = params.projectId as string;
-  const learnerId = searchParams.get("learnerId") || "learner-dev-001";
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   // Fetch project tree - fall back to mock data if API fails
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["projectTree", projectId, learnerId],
+    queryKey: ["projectTree", projectId],
     queryFn: async () => {
       try {
-        return await api.getProjectTree(projectId, learnerId);
+        return await api.getProjectTree(projectId);
       } catch {
         // Fall back to mock data for development
         console.log("Using mock data - API not available");
@@ -152,7 +150,7 @@ export default function ProjectPage() {
             <Button variant="ghost" size="icon" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4" />
             </Button>
-            <Link href={`/workspace/${projectId}?learnerId=${learnerId}${projectTree.project.workspace_type ? `&type=${projectTree.project.workspace_type}` : ''}`}>
+            <Link href={`/workspace/${projectId}?type=${projectTree.project.workspace_type || 'sql'}`}>
               <Button>
                 <Code className="h-4 w-4 mr-2" />
                 Open Workspace
@@ -238,7 +236,6 @@ export default function ProjectPage() {
       {/* Task Detail Drawer */}
       <TaskDetailDrawer
         taskId={selectedTaskId}
-        learnerId={learnerId}
         open={!!selectedTaskId}
         onClose={() => setSelectedTaskId(null)}
         workspaceType={projectTree.project.workspace_type}

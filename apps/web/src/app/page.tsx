@@ -6,13 +6,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen, Code, MessageSquare } from "lucide-react";
-import { LearnerIdInput, useLearnerIdState } from "@/components/shared/LearnerIdInput";
 import { ProjectSelector } from "@/components/shared/ProjectSelector";
 import { api } from "@/lib/api";
+import { getLTIContext } from "@/lib/lti";
 
 export default function Home() {
-  const { learnerId, setLearnerId, isLoaded } = useLearnerIdState();
   const [projectId, setProjectId] = useState<string>("");
+
+  const ltiCtx = getLTIContext();
 
   // Fetch projects to set default
   const { data: projects } = useQuery({
@@ -21,32 +22,25 @@ export default function Home() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Set default project when projects load
+  // Set default project when projects load (prefer LTI context project)
   useEffect(() => {
-    if (projects && projects.length > 0 && !projectId) {
+    if (ltiCtx?.projectId) {
+      setProjectId(ltiCtx.projectId);
+    } else if (projects && projects.length > 0 && !projectId) {
       setProjectId(projects[0].id);
     }
-  }, [projects, projectId]);
+  }, [projects, projectId, ltiCtx?.projectId]);
 
   // Get selected project's workspace type
   const selectedProject = projects?.find(p => p.id === projectId);
-  const workspaceType = selectedProject?.workspace_type;
-
-  if (!isLoaded) {
-    return (
-      <main className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </main>
-    );
-  }
+  const workspaceType = selectedProject?.workspace_type || ltiCtx?.workspaceType;
 
   return (
     <main className="min-h-screen bg-background">
-      {/* Header with Learner ID */}
+      {/* Header */}
       <header className="border-b border-border">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <h2 className="font-semibold">Learning Task Tracker</h2>
-          <LearnerIdInput value={learnerId} onChange={setLearnerId} />
         </div>
       </header>
 
@@ -89,7 +83,7 @@ export default function Home() {
                 Track your completion status and find your next step.
               </p>
               <Link
-                href={projectId ? `/project/${projectId}?learnerId=${learnerId}` : "#"}
+                href={projectId ? `/project/${projectId}` : "#"}
               >
                 <Button className="w-full" disabled={!projectId}>
                   View Project
@@ -118,7 +112,7 @@ export default function Home() {
                 from your AI tutor as you work through tasks.
               </p>
               <Link
-                href={projectId ? `/workspace/${projectId}?learnerId=${learnerId}${workspaceType ? `&type=${workspaceType}` : ''}` : "#"}
+                href={projectId ? `/workspace/${projectId}?type=${workspaceType || 'sql'}` : "#"}
               >
                 <Button variant="secondary" className="w-full" disabled={!projectId}>
                   Open Workspace

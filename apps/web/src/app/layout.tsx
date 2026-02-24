@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { JetBrains_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
-import { DebugButton } from "@/components/shared/DebugButton";
+
 
 const inter = Inter({
   subsets: ["latin"],
@@ -30,7 +30,6 @@ export default function RootLayout({
         className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased min-h-screen`}
       >
         <Providers>{children}</Providers>
-        {process.env.NEXT_PUBLIC_DEBUG === "true" && <DebugButton />}
       </body>
     </html>
   );

@@ -692,7 +692,7 @@ async def lifespan(app: FastAPI):
     await init_database()
 
     # Initialize LTI storage
-    redis_url = os.getenv("LTI_REDIS_URL", "redis://localhost:6379/0")
+    redis_url = os.getenv("LTT_REDIS_URL", "redis://localhost:6379/0")
     init_lti_storage(redis_url)
 
     yield
@@ -733,7 +733,7 @@ volumes:
 LTI_PLATFORM_CONFIG=configs/lti/platform.json
 LTI_PRIVATE_KEY=configs/lti/private.key
 LTI_PUBLIC_KEY=configs/lti/public.key
-LTI_REDIS_URL=redis://localhost:6379/0
+LTT_REDIS_URL=redis://localhost:6379/0
 
 # Frontend URL (where the Next.js app is served)
 LTT_FRONTEND_URL=https://your-domain.ngrok-free.app

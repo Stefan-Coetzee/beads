@@ -33,7 +33,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Content-Security-Policy",
-            value: `frame-ancestors *`,
+            value: `frame-ancestors 'self' ${ltiPlatform}`,
           },
         ],
       },

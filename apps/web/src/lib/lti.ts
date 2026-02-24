@@ -18,6 +18,8 @@ export interface LTIContext {
   projectId: string;
   workspaceType: string;
   isInstructor: boolean;
+  /** Origin of the embedding platform (for postMessage targeting). */
+  platformOrigin?: string;
 }
 
 /**
@@ -40,6 +42,7 @@ export function parseLTIContext(
     projectId: searchParams.get("project_id") || "",
     workspaceType: searchParams.get("type") || "sql",
     isInstructor: searchParams.get("instructor") === "1",
+    platformOrigin: searchParams.get("platform_origin") || undefined,
   };
 }
 
@@ -85,8 +88,71 @@ export function isInIframe(): boolean {
 export function requestIframeResize(height?: number): void {
   if (!isInIframe()) return;
   const h = height ?? document.documentElement.scrollHeight;
+  const ctx = getLTIContext();
+  // Use the stored platform origin when available; fall back to "*" for
+  // dev environments where the origin may not be set.
+  const targetOrigin = ctx?.platformOrigin || "*";
   window.parent.postMessage(
     { subject: "lti.frameResize", height: h },
-    "*"
+    targetOrigin
   );
+}
+
+/**
+ * Create a fake LTI session via the dev login endpoint.
+ *
+ * This exercises the same auth code path as a real LTI launch —
+ * a Redis-backed session is created and the launch_id is stored
+ * in sessionStorage just like a real launch redirect would.
+ *
+ * Only works when `auth_enabled=False` on the backend.
+ */
+export async function devLogin(
+  learnerId?: string,
+  projectId?: string
+): Promise<LTIContext> {
+  const res = await fetch("/lti/dev/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      learner_id: learnerId,
+      project_id: projectId,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Dev login failed: ${res.status} ${await res.text()}`);
+  }
+
+  const data = await res.json();
+  const ctx: LTIContext = {
+    isLTI: true,
+    launchId: data.launch_id,
+    learnerId: data.learner_id,
+    projectId: data.project_id || "",
+    workspaceType: "sql",
+    isInstructor: false,
+  };
+  storeLTIContext(ctx);
+  return ctx;
+}
+
+/**
+ * Clear the current dev session (frontend + backend).
+ */
+export async function devLogout(): Promise<void> {
+  const ctx = getLTIContext();
+  if (ctx?.launchId) {
+    try {
+      await fetch("/lti/dev/logout", {
+        method: "POST",
+        headers: { "X-LTI-Launch-Id": ctx.launchId },
+      });
+    } catch {
+      // Best-effort
+    }
+  }
+  if (typeof sessionStorage !== "undefined") {
+    sessionStorage.removeItem(LTI_STORAGE_KEY);
+  }
 }

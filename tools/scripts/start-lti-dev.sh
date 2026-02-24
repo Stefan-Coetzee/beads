@@ -55,7 +55,7 @@ PYTHONPATH=services/ltt-core/src uv run alembic upgrade head
 
 # ---- 3. Start API server (background) ----------------------------
 info "Starting API server on :8000..."
-export LTI_REDIS_URL="redis://localhost:6379/0"
+export LTT_REDIS_URL="redis://localhost:6379/0"
 export DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev}"
 
 uv run uvicorn api.app:app \

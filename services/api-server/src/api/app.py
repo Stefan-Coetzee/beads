@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import logging
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
@@ -22,10 +21,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from api.agents import init_checkpointer, close_checkpointer
 from api.database import init_database, close_database, get_session_factory
 from api.routes import router
 from api.frontend_routes import router as frontend_router
 from api.lti.routes import router as lti_router, init_lti_storage, is_lti_enabled
+from api.settings import get_settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -76,19 +77,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     print("Database pool initialized in event loop")
 
     # Initialize LTI storage if Redis URL is configured
-    lti_redis_url = os.getenv("LTI_REDIS_URL")
-    if lti_redis_url:
-        init_lti_storage(lti_redis_url)
+    settings = get_settings()
+    if settings.redis_url:
+        init_lti_storage(settings.redis_url)
         print("LTI storage initialized (Redis)")
     else:
-        logger.info("LTI_REDIS_URL not set — LTI endpoints disabled")
+        logger.info("LTT_REDIS_URL not set — LTI endpoints disabled")
 
-    # Ensure at least one project exists
-    await ensure_projects_exist()
+    # Initialize agent checkpointer (PostgresSaver or MemorySaver)
+    await init_checkpointer()
+
+    # Ensure at least one project exists (local dev only)
+    if settings.env == "local":
+        await ensure_projects_exist()
 
     yield
 
-    # Shutdown: Close database connections
+    # Shutdown: Close checkpointer pool, then database connections
+    await close_checkpointer()
     await close_database()
     print("Database connections closed")
 
@@ -102,15 +108,14 @@ def get_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    settings = get_settings()
+
     # CSP middleware for LTI iframe embedding
     class CSPMiddleware(BaseHTTPMiddleware):
         async def dispatch(self, request: Request, call_next):
             response: Response = await call_next(request)
-            lti_platform = os.getenv(
-                "LTI_PLATFORM_URL", "https://imbizo.alx-ai-tools.com"
-            )
             response.headers["Content-Security-Policy"] = (
-                "frame-ancestors *"
+                f"frame-ancestors {settings.csp_frame_ancestors}"
             )
             # Remove X-Frame-Options so CSP frame-ancestors takes precedence
             if "X-Frame-Options" in response.headers:
@@ -122,7 +127,7 @@ def get_app() -> FastAPI:
     # CORS middleware for frontend access
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Configure appropriately for production
+        allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -136,7 +141,7 @@ def get_app() -> FastAPI:
     # Health check at root
     @app.get("/health")
     async def health_check():
-        return {"status": "healthy", "lti_enabled": is_lti_enabled()}
+        return {"status": "healthy"}
 
     return app
 

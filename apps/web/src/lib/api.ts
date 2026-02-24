@@ -2,7 +2,7 @@ import type {
   ProjectTree,
   TaskDetail,
   ChatResponse,
-  SubmitResponse,
+  // SubmitResponse,  // Disabled: direct submit (see ADR-004)
   TaskSummary,
   WorkspaceContext,
 } from "@/types";
@@ -35,7 +35,10 @@ export function lttFetch(
 }
 
 /**
- * Type-safe API client
+ * Type-safe API client.
+ *
+ * Learner identity is resolved server-side from the X-LTI-Launch-Id header
+ * (injected by lttFetch).  No client-side learnerId params needed.
  */
 export const api = {
   // Project list
@@ -46,24 +49,18 @@ export const api = {
   },
 
   // Project endpoints
-  async getProjectTree(
-    projectId: string,
-    learnerId: string
-  ): Promise<ProjectTree> {
-    const res = await fetch(
-      `${API_BASE_URL}/api/v1/project/${projectId}/tree?learner_id=${learnerId}`
+  async getProjectTree(projectId: string): Promise<ProjectTree> {
+    const res = await lttFetch(
+      `${API_BASE_URL}/api/v1/project/${projectId}/tree`
     );
     if (!res.ok) throw new Error("Failed to fetch project tree");
     return res.json();
   },
 
   // Task endpoints
-  async getTaskDetails(
-    taskId: string,
-    learnerId: string
-  ): Promise<TaskDetail> {
-    const res = await fetch(
-      `${API_BASE_URL}/api/v1/task/${taskId}?learner_id=${learnerId}`
+  async getTaskDetails(taskId: string): Promise<TaskDetail> {
+    const res = await lttFetch(
+      `${API_BASE_URL}/api/v1/task/${taskId}`
     );
     if (!res.ok) throw new Error("Failed to fetch task");
     return res.json();
@@ -71,11 +68,10 @@ export const api = {
 
   async getReadyTasks(
     projectId: string,
-    learnerId: string,
     limit: number = 5
   ): Promise<{ tasks: TaskSummary[]; total_ready: number; message: string }> {
-    const res = await fetch(
-      `${API_BASE_URL}/api/v1/project/${projectId}/ready?learner_id=${learnerId}&limit=${limit}`
+    const res = await lttFetch(
+      `${API_BASE_URL}/api/v1/project/${projectId}/ready?limit=${limit}`
     );
     if (!res.ok) throw new Error("Failed to fetch ready tasks");
     return res.json();
@@ -83,42 +79,36 @@ export const api = {
 
   // Progress endpoints
   async startTask(
-    taskId: string,
-    learnerId: string
+    taskId: string
   ): Promise<{ success: boolean; status: string; message: string }> {
     const res = await lttFetch(`${API_BASE_URL}/api/v1/task/${taskId}/start`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ learner_id: learnerId }),
+      body: JSON.stringify({}),
     });
     if (!res.ok) throw new Error("Failed to start task");
     return res.json();
   },
 
-  async submitWork(
-    taskId: string,
-    learnerId: string,
-    content: string,
-    submissionType: string = "sql"
-  ): Promise<SubmitResponse> {
-    const res = await lttFetch(`${API_BASE_URL}/api/v1/task/${taskId}/submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        learner_id: learnerId,
-        content,
-        submission_type: submissionType,
-      }),
-    });
-    if (!res.ok) throw new Error("Failed to submit work");
-    return res.json();
-  },
+  // --- Disabled: direct submit (see ADR-004) ---
+  // All submissions go through the agent chat flow until custom validators exist.
+  // async submitWork(
+  //   taskId: string,
+  //   content: string,
+  //   submissionType: string = "sql"
+  // ): Promise<SubmitResponse> {
+  //   const res = await lttFetch(`${API_BASE_URL}/api/v1/task/${taskId}/submit`, {
+  //     method: "POST",
+  //     headers: { "Content-Type": "application/json" },
+  //     body: JSON.stringify({ content, submission_type: submissionType }),
+  //   });
+  //   if (!res.ok) throw new Error("Failed to submit work");
+  //   return res.json();
+  // },
 
   // Chat endpoints
   async chat(
     message: string,
-    learnerId: string,
-    projectId: string,
     threadId?: string,
     context?: WorkspaceContext
   ): Promise<ChatResponse> {
@@ -127,8 +117,6 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message,
-        learner_id: learnerId,
-        project_id: projectId,
         thread_id: threadId,
         context,
       }),
@@ -137,26 +125,11 @@ export const api = {
     return res.json();
   },
 
-  // Stream chat endpoint
-  chatStream(
-    message: string,
-    learnerId: string,
-    projectId: string,
-    threadId?: string,
-    context?: WorkspaceContext
-  ): EventSource {
-    // Note: For proper streaming, we'll use fetch with ReadableStream
-    // EventSource doesn't support POST, so we'll handle this differently
-    const url = new URL(`${API_BASE_URL}/api/v1/chat/stream`);
-    // This is a placeholder - actual implementation needs POST body streaming
-    throw new Error("Use fetch-based streaming instead");
-  },
-
   // Database initialization
   async getDatabaseSchema(
     projectId: string
   ): Promise<{ schema: string; sample_data: string }> {
-    const res = await fetch(
+    const res = await lttFetch(
       `${API_BASE_URL}/api/v1/project/${projectId}/database`
     );
     if (!res.ok) throw new Error("Failed to fetch database schema");
@@ -165,20 +138,18 @@ export const api = {
 };
 
 /**
- * Stream chat messages using fetch
+ * Stream chat messages using fetch.
+ *
+ * Learner/project identity resolved server-side from the LTI launch header.
  */
 export async function* streamChat(
   message: string,
-  learnerId: string,
-  projectId: string,
   threadId?: string,
   context?: WorkspaceContext
 ): AsyncGenerator<{ type: string; content: unknown }> {
   // Ensure context is properly structured for the API
   const requestBody = {
     message,
-    learner_id: learnerId,
-    project_id: projectId,
     thread_id: threadId,
     context: context ? {
       workspace_type: context.workspace_type || "sql",

@@ -4,7 +4,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useCallback, useState, useRef } from "react";
 import Link from "next/link";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
-import { ArrowLeft, BookOpen, RefreshCw, AlertTriangle, Database, Clock } from "lucide-react";
+import { ArrowLeft, BookOpen, RefreshCw, Database, Clock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { SqlEditor } from "@/components/workspace/SqlEditor";
@@ -15,7 +15,7 @@ import { ChatPanel } from "@/components/chat/ChatPanel";
 import { TaskDetailDrawer } from "@/components/shared/TaskDetailDrawer";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { QueryResult, WorkspaceType } from "@/types";
-import { parseLTIContext, storeLTIContext, getLTIContext } from "@/lib/lti";
+import { parseLTIContext, storeLTIContext, getLTIContext, isInIframe, devLogin } from "@/lib/lti";
 
 // SQL engine
 import {
@@ -44,12 +44,24 @@ export default function WorkspacePage() {
   // Inject projectId from the URL path since it's not a search param.
   const urlLtiCtx = parseLTIContext(searchParams);
   if (urlLtiCtx) storeLTIContext({ ...urlLtiCtx, projectId });
-  const ltiCtx = urlLtiCtx ?? getLTIContext();
 
-  const learnerId = searchParams.get("learnerId") ?? ltiCtx?.learnerId ?? "learner-dev-001";
+  const [ltiCtx, setLtiCtx] = useState<ReturnType<typeof getLTIContext>>(urlLtiCtx ?? getLTIContext());
+  const [devLoginPending, setDevLoginPending] = useState(false);
 
-  // Workspace type: URL param → stored LTI context → null (show error)
-  const workspaceType = (searchParams.get("type") ?? ltiCtx?.workspaceType ?? null) as WorkspaceType | null;
+  // Auto dev-login: local dev only — stripped from production builds.
+  // Creates a fake Redis-backed session so the same auth path is exercised.
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    if (ltiCtx || isInIframe() || devLoginPending) return;
+    setDevLoginPending(true);
+    devLogin(undefined, projectId)
+      .then((ctx) => setLtiCtx(ctx))
+      .catch((err) => console.warn("[dev-login] failed (Redis may not be running):", err))
+      .finally(() => setDevLoginPending(false));
+  }, [ltiCtx, projectId, devLoginPending]);
+
+  // Workspace type: URL param → stored LTI context → default "sql"
+  const workspaceType = (searchParams.get("type") ?? ltiCtx?.workspaceType ?? "sql") as WorkspaceType;
 
   // Loading progress state
   const [sqlProgress, setSqlProgress] = useState<LoadProgress | null>(null);
@@ -215,28 +227,12 @@ export default function WorkspacePage() {
   // Show loading overlay for SQL workspace while DB downloads
   const showSqlLoading = workspaceType === "sql" && !isSqlReady;
 
-  // Error state: no workspace type specified
-  if (!workspaceType) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-background">
-        <AlertTriangle className="h-12 w-12 text-yellow-500 mb-4" />
-        <h1 className="text-xl font-semibold mb-2">Workspace Type Required</h1>
-        <p className="text-muted-foreground mb-4">
-          Please specify a workspace type in the URL: ?type=sql or ?type=python
-        </p>
-        <Link href={`/project/${projectId}?learnerId=${learnerId}`}>
-          <Button>Back to Project</Button>
-        </Link>
-      </div>
-    );
-  }
-
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-4">
-          <Link href={`/project/${projectId}?learnerId=${learnerId}`}>
+          <Link href={`/project/${projectId}`}>
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -268,7 +264,7 @@ export default function WorkspacePage() {
               Reset Env
             </Button>
           )}
-          <Link href={`/project/${projectId}?learnerId=${learnerId}`}>
+          <Link href={`/project/${projectId}`}>
             <Button variant="outline" size="sm">
               <BookOpen className="h-4 w-4 mr-1" />
               Overview
@@ -357,8 +353,6 @@ export default function WorkspacePage() {
           <Panel defaultSize={45} minSize={30}>
             <div className="h-full p-4">
               <ChatPanel
-                learnerId={learnerId}
-                projectId={projectId}
                 editorContent={currentEditorContent}
                 queryResults={workspaceType === "sql" ? queryResults : null}
                 pythonResults={workspaceType === "python" ? pythonResults : null}
@@ -374,7 +368,6 @@ export default function WorkspacePage() {
       {/* Task Detail Drawer */}
       <TaskDetailDrawer
         taskId={drawerTaskId}
-        learnerId={learnerId}
         open={!!drawerTaskId}
         onClose={closeDrawer}
         workspaceType={workspaceType}

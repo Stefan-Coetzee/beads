@@ -150,7 +150,7 @@ docker-compose up -d  # postgres, mysql, redis
 PYTHONPATH=services/ltt-core/src uv run --package ltt-core python -m alembic upgrade head
 
 # 4. Start API server
-LTI_REDIS_URL=redis://localhost:6379/0 \
+LTT_REDIS_URL=redis://localhost:6379/0 \
   uv run uvicorn api.app:app --host 0.0.0.0 --port 8000 \
   --app-dir services/api-server/src
 

@@ -91,7 +91,7 @@ src/api/
 
 ```bash
 # With LTI (requires Redis)
-LTI_REDIS_URL=redis://localhost:6379/0 \
+LTT_REDIS_URL=redis://localhost:6379/0 \
   uv run uvicorn api.app:app --host 0.0.0.0 --port 8000 \
   --app-dir services/api-server/src --reload
 
@@ -109,7 +109,7 @@ Or use the convenience script: `./tools/scripts/start-lti-dev.sh`
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
 | `DATABASE_URL` | Yes | `postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev` | PostgreSQL |
-| `LTI_REDIS_URL` | For LTI | — | Redis URL. If unset, LTI is disabled. |
+| `LTT_REDIS_URL` | For LTI | — | Redis URL. If unset, LTI is disabled. |
 | `LTT_FRONTEND_URL` | No | `http://localhost:3000` | Where `/lti/launch` redirects |
 | `LTI_PLATFORM_URL` | No | `https://imbizo.alx-ai-tools.com` | CSP `frame-ancestors` |
 | `DEBUG` | No | — | Enables `/lti/debug/*` endpoints |

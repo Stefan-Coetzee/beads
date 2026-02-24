@@ -16,7 +16,7 @@ from langchain_core.messages import HumanMessage
 
 from agent.config import Config, get_config
 from agent.graph import create_agent, create_custom_graph
-from agent.prompts import SYSTEM_PROMPT, build_system_prompt
+from agent.prompts import OPERATIONAL_INSTRUCTIONS, SYSTEM_PROMPT, build_system_prompt
 from agent.state import AgentState, LearnerProgress, TaskContext
 from agent.tools import create_tools, get_tool_descriptions
 
@@ -234,7 +234,7 @@ class TestPromptStructure:
     """Test system prompt structure and content."""
 
     def test_prompt_has_core_sections(self):
-        """Verify prompt has expected sections."""
+        """Verify operational instructions have expected sections."""
         expected_sections = [
             "Core Teaching Principles",
             "Understanding Task Hierarchy",
@@ -244,15 +244,15 @@ class TestPromptStructure:
             "Important Rules",
         ]
         for section in expected_sections:
-            assert section in SYSTEM_PROMPT, (
-                f"Missing section '{section}' in SYSTEM_PROMPT"
+            assert section in OPERATIONAL_INSTRUCTIONS, (
+                f"Missing section '{section}' in OPERATIONAL_INSTRUCTIONS"
             )
 
     def test_prompt_has_task_lifecycle(self):
-        """Verify prompt includes task lifecycle instructions."""
-        assert "CRITICAL: Task Lifecycle" in SYSTEM_PROMPT
-        assert "start_task" in SYSTEM_PROMPT
-        assert "submit" in SYSTEM_PROMPT
+        """Verify operational instructions include task lifecycle rules."""
+        assert "CRITICAL: Task Lifecycle" in OPERATIONAL_INSTRUCTIONS
+        assert "start_task" in OPERATIONAL_INSTRUCTIONS
+        assert "submit" in OPERATIONAL_INSTRUCTIONS
 
     def test_prompt_has_context_placeholders(self):
         """Verify prompt has placeholders for dynamic context."""

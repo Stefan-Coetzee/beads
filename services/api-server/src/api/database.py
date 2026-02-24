@@ -5,7 +5,6 @@ This module handles database initialization and cleanup within
 the FastAPI event loop, ensuring connection pooling works correctly.
 """
 
-import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -17,11 +16,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import AsyncAdaptedQueuePool
 
-# Database configuration
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev",
-)
+from api.settings import get_settings
 
 # Module-level state (initialized in startup)
 _engine: AsyncEngine | None = None
@@ -37,13 +32,14 @@ async def init_database() -> None:
     """
     global _engine, _session_factory
 
+    settings = get_settings()
     _engine = create_async_engine(
-        DATABASE_URL,
+        settings.database_url,
         poolclass=AsyncAdaptedQueuePool,
         pool_pre_ping=True,
         pool_size=10,
         max_overflow=20,
-        echo=os.getenv("SQL_ECHO", "false").lower() == "true",
+        echo=settings.log_level == "DEBUG",
     )
 
     _session_factory = async_sessionmaker(

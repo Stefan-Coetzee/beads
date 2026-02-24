@@ -107,7 +107,7 @@ PYTHONPATH=services/ltt-core/src uv run --package ltt-core python -m alembic upg
 ./tools/scripts/start-lti-dev.sh
 
 # Or manually (each in a separate terminal)
-LTI_REDIS_URL=redis://localhost:6379/0 \
+LTT_REDIS_URL=redis://localhost:6379/0 \
   uv run uvicorn api.app:app --host 0.0.0.0 --port 8000 \
   --app-dir services/api-server/src --reload
 
@@ -224,7 +224,7 @@ PYTHONPATH=services/ltt-core/src uv run --package ltt-core python -m alembic rev
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `DATABASE_URL` | Yes | PostgreSQL connection (default: dev credentials) |
-| `LTI_REDIS_URL` | For LTI | Redis URL. If unset, LTI is disabled. |
+| `LTT_REDIS_URL` | For LTI | Redis URL. If unset, LTI is disabled. |
 | `LTT_FRONTEND_URL` | No | Where `/lti/launch` redirects (default: `http://localhost:3000`) |
 | `LTI_PLATFORM_URL` | No | CSP `frame-ancestors` (default: `https://imbizo.alx-ai-tools.com`) |
 | `DEBUG` | No | Enables `/lti/debug/*` endpoints |

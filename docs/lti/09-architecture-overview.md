@@ -83,7 +83,7 @@ Normal operation: task navigation, chat, submissions, grade passback
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
-| `LTI_REDIS_URL` | Yes (for LTI) | — | Redis connection URL. If unset, LTI endpoints are disabled. |
+| `LTT_REDIS_URL` | Yes (for LTI) | — | Redis connection URL. If unset, LTI endpoints are disabled. |
 | `DATABASE_URL` | Yes | `postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev` | PostgreSQL connection |
 | `LTT_FRONTEND_URL` | No | `http://localhost:3000` | Where `/lti/launch` redirects after JWT validation |
 | `LTI_PLATFORM_URL` | No | `https://imbizo.alx-ai-tools.com` | Used in CSP `frame-ancestors` |

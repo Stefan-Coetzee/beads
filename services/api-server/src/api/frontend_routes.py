@@ -11,28 +11,19 @@ Provides endpoints for:
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from api.auth import LearnerContext, get_learner_context
 from api.database import get_session_factory
-from ltt.models import SubmissionType, TaskStatus, LearnerModel
+from ltt.models import TaskStatus
 from ltt.services.task_service import get_task, get_children, TaskNotFoundError
 from ltt.services.progress_service import get_or_create_progress, update_status
 from ltt.services.dependency_service import get_ready_work, is_task_blocked
-from ltt.services.submission_service import create_submission
-from ltt.services.validation_service import validate_submission
-from sqlalchemy import select
-
-
-async def ensure_learner_exists(session, learner_id: str) -> None:
-    """Create learner if it doesn't exist."""
-    result = await session.execute(
-        select(LearnerModel).where(LearnerModel.id == learner_id)
-    )
-    if not result.scalar_one_or_none():
-        learner = LearnerModel(id=learner_id, learner_metadata="{}")
-        session.add(learner)
-        await session.commit()
+# Disabled: direct submit (see ADR-004). Uncomment when custom validators exist.
+# from ltt.models import SubmissionType
+# from ltt.services.submission_service import create_submission
+# from ltt.services.validation_service import validate_submission
 
 router = APIRouter(prefix="/api/v1", tags=["frontend"])
 
@@ -123,7 +114,7 @@ class ReadyTasksResponse(BaseModel):
 class StartTaskRequest(BaseModel):
     """Request to start a task."""
 
-    learner_id: str = Field(..., description="The learner's ID")
+    pass
 
 
 class StartTaskResponse(BaseModel):
@@ -134,22 +125,21 @@ class StartTaskResponse(BaseModel):
     message: str
 
 
-class SubmitWorkRequest(BaseModel):
-    """Request to submit work."""
-
-    learner_id: str = Field(..., description="The learner's ID")
-    content: str = Field(..., description="The submission content")
-    submission_type: str = Field(default="sql", description="Type of submission")
-
-
-class SubmitWorkResponse(BaseModel):
-    """Response from submitting work."""
-
-    success: bool
-    passed: bool
-    message: str
-    status: str
-    submission_id: str | None = None
+# --- Disabled: direct submit endpoint (see ADR-004) ---
+# All submissions go through the agent chat flow until custom validators exist.
+#
+# class SubmitWorkRequest(BaseModel):
+#     """Request to submit work."""
+#     content: str = Field(..., description="The submission content")
+#     submission_type: str = Field(default="sql", description="Type of submission")
+#
+# class SubmitWorkResponse(BaseModel):
+#     """Response from submitting work."""
+#     success: bool
+#     passed: bool
+#     message: str
+#     status: str
+#     submission_id: str | None = None
 
 
 class DatabaseSchemaResponse(BaseModel):
@@ -195,19 +185,18 @@ async def list_projects() -> list[dict]:
 @router.get("/project/{project_id}/tree", response_model=ProjectTreeResponse)
 async def get_project_tree(
     project_id: str,
-    learner_id: str = Query(..., description="The learner's ID"),
+    ctx: LearnerContext = Depends(get_learner_context),
 ) -> ProjectTreeResponse:
     """
     Get the full project tree with learner progress.
 
     Returns hierarchical task structure with completion status.
     """
+    learner_id = ctx.learner_id
     session_factory = get_session_factory()
 
     async with session_factory() as session:
         try:
-            # Ensure learner exists
-            await ensure_learner_exists(session, learner_id)
 
             # Get project (root task)
             project = await get_task(session, project_id)
@@ -343,18 +332,18 @@ async def get_tasks_blocked_by(session, task_id: str, learner_id: str) -> list:
 @router.get("/task/{task_id}", response_model=TaskDetailResponse)
 async def get_task_details(
     task_id: str,
-    learner_id: str = Query(..., description="The learner's ID"),
+    ctx: LearnerContext = Depends(get_learner_context),
 ) -> TaskDetailResponse:
     """
     Get detailed information about a specific task.
 
     Includes progress status, blocking info, and content.
     """
+    learner_id = ctx.learner_id
     session_factory = get_session_factory()
 
     async with session_factory() as session:
         try:
-            await ensure_learner_exists(session, learner_id)
             task = await get_task(session, task_id)
             progress = await get_or_create_progress(session, task_id, learner_id)
 
@@ -426,7 +415,7 @@ async def get_task_details(
 @router.get("/project/{project_id}/ready", response_model=ReadyTasksResponse)
 async def get_ready_tasks(
     project_id: str,
-    learner_id: str = Query(..., description="The learner's ID"),
+    ctx: LearnerContext = Depends(get_learner_context),
     limit: int = Query(default=5, ge=1, le=20),
 ) -> ReadyTasksResponse:
     """
@@ -434,11 +423,11 @@ async def get_ready_tasks(
 
     Returns unblocked tasks ordered by priority.
     """
+    learner_id = ctx.learner_id
     session_factory = get_session_factory()
 
     async with session_factory() as session:
         try:
-            await ensure_learner_exists(session, learner_id)
             ready_tasks = await get_ready_work(
                 session,
                 project_id=project_id,
@@ -478,23 +467,23 @@ async def get_ready_tasks(
 @router.post("/task/{task_id}/start", response_model=StartTaskResponse)
 async def start_task(
     task_id: str,
-    request: StartTaskRequest,
+    ctx: LearnerContext = Depends(get_learner_context),
 ) -> StartTaskResponse:
     """
     Start working on a task.
 
     Sets the learner's status to 'in_progress'.
     """
+    learner_id = ctx.learner_id
     session_factory = get_session_factory()
 
     async with session_factory() as session:
         try:
-            await ensure_learner_exists(session, request.learner_id)
             # Check task exists
             await get_task(session, task_id)
 
             # Check not blocked
-            is_blocked, blockers = await is_task_blocked(session, task_id, request.learner_id)
+            is_blocked, blockers = await is_task_blocked(session, task_id, learner_id)
             if is_blocked:
                 blocker_ids = ", ".join(b.id for b in blockers)
                 return StartTaskResponse(
@@ -504,7 +493,7 @@ async def start_task(
                 )
 
             # Update status
-            progress = await get_or_create_progress(session, task_id, request.learner_id)
+            progress = await get_or_create_progress(session, task_id, learner_id)
 
             if progress.status == TaskStatus.CLOSED.value:
                 return StartTaskResponse(
@@ -513,7 +502,7 @@ async def start_task(
                     message="Task is already completed",
                 )
 
-            await update_status(session, task_id, request.learner_id, TaskStatus.IN_PROGRESS)
+            await update_status(session, task_id, learner_id, TaskStatus.IN_PROGRESS)
             await session.commit()
 
             return StartTaskResponse(
@@ -529,62 +518,46 @@ async def start_task(
             raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/task/{task_id}/submit", response_model=SubmitWorkResponse)
-async def submit_work(
-    task_id: str,
-    request: SubmitWorkRequest,
-) -> SubmitWorkResponse:
-    """
-    Submit work for a task.
-
-    Creates a submission and runs validation.
-    """
-    session_factory = get_session_factory()
-
-    async with session_factory() as session:
-        try:
-            await ensure_learner_exists(session, request.learner_id)
-            # Map string to enum
-            try:
-                sub_type = SubmissionType(request.submission_type)
-            except ValueError:
-                sub_type = SubmissionType.SQL
-
-            # Create submission
-            submission = await create_submission(
-                session,
-                task_id=task_id,
-                learner_id=request.learner_id,
-                content=request.content,
-                submission_type=sub_type,
-            )
-
-            await session.commit()
-
-            # Validate submission
-            validation = await validate_submission(session, submission.id)
-            await session.commit()
-
-            # Update task status if passed
-            if validation.passed:
-                await update_status(session, task_id, request.learner_id, TaskStatus.CLOSED)
-                await session.commit()
-
-            progress = await get_or_create_progress(session, task_id, request.learner_id)
-
-            return SubmitWorkResponse(
-                success=True,
-                passed=validation.passed,
-                message=validation.feedback or ("Correct!" if validation.passed else "Try again"),
-                status=progress.status,
-                submission_id=submission.id,
-            )
-
-        except TaskNotFoundError:
-            raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
-        except Exception as e:
-            await session.rollback()
-            raise HTTPException(status_code=500, detail=str(e))
+# --- Disabled: direct submit endpoint (see ADR-004) ---
+# All submissions go through the agent chat flow until custom validators exist.
+# Uncomment when real validators (SQL result checks, code tests) are ready.
+#
+# @router.post("/task/{task_id}/submit", response_model=SubmitWorkResponse)
+# async def submit_work(
+#     task_id: str,
+#     request: SubmitWorkRequest,
+#     ctx: LearnerContext = Depends(get_learner_context),
+# ) -> SubmitWorkResponse:
+#     """Submit work for a task. Creates a submission and runs validation."""
+#     learner_id = ctx.learner_id
+#     session_factory = get_session_factory()
+#     async with session_factory() as session:
+#         try:
+#             try:
+#                 sub_type = SubmissionType(request.submission_type)
+#             except ValueError:
+#                 sub_type = SubmissionType.SQL
+#             submission = await create_submission(
+#                 session, task_id=task_id, learner_id=learner_id,
+#                 content=request.content, submission_type=sub_type,
+#             )
+#             await session.commit()
+#             validation = await validate_submission(session, submission.id)
+#             await session.commit()
+#             if validation.passed:
+#                 await update_status(session, task_id, learner_id, TaskStatus.CLOSED)
+#                 await session.commit()
+#             progress = await get_or_create_progress(session, task_id, learner_id)
+#             return SubmitWorkResponse(
+#                 success=True, passed=validation.passed,
+#                 message=validation.feedback or ("Correct!" if validation.passed else "Try again"),
+#                 status=progress.status, submission_id=submission.id,
+#             )
+#         except TaskNotFoundError:
+#             raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+#         except Exception as e:
+#             await session.rollback()
+#             raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/project/{project_id}/database", response_model=DatabaseSchemaResponse)

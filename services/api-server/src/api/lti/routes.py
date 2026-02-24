@@ -9,10 +9,11 @@ GET  /lti/jwks    - Tool's public key set
 from __future__ import annotations
 
 import logging
-import os
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+
+from api.settings import get_settings
 
 from .adapter import FastAPIMessageLaunch, FastAPIOIDCLogin, FastAPIRequest
 from .config import get_tool_config
@@ -38,7 +39,7 @@ def get_launch_data_storage() -> RedisLaunchDataStorage:
     """Get the launch data storage singleton."""
     if _launch_data_storage is None:
         raise RuntimeError(
-            "LTI storage not initialized. Set LTI_REDIS_URL env var and restart."
+            "LTI storage not initialized. Set LTT_REDIS_URL env var and restart."
         )
     return _launch_data_storage
 
@@ -273,7 +274,8 @@ async def lti_launch(request: Request):
     )
 
     # Build frontend URL with launch context
-    frontend_base = os.getenv("LTT_FRONTEND_URL", "http://localhost:3000")
+    settings = get_settings()
+    frontend_base = settings.frontend_url
     redirect_url = (
         f"{frontend_base}/workspace/{project_id}"
         f"?launch_id={launch_id}"
@@ -281,6 +283,7 @@ async def lti_launch(request: Request):
         f"&type={workspace_type}"
         f"&lti=1"
         f"&instructor={1 if is_instructor else 0}"
+        f"&platform_origin={settings.lti_platform_url}"
     )
 
     return RedirectResponse(url=redirect_url, status_code=302)
@@ -292,7 +295,7 @@ async def lti_debug_context(request: Request):
     Return full LTI launch data for the current session.
     Only available when DEBUG=true env var is set.
     """
-    if not os.getenv("DEBUG"):
+    if not get_settings().debug:
         raise HTTPException(status_code=404, detail="Not found")
 
     launch_id = request.headers.get("x-lti-launch-id")
@@ -313,7 +316,7 @@ async def lti_debug_health(request: Request):
     Check all LTI-related subsystems and surface misconfigurations.
     Only available when DEBUG=true env var is set.
     """
-    if not os.getenv("DEBUG"):
+    if not get_settings().debug:
         raise HTTPException(status_code=404, detail="Not found")
 
     checks: dict = {}
@@ -392,7 +395,7 @@ async def lti_debug_grade_test(request: Request):
     Send a test grade (0.5 / 1.0) via AGS for the current session.
     Only available when DEBUG=true env var is set.
     """
-    if not os.getenv("DEBUG"):
+    if not get_settings().debug:
         raise HTTPException(status_code=404, detail="Not found")
 
     launch_id = request.headers.get("x-lti-launch-id")
@@ -426,6 +429,105 @@ async def lti_debug_grade_test(request: Request):
     if ok:
         return JSONResponse(content={"ok": True, "score": 0.5, "max_score": 1.0})
     return JSONResponse(content={"ok": False, "error": "AGS call failed — check server logs"})
+
+
+@router.post("/dev/login")
+async def dev_login(request: Request):
+    """
+    Create a fake LTI launch for local development.
+
+    Only available when ``auth_enabled=False``.  Creates a Redis-backed
+    session identical in shape to a real LTI launch so that the same
+    ``get_learner_context`` code path is exercised.
+    """
+    from uuid import uuid4
+
+    from api.database import get_session_factory
+    from ltt.models.learner import LearnerModel
+    from sqlalchemy import select
+
+    settings = get_settings()
+    if settings.auth_enabled:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    # Require Redis for dev login (sessions are stored there)
+    try:
+        storage = get_launch_data_storage()
+    except RuntimeError:
+        raise HTTPException(
+            status_code=503,
+            detail="Dev login requires Redis. Set LTT_REDIS_URL and restart.",
+        )
+
+    body = await request.json()
+    learner_id = body.get("learner_id", settings.dev_learner_id)
+    project_id = body.get("project_id", settings.dev_project_id) or ""
+
+    # Ensure learner exists in DB
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        result = await session.execute(
+            select(LearnerModel).where(LearnerModel.id == learner_id)
+        )
+        if not result.scalar_one_or_none():
+            import json as _json
+
+            session.add(LearnerModel(
+                id=learner_id,
+                learner_metadata=_json.dumps({
+                    "name": "Dev User",
+                    "source": "dev_login",
+                }),
+            ))
+            await session.commit()
+
+    # Create fake launch in Redis (24h TTL for dev convenience)
+    launch_id = f"dev-{uuid4().hex[:12]}"
+    storage.set_value(
+        f"launch_info:{launch_id}",
+        {
+            "sub": f"dev-{learner_id}",
+            "iss": "http://localhost",
+            "email": None,
+            "name": "Dev User",
+            "learner_id": learner_id,
+            "project_id": project_id,
+            "workspace_type": "sql",
+            "roles": [],
+            "context": {},
+            "resource_link": {},
+            "tool_platform": {},
+            "ags": {},
+            "custom": {"project_id": project_id},
+        },
+        exp=86400,
+    )
+
+    return JSONResponse(content={
+        "launch_id": launch_id,
+        "learner_id": learner_id,
+        "project_id": project_id,
+    })
+
+
+@router.post("/dev/logout")
+async def dev_logout(request: Request):
+    """Clear a dev login session. Only when ``auth_enabled=False``."""
+    settings = get_settings()
+    if settings.auth_enabled:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    launch_id = request.headers.get("x-lti-launch-id")
+    if not launch_id:
+        return JSONResponse(content={"ok": False, "error": "Missing X-LTI-Launch-Id header"})
+
+    try:
+        storage = get_launch_data_storage()
+        storage._redis.delete(f"lti1p3:launch_info:{launch_id}")
+    except RuntimeError:
+        pass
+
+    return JSONResponse(content={"ok": True})
 
 
 @router.get("/jwks")

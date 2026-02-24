@@ -90,7 +90,7 @@ For LTI testing, start the backend and a tunnel:
 
 ```bash
 # Backend (separate terminal)
-LTI_REDIS_URL=redis://localhost:6379/0 \
+LTT_REDIS_URL=redis://localhost:6379/0 \
   uv run uvicorn api.app:app --host 0.0.0.0 --port 8000 \
   --app-dir services/api-server/src --reload
 
