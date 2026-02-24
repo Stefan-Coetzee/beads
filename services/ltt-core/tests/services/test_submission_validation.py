@@ -3,7 +3,6 @@ Tests for submission and validation services.
 """
 
 import pytest
-
 from ltt.models import (
     LearnerModel,
     SubmissionType,

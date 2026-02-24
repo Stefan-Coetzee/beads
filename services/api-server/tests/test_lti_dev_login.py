@@ -1,12 +1,10 @@
 """Tests for the dev login/logout flow (/lti/dev/login, /lti/dev/logout)."""
 
-from sqlalchemy import select
-
 from ltt.models.learner import LearnerModel
+from sqlalchemy import select
 
 
 class TestDevLogin:
-
     async def test_dev_login_creates_session(self, client, lti_storage):
         """Dev login returns launch_id and stores session in Redis."""
         resp = await client.post(
@@ -57,16 +55,12 @@ class TestDevLogin:
 
     async def test_dev_login_blocked_when_auth_enabled(self, client_auth):
         """Dev login returns 404 when auth_enabled=True."""
-        resp = await client_auth.post(
-            "/lti/dev/login", json={"learner_id": "x"}
-        )
+        resp = await client_auth.post("/lti/dev/login", json={"learner_id": "x"})
         assert resp.status_code == 404
 
     async def test_dev_login_session_usable_for_api(self, client):
         """Launch_id from dev login can be used as X-LTI-Launch-Id header."""
-        login_resp = await client.post(
-            "/lti/dev/login", json={"learner_id": "learner-api-test"}
-        )
+        login_resp = await client.post("/lti/dev/login", json={"learner_id": "learner-api-test"})
         launch_id = login_resp.json()["launch_id"]
 
         ctx_resp = await client.get(
@@ -79,12 +73,9 @@ class TestDevLogin:
 
 
 class TestDevLogout:
-
     async def test_dev_logout_clears_session(self, client, lti_storage):
         """Logout deletes the launch_info key from Redis."""
-        login_resp = await client.post(
-            "/lti/dev/login", json={"learner_id": "learner-logout-test"}
-        )
+        login_resp = await client.post("/lti/dev/login", json={"learner_id": "learner-logout-test"})
         launch_id = login_resp.json()["launch_id"]
         assert lti_storage.get_value(f"launch_info:{launch_id}") is not None
 

@@ -36,7 +36,11 @@ select = ["E", "F", "I", "N", "W", "UP"]
 ignore = ["E501", "F821"]  # F821: SQLAlchemy forward references
 
 [tool.ruff.lint.per-file-ignores]
-"services/ltt-core/src/ltt/db/migrations/env.py" = ["E402"]  # Need to load .env before imports
+"services/ltt-core/src/ltt/db/migrations/env.py" = ["E402"]  # load_dotenv() before imports
+"services/api-server/src/api/app.py" = ["E402"]  # load_dotenv() before imports
+"services/agent-tutor/tests/test_e2e_agentic_workflow.py" = ["E402"]  # pytestmark before imports
+"services/api-server/tests/test_lti_launch.py" = ["N806"]  # MockOIDCLogin, MockLaunch naming convention
+"tools/simulation/tests/test_learner_sim_module/test_learner_sim.py" = ["E402"]  # pytest fixtures before imports
 
 [tool.mypy]
 python_version = "3.12"

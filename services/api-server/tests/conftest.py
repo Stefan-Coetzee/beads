@@ -18,12 +18,19 @@ Fixtures:
 from __future__ import annotations
 
 import sys
+
+# Prevent api/__init__.py from eagerly importing api.app (which pulls in
+# langchain_anthropic and the entire agent stack).  We install a fake 'api'
+# package entry so that submodule imports like 'api.settings' resolve their
+# parent without triggering __init__.py's top-level import.
+import types as _types
 from collections.abc import AsyncGenerator
 from unittest.mock import patch
 
 import fakeredis
 import pytest
 import pytest_asyncio
+from ltt.models.base import Base
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -31,33 +38,19 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from ltt.models.base import Base
-
-# Prevent api/__init__.py from eagerly importing api.app (which pulls in
-# langchain_anthropic and the entire agent stack).  We install a fake 'api'
-# package entry so that submodule imports like 'api.settings' resolve their
-# parent without triggering __init__.py's top-level import.
-import types as _types
-
 if "api" not in sys.modules:
     sys.modules["api"] = _types.ModuleType("api")
     sys.modules["api"].__path__ = [  # type: ignore[attr-defined]
-        __import__("pathlib").Path(__file__).resolve().parents[1]
-        / "src"
-        / "api"
+        __import__("pathlib").Path(__file__).resolve().parents[1] / "src" / "api"
     ].__str__()
     # __path__ must be a list of strings for the import machinery
-    _api_src = str(
-        __import__("pathlib").Path(__file__).resolve().parents[1] / "src" / "api"
-    )
+    _api_src = str(__import__("pathlib").Path(__file__).resolve().parents[1] / "src" / "api")
     sys.modules["api"].__path__ = [_api_src]  # type: ignore[attr-defined]
 
-from api.settings import Settings, clear_settings_cache  # noqa: E402
 from api.lti.storage import RedisLaunchDataStorage  # noqa: E402
+from api.settings import Settings, clear_settings_cache  # noqa: E402
 
-TEST_DATABASE_URL = (
-    "postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_test"
-)
+TEST_DATABASE_URL = "postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_test"
 
 
 # ---------------------------------------------------------------------------
@@ -119,9 +112,7 @@ async def async_session(async_engine: AsyncEngine) -> AsyncGenerator[AsyncSessio
 async def session_factory(
     async_engine: AsyncEngine,
 ) -> async_sessionmaker[AsyncSession]:
-    return async_sessionmaker(
-        async_engine, class_=AsyncSession, expire_on_commit=False
-    )
+    return async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
 
 
 # ---------------------------------------------------------------------------
@@ -152,13 +143,12 @@ def _build_test_app(
     storage: RedisLaunchDataStorage,
 ):
     """Build a FastAPI app with patched singletons (no real lifespan)."""
-    from fastapi import FastAPI
-
-    from api.database import _engine, _session_factory  # noqa: F401
     import api.database as db_mod
     import api.lti.routes as lti_routes_mod
+    from api.database import _engine, _session_factory  # noqa: F401
     from api.frontend_routes import router as frontend_router
     from api.lti.routes import router as lti_router
+    from fastapi import FastAPI
 
     # Patch module-level singletons
     db_mod._engine = engine
@@ -190,12 +180,12 @@ async def app(
     session_factory: async_sessionmaker[AsyncSession],
     lti_storage: RedisLaunchDataStorage,
 ) -> AsyncGenerator:
-    with patch("api.settings.get_settings", return_value=test_settings), \
-         patch("api.auth.get_settings", return_value=test_settings), \
-         patch("api.lti.routes.get_settings", return_value=test_settings):
-        test_app = _build_test_app(
-            test_settings, async_engine, session_factory, lti_storage
-        )
+    with (
+        patch("api.settings.get_settings", return_value=test_settings),
+        patch("api.auth.get_settings", return_value=test_settings),
+        patch("api.lti.routes.get_settings", return_value=test_settings),
+    ):
+        test_app = _build_test_app(test_settings, async_engine, session_factory, lti_storage)
         yield test_app
     clear_settings_cache()
 
@@ -221,12 +211,12 @@ async def app_auth(
     session_factory: async_sessionmaker[AsyncSession],
     lti_storage: RedisLaunchDataStorage,
 ) -> AsyncGenerator:
-    with patch("api.settings.get_settings", return_value=test_settings_auth), \
-         patch("api.auth.get_settings", return_value=test_settings_auth), \
-         patch("api.lti.routes.get_settings", return_value=test_settings_auth):
-        test_app = _build_test_app(
-            test_settings_auth, async_engine, session_factory, lti_storage
-        )
+    with (
+        patch("api.settings.get_settings", return_value=test_settings_auth),
+        patch("api.auth.get_settings", return_value=test_settings_auth),
+        patch("api.lti.routes.get_settings", return_value=test_settings_auth),
+    ):
+        test_app = _build_test_app(test_settings_auth, async_engine, session_factory, lti_storage)
         yield test_app
     clear_settings_cache()
 

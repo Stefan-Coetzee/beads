@@ -5,10 +5,9 @@ Pytest configuration and fixtures for the Learning Task Tracker tests.
 from collections.abc import AsyncGenerator
 
 import pytest_asyncio
+from ltt.models.base import Base
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-
-from ltt.models.base import Base
 
 # Test database URL
 TEST_DATABASE_URL = "postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_test"

@@ -38,10 +38,6 @@ from .context import TaskContext
 # Conversation
 from .conversation_thread import ConversationThread
 
-# LTI
-from .lti_launch import LTILaunch
-from .lti_mapping import LTIUserMapping
-
 # Dependency
 from .dependency import (
     Dependency,
@@ -87,6 +83,10 @@ from .learning import (
     LearningObjectiveModel,
     ObjectiveTaxonomy,
 )
+
+# LTI
+from .lti_launch import LTILaunch
+from .lti_mapping import LTIUserMapping
 
 # Status Summary
 from .status_summary import (

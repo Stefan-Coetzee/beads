@@ -7,11 +7,9 @@ These tests verify:
 3. State management
 """
 
-import pytest
-
 from agent.config import Config, LearnerSimulatorConfig, ModelConfig
 from learner_sim.prompts import LEARNER_GREETING, build_learner_prompt
-from learner_sim.simulator import LearnerSimulator, LearnerState, create_learner_graph
+from learner_sim.simulator import LearnerState, create_learner_graph
 
 
 class TestLearnerPrompts:

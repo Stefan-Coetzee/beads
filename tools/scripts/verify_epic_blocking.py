@@ -8,10 +8,9 @@ This script tests the fix for the issue where tasks under a blocked epic
 import asyncio
 import os
 
+from ltt.services.dependency_service import get_ready_work
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-
-from ltt.services.dependency_service import get_ready_work
 
 
 async def verify_epic_blocking():

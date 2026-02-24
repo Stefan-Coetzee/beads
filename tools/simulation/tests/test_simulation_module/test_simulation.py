@@ -9,12 +9,10 @@ These tests verify:
 
 import json
 import tempfile
-from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from agent.config import Config, ModelConfig, SimulationConfig
 from api.client import AgentClient, ChatResponse
 from simulation.runner import ConversationLog, ConversationRunner, ConversationTurn
@@ -110,11 +108,13 @@ class TestConversationLog:
 def mock_api_client():
     """Create a mock AgentClient for testing."""
     client = MagicMock(spec=AgentClient)
-    client.chat = AsyncMock(return_value=ChatResponse(
-        response="Hello, how can I help you?",
-        thread_id="thread-123",
-        tool_calls=[],
-    ))
+    client.chat = AsyncMock(
+        return_value=ChatResponse(
+            response="Hello, how can I help you?",
+            thread_id="thread-123",
+            tool_calls=[],
+        )
+    )
     client.health_check = AsyncMock(return_value=True)
     return client
 

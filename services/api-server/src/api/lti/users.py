@@ -8,22 +8,20 @@ Creates new learner records on first LTI launch.
 from __future__ import annotations
 
 import json
-from typing import Optional
-
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from ltt.models.learner import LearnerModel
 from ltt.models.lti_mapping import LTIUserMapping
 from ltt.utils.ids import generate_entity_id
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def get_or_create_lti_learner(
     session: AsyncSession,
     lti_sub: str,
     lti_iss: str,
-    name: Optional[str] = None,
-    email: Optional[str] = None,
+    name: str | None = None,
+    email: str | None = None,
 ) -> str:
     """
     Map an LTI user to an LTT learner_id.
@@ -59,13 +57,15 @@ async def get_or_create_lti_learner(
     # First launch: create learner + mapping
     learner_id = generate_entity_id("learner")
 
-    metadata = json.dumps({
-        "name": name or "",
-        "email": email or "",
-        "lti_sub": lti_sub,
-        "lti_iss": lti_iss,
-        "source": "lti",
-    })
+    metadata = json.dumps(
+        {
+            "name": name or "",
+            "email": email or "",
+            "lti_sub": lti_sub,
+            "lti_iss": lti_iss,
+            "source": "lti",
+        }
+    )
 
     learner = LearnerModel(id=learner_id, learner_metadata=metadata)
     session.add(learner)
@@ -88,7 +88,7 @@ async def get_learner_by_lti(
     session: AsyncSession,
     lti_sub: str,
     lti_iss: str,
-) -> Optional[str]:
+) -> str | None:
     """Look up learner_id by LTI identity. Returns None if not found."""
     result = await session.execute(
         select(LTIUserMapping.learner_id).where(

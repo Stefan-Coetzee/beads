@@ -2,7 +2,6 @@
 
 
 class TestDebugContext:
-
     async def test_returns_launch_data(self, client, seed_launch):
         """GET /lti/debug/context returns stored launch data."""
         launch_id = seed_launch(
@@ -35,7 +34,6 @@ class TestDebugContext:
 
 
 class TestDebugHealth:
-
     async def test_health_checks_redis(self, client):
         """Health check reports Redis status."""
         resp = await client.get("/lti/debug/health")

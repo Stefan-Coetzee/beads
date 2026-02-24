@@ -23,7 +23,7 @@ class ProjectContext(BaseModel):
     description: str | None = None
     narrative_context: str | None = None
     workspace_type: str | None = None  # sql, python, cybersecurity
-    tutor_persona: str | None = None   # Custom persona from project JSON
+    tutor_persona: str | None = None  # Custom persona from project JSON
 
 
 class EpicContext(BaseModel):

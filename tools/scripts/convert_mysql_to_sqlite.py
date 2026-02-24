@@ -10,7 +10,7 @@ from pathlib import Path
 def convert_mysql_to_sqlite(mysql_file: Path, output_file: Path):
     """Convert MySQL dump to SQLite-compatible SQL."""
 
-    with open(mysql_file, "r", encoding="utf-8") as f:
+    with open(mysql_file, encoding="utf-8") as f:
         content = f.read()
 
     sqlite_statements = []
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS column_legend (
         while i < len(values_str):
             char = values_str[i]
 
-            if char == "'" and (i == 0 or values_str[i-1] != "\\"):
+            if char == "'" and (i == 0 or values_str[i - 1] != "\\"):
                 in_string = not in_string
                 current_value += char
             elif char == "(" and not in_string:
@@ -172,7 +172,7 @@ CREATE TABLE IF NOT EXISTS column_legend (
         # Process in batches to avoid huge statements
         batch_size = 500
         for batch_start in range(0, len(rows), batch_size):
-            batch = rows[batch_start:batch_start + batch_size]
+            batch = rows[batch_start : batch_start + batch_size]
 
             # Build value strings, escaping single quotes properly
             value_strs = []
@@ -186,8 +186,8 @@ CREATE TABLE IF NOT EXISTS column_legend (
                         # Replace any unescaped single quotes with escaped ones
                         # First, un-escape MySQL's escaped quotes, then re-escape for SQLite
                         inner = inner.replace("\\'", "'")  # MySQL escape
-                        inner = inner.replace("''", "'")   # SQL standard escape
-                        inner = inner.replace("'", "''")   # SQLite escape
+                        inner = inner.replace("''", "'")  # SQL standard escape
+                        inner = inner.replace("'", "''")  # SQLite escape
                         escaped_values.append(f"'{inner}'")
                     else:
                         escaped_values.append(val)

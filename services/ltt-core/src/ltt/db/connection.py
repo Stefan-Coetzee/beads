@@ -117,6 +117,7 @@ async def close_engine() -> None:
 # For Testing / Reconfiguration
 # =============================================================================
 
+
 def reset_engine() -> None:
     """Reset engine (for testing). Creates fresh engine on next access."""
     global _engine, _session_factory

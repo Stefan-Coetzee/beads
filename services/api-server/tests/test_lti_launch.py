@@ -5,15 +5,14 @@ of the launch handler (user mapping, Redis storage, redirect generation).
 """
 
 import re
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
+from ltt.models.learner import LearnerModel
+from ltt.models.lti_launch import LTILaunch
+from ltt.models.lti_mapping import LTIUserMapping
+from ltt.utils.ids import generate_entity_id
 from sqlalchemy import select
 from starlette.responses import RedirectResponse
-
-from ltt.models.lti_mapping import LTIUserMapping
-from ltt.models.lti_launch import LTILaunch
-from ltt.models.learner import LearnerModel
-from ltt.utils.ids import generate_entity_id
 
 
 def _mock_launch_data(
@@ -36,7 +35,8 @@ def _mock_launch_data(
         "sub": sub,
         "iss": iss,
         "https://purl.imsglobal.org/spec/lti/claim/custom": custom,
-        "https://purl.imsglobal.org/spec/lti/claim/roles": roles or [
+        "https://purl.imsglobal.org/spec/lti/claim/roles": roles
+        or [
             "http://purl.imsglobal.org/vocab/lis/v2/membership#Learner",
         ],
         "https://purl.imsglobal.org/spec/lti/claim/context": {
@@ -57,7 +57,6 @@ def _mock_launch_data(
 
 
 class TestLtiLogin:
-
     async def test_login_post_redirects(self, client):
         """POST /lti/login with valid params returns a redirect."""
         with patch("api.lti.routes.FastAPIOIDCLogin") as MockOIDCLogin:
@@ -79,8 +78,7 @@ class TestLtiLogin:
 
     async def test_login_missing_target_link_uri(self, client):
         """POST /lti/login without target_link_uri returns 400."""
-        with patch("api.lti.routes.FastAPIOIDCLogin") as MockOIDCLogin:
-            mock_instance = MockOIDCLogin.return_value
+        with patch("api.lti.routes.FastAPIOIDCLogin"):
             # Simulate OIDCLogin processing with missing target_link_uri
             resp = await client.post(
                 "/lti/login",
@@ -108,10 +106,7 @@ class TestLtiLogin:
 
 
 class TestLtiLaunch:
-
-    async def test_launch_creates_learner_and_redirects(
-        self, client, async_session, lti_storage
-    ):
+    async def test_launch_creates_learner_and_redirects(self, client, async_session, lti_storage):
         """Successful launch creates learner, stores Redis, redirects."""
         with patch("api.lti.routes.FastAPIMessageLaunch") as MockLaunch:
             mock = MockLaunch.return_value
@@ -140,9 +135,7 @@ class TestLtiLaunch:
 
         # Verify learner mapping in DB
         result = await async_session.execute(
-            select(LTIUserMapping).where(
-                LTIUserMapping.lti_sub == "platform-user-42"
-            )
+            select(LTIUserMapping).where(LTIUserMapping.lti_sub == "platform-user-42")
         )
         mapping = result.scalar_one_or_none()
         assert mapping is not None
@@ -174,19 +167,19 @@ class TestLtiLaunch:
             )
         assert "instructor=1" in resp.headers["location"]
 
-    async def test_launch_existing_learner_reuses_mapping(
-        self, client, async_session
-    ):
+    async def test_launch_existing_learner_reuses_mapping(self, client, async_session):
         """Second launch for same sub+iss reuses the same learner_id."""
         learner_id = "learner-existing-001"
         async_session.add(LearnerModel(id=learner_id, learner_metadata="{}"))
-        async_session.add(LTIUserMapping(
-            id=generate_entity_id("lti"),
-            lti_sub="returning-user",
-            lti_iss="https://imbizo.alx-ai-tools.com",
-            learner_id=learner_id,
-            name="Old Name",
-        ))
+        async_session.add(
+            LTIUserMapping(
+                id=generate_entity_id("lti"),
+                lti_sub="returning-user",
+                lti_iss="https://imbizo.alx-ai-tools.com",
+                learner_id=learner_id,
+                name="Old Name",
+            )
+        )
         await async_session.commit()
 
         with patch("api.lti.routes.FastAPIMessageLaunch") as MockLaunch:
@@ -209,9 +202,7 @@ class TestLtiLaunch:
         assert resp.status_code == 302
         assert f"learnerId={learner_id}" in resp.headers["location"]
 
-    async def test_launch_persists_lti_launch_record(
-        self, client, async_session, lti_storage
-    ):
+    async def test_launch_persists_lti_launch_record(self, client, async_session, lti_storage):
         """Launch persists an LTILaunch record in DB for grade passback."""
         with patch("api.lti.routes.FastAPIMessageLaunch") as MockLaunch:
             mock = MockLaunch.return_value

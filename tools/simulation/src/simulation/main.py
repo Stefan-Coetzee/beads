@@ -9,9 +9,9 @@ Usage:
 import asyncio
 
 import typer
+from agent.config import Config, LearnerSimulatorConfig, ModelConfig, SimulationConfig
 from rich.console import Console
 
-from agent.config import Config, LearnerSimulatorConfig, ModelConfig, SimulationConfig
 from simulation.runner import run_simulation
 
 app = typer.Typer(
@@ -38,7 +38,9 @@ async def create_learner() -> str:
 
 @app.command()
 def run(
-    learner_id: str = typer.Option(None, "--learner-id", "-l", help="Learner ID (auto-creates if not provided)"),
+    learner_id: str = typer.Option(
+        None, "--learner-id", "-l", help="Learner ID (auto-creates if not provided)"
+    ),
     project_id: str = typer.Option(..., "--project-id", "-p", help="Project ID"),
     max_turns: int = typer.Option(30, "--max-turns", "-t", help="Maximum conversation turns"),
     comprehension: float = typer.Option(
@@ -122,9 +124,8 @@ def show_log(
     import json
     from pathlib import Path
 
-    from rich.panel import Panel
-
     from agent.config import get_config
+    from rich.panel import Panel
 
     # Try to find the log file
     log_path = Path(log_file)

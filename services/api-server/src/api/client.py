@@ -6,8 +6,8 @@ via HTTP instead of direct agent calls.
 """
 
 import json
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import AsyncGenerator
 
 import httpx
 

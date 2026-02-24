@@ -3,7 +3,6 @@ Tests for learning objectives service.
 """
 
 import pytest
-
 from ltt.models import BloomLevel, ObjectiveTaxonomy, TaskCreate, TaskType
 from ltt.services.learning import (
     LearningObjectiveNotFoundError,

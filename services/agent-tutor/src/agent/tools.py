@@ -5,10 +5,9 @@ These tools wrap the LTT tools module to work with LangGraph's tool calling.
 Each tool is async and requires a database session and learner_id from context.
 """
 
-from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
+from collections.abc import Callable
 
+from langchain_core.tools import StructuredTool
 from ltt.tools import (
     GetCommentsInput,
     GetContextInput,
@@ -26,6 +25,8 @@ from ltt.tools import go_back as ltt_go_back
 from ltt.tools import request_help as ltt_request_help
 from ltt.tools import start_task as ltt_start_task
 from ltt.tools import submit as ltt_submit
+from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # =============================================================================
 # Tool Input Schemas (simplified for LLM)
@@ -97,9 +98,6 @@ class RequestHelpToolInput(BaseModel):
 # =============================================================================
 
 
-from typing import Callable
-
-
 def create_tools(
     session_factory: Callable[[], AsyncSession],
     learner_id: str,
@@ -163,7 +161,9 @@ def create_tools(
         Submission types: code, sql, text, jupyter_cell, result_set
         """
         async with session_factory() as session:
-            input_data = SubmitInput(task_id=task_id, content=content, submission_type=submission_type)
+            input_data = SubmitInput(
+                task_id=task_id, content=content, submission_type=submission_type
+            )
             result = await ltt_submit(input=input_data, learner_id=learner_id, session=session)
             return result.model_dump_json(indent=2)
 
@@ -186,7 +186,9 @@ def create_tools(
         """
         async with session_factory() as session:
             input_data = GetCommentsInput(task_id=task_id, limit=limit)
-            result = await ltt_get_comments(input=input_data, learner_id=learner_id, session=session)
+            result = await ltt_get_comments(
+                input=input_data, learner_id=learner_id, session=session
+            )
             return result.model_dump_json(indent=2)
 
     async def go_back(task_id: str, reason: str) -> str:
@@ -208,7 +210,9 @@ def create_tools(
         """
         async with session_factory() as session:
             input_data = RequestHelpInput(task_id=task_id, message=message)
-            result = await ltt_request_help(input=input_data, learner_id=learner_id, session=session)
+            result = await ltt_request_help(
+                input=input_data, learner_id=learner_id, session=session
+            )
             return result.model_dump_json(indent=2)
 
     async def get_stack() -> str:

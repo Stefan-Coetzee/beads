@@ -15,13 +15,13 @@ import asyncio
 
 import typer
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from ltt.db.connection import get_session_factory
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt
 
 from agent.graph import create_agent
-from ltt.db.connection import get_session_factory
 
 app = typer.Typer(
     name="agent",

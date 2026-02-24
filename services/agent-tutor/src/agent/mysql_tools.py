@@ -95,7 +95,8 @@ async def execute_readonly_query(query: str) -> dict[str, Any]:
                     "rows": [list(row) for row in rows],
                     "row_count": len(rows),
                     "truncated": truncated,
-                    "message": f"Query returned {len(rows)} rows" + (" (truncated to 100)" if truncated else ""),
+                    "message": f"Query returned {len(rows)} rows"
+                    + (" (truncated to 100)" if truncated else ""),
                 }
         finally:
             conn.close()

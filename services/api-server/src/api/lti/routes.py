@@ -38,9 +38,7 @@ def init_lti_storage(redis_url: str = "redis://localhost:6379/0") -> None:
 def get_launch_data_storage() -> RedisLaunchDataStorage:
     """Get the launch data storage singleton."""
     if _launch_data_storage is None:
-        raise RuntimeError(
-            "LTI storage not initialized. Set LTT_REDIS_URL env var and restart."
-        )
+        raise RuntimeError("LTI storage not initialized. Set LTT_REDIS_URL env var and restart.")
     return _launch_data_storage
 
 
@@ -131,9 +129,7 @@ async def lti_launch(request: Request):
     iss = launch_data.get("iss")
 
     # Extract context (needed before name/email fallback)
-    custom = launch_data.get(
-        "https://purl.imsglobal.org/spec/lti/claim/custom", {}
-    )
+    custom = launch_data.get("https://purl.imsglobal.org/spec/lti/claim/custom", {})
 
     # name/email: standard JWT claims, falling back to custom param substitution.
     # Filter out un-substituted LTI variable references (e.g. "$Person.name.full")
@@ -150,13 +146,19 @@ async def lti_launch(request: Request):
     if (not name or not email) and message_launch.has_nrps():
         try:
             import asyncio
+
             nrps = message_launch.get_nrps()
             members = await asyncio.to_thread(nrps.get_members)
             for member in members:
                 if member.get("user_id") == sub:
-                    name = name or _resolved(member.get("name")) or " ".join(
-                        filter(None, [member.get("given_name"), member.get("family_name")])
-                    ) or None
+                    name = (
+                        name
+                        or _resolved(member.get("name"))
+                        or " ".join(
+                            filter(None, [member.get("given_name"), member.get("family_name")])
+                        )
+                        or None
+                    )
                     email = email or _resolved(member.get("email"))
                     logger.info("NRPS resolved name=%s email=%s for sub=%s", name, email, sub)
                     break
@@ -181,20 +183,25 @@ async def lti_launch(request: Request):
 
     # Persist active launch for grade passback to DB (survives Redis expiry/restart)
     import json as _json
+
     from ltt.models.lti_launch import LTILaunch
-    from ltt.utils.ids import generate_entity_id
-    ags_claim_for_persist = launch_data.get("https://purl.imsglobal.org/spec/lti-ags/claim/endpoint", {})
+
+    ags_claim_for_persist = launch_data.get(
+        "https://purl.imsglobal.org/spec/lti-ags/claim/endpoint", {}
+    )
     async with get_session() as session:
         existing = await session.get(LTILaunch, launch_id)
         if not existing:
-            session.add(LTILaunch(
-                id=launch_id,
-                learner_id=learner_id,
-                project_id=project_id,
-                lti_sub=sub,
-                ags_lineitems=ags_claim_for_persist.get("lineitems"),
-                ags_scope=_json.dumps(ags_claim_for_persist.get("scope", [])),
-            ))
+            session.add(
+                LTILaunch(
+                    id=launch_id,
+                    learner_id=learner_id,
+                    project_id=project_id,
+                    lti_sub=sub,
+                    ags_lineitems=ags_claim_for_persist.get("lineitems"),
+                    ags_scope=_json.dumps(ags_claim_for_persist.get("scope", [])),
+                )
+            )
             await session.commit()
 
     # Also cache in Redis for fast lookup (2h hot cache)
@@ -217,8 +224,12 @@ async def lti_launch(request: Request):
             "workspace_type": workspace_type,
             "roles": launch_data.get("https://purl.imsglobal.org/spec/lti/claim/roles", []),
             "context": launch_data.get("https://purl.imsglobal.org/spec/lti/claim/context", {}),
-            "resource_link": launch_data.get("https://purl.imsglobal.org/spec/lti/claim/resource_link", {}),
-            "tool_platform": launch_data.get("https://purl.imsglobal.org/spec/lti/claim/tool_platform", {}),
+            "resource_link": launch_data.get(
+                "https://purl.imsglobal.org/spec/lti/claim/resource_link", {}
+            ),
+            "tool_platform": launch_data.get(
+                "https://purl.imsglobal.org/spec/lti/claim/tool_platform", {}
+            ),
             "ags": launch_data.get("https://purl.imsglobal.org/spec/lti-ags/claim/endpoint", {}),
             "custom": custom,
             "all_keys": list(launch_data.keys()),
@@ -248,16 +259,27 @@ async def lti_launch(request: Request):
         "  Custom params: %s\n"
         "  All keys:      %s\n"
         "======================",
-        sub, iss, email, name,
+        sub,
+        iss,
+        email,
+        name,
         learner_id,
-        project_id, workspace_type,
+        project_id,
+        workspace_type,
         launch_id,
         roles_claim,
-        context_claim.get("id"), context_claim.get("label"), context_claim.get("title"),
-        resource_link.get("id"), resource_link.get("title"),
-        lis_claim.get("person_sourcedid"), lis_claim.get("course_section_sourcedid"),
-        tool_platform.get("guid"), tool_platform.get("name"), tool_platform.get("version"),
-        ags_claim.get("lineitems"), ags_claim.get("scope"),
+        context_claim.get("id"),
+        context_claim.get("label"),
+        context_claim.get("title"),
+        resource_link.get("id"),
+        resource_link.get("title"),
+        lis_claim.get("person_sourcedid"),
+        lis_claim.get("course_section_sourcedid"),
+        tool_platform.get("guid"),
+        tool_platform.get("name"),
+        tool_platform.get("version"),
+        ags_claim.get("lineitems"),
+        ags_claim.get("scope"),
         custom,
         list(launch_data.keys()),
     )
@@ -268,10 +290,7 @@ async def lti_launch(request: Request):
         "http://purl.imsglobal.org/vocab/lis/v2/membership#Administrator",
         "http://purl.imsglobal.org/vocab/lis/v2/institution/person#Administrator",
     )
-    is_instructor = any(
-        any(r.startswith(p) for p in instructor_role_prefixes)
-        for r in roles_claim
-    )
+    is_instructor = any(any(r.startswith(p) for p in instructor_role_prefixes) for r in roles_claim)
 
     # Build frontend URL with launch context
     settings = get_settings()
@@ -332,8 +351,10 @@ async def lti_debug_health(request: Request):
 
     # Database
     try:
-        from api.database import get_session
         from sqlalchemy import text
+
+        from api.database import get_session
+
         async with get_session() as session:
             await session.execute(text("SELECT 1"))
         checks["database"] = {"ok": True, "detail": "connected"}
@@ -360,24 +381,32 @@ async def lti_debug_health(request: Request):
                 checks["ags"] = {
                     "ok": bool(ags.get("lineitems")),
                     "detail": f"lineitems={'present' if ags.get('lineitems') else 'missing'}, "
-                              f"scopes={len(ags.get('scope', []))}",
+                    f"scopes={len(ags.get('scope', []))}",
                 }
-                has_nrps = "https://purl.imsglobal.org/spec/lti-nrps/claim/namesroleservice" in info.get("all_keys", [])
+                has_nrps = (
+                    "https://purl.imsglobal.org/spec/lti-nrps/claim/namesroleservice"
+                    in info.get("all_keys", [])
+                )
                 checks["nrps"] = {
                     "ok": has_nrps,
-                    "detail": "claim present in JWT" if has_nrps else "not in JWT — enable NRPS in Studio",
+                    "detail": "claim present in JWT"
+                    if has_nrps
+                    else "not in JWT — enable NRPS in Studio",
                 }
                 has_pii = bool(info.get("name")) or bool(info.get("email"))
                 checks["pii"] = {
                     "ok": has_pii,
                     "detail": (
                         f"name={'✓' if info.get('name') else '✗'}, email={'✓' if info.get('email') else '✗'}"
-                        if has_pii else
-                        "null — enable PII sharing flag in Django admin for this course"
+                        if has_pii
+                        else "null — enable PII sharing flag in Django admin for this course"
                     ),
                 }
             else:
-                checks["session"] = {"ok": False, "detail": f"launch_id={launch_id} not found in Redis (expired?)"}
+                checks["session"] = {
+                    "ok": False,
+                    "detail": f"launch_id={launch_id} not found in Redis (expired?)",
+                }
         except Exception as exc:
             checks["session"] = {"ok": False, "detail": str(exc)}
     else:
@@ -405,14 +434,17 @@ async def lti_debug_grade_test(request: Request):
     storage = get_launch_data_storage()
     info = storage.get_value(f"launch_info:{launch_id}")
     if not info:
-        return JSONResponse(content={"ok": False, "error": f"No launch data for launch_id={launch_id}"})
+        return JSONResponse(
+            content={"ok": False, "error": f"No launch data for launch_id={launch_id}"}
+        )
 
     sub = info.get("sub")
     if not sub:
         return JSONResponse(content={"ok": False, "error": "No sub in launch data"})
 
-    from .grades import send_grade
     import asyncio
+
+    from .grades import send_grade
 
     ok = await asyncio.to_thread(
         send_grade,
@@ -442,9 +474,10 @@ async def dev_login(request: Request):
     """
     from uuid import uuid4
 
-    from api.database import get_session_factory
     from ltt.models.learner import LearnerModel
     from sqlalchemy import select
+
+    from api.database import get_session_factory
 
     settings = get_settings()
     if settings.auth_enabled:
@@ -466,19 +499,21 @@ async def dev_login(request: Request):
     # Ensure learner exists in DB
     session_factory = get_session_factory()
     async with session_factory() as session:
-        result = await session.execute(
-            select(LearnerModel).where(LearnerModel.id == learner_id)
-        )
+        result = await session.execute(select(LearnerModel).where(LearnerModel.id == learner_id))
         if not result.scalar_one_or_none():
             import json as _json
 
-            session.add(LearnerModel(
-                id=learner_id,
-                learner_metadata=_json.dumps({
-                    "name": "Dev User",
-                    "source": "dev_login",
-                }),
-            ))
+            session.add(
+                LearnerModel(
+                    id=learner_id,
+                    learner_metadata=_json.dumps(
+                        {
+                            "name": "Dev User",
+                            "source": "dev_login",
+                        }
+                    ),
+                )
+            )
             await session.commit()
 
     # Create fake launch in Redis (24h TTL for dev convenience)
@@ -503,11 +538,13 @@ async def dev_login(request: Request):
         exp=86400,
     )
 
-    return JSONResponse(content={
-        "launch_id": launch_id,
-        "learner_id": learner_id,
-        "project_id": project_id,
-    })
+    return JSONResponse(
+        content={
+            "launch_id": launch_id,
+            "learner_id": learner_id,
+            "project_id": project_id,
+        }
+    )
 
 
 @router.post("/dev/logout")
@@ -555,9 +592,7 @@ def _handle_deep_link(message_launch, launch_data: dict):
 
     resource = DeepLinkResource()
     resource.set_url(
-        launch_data.get(
-            "https://purl.imsglobal.org/spec/lti/claim/target_link_uri", ""
-        )
+        launch_data.get("https://purl.imsglobal.org/spec/lti/claim/target_link_uri", "")
     )
     resource.set_custom_params({"project_id": "proj-9b46"})
     resource.set_title("Maji Ndogo Water Analysis")

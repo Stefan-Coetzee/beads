@@ -3,7 +3,6 @@ Tests for control tools (go_back, request_help).
 """
 
 import pytest
-
 from ltt.models import LearnerModel, TaskCreate, TaskStatus, TaskType
 from ltt.services.progress_service import update_status
 from ltt.services.task_service import create_task

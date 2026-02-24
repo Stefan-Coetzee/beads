@@ -3,7 +3,6 @@ Tests for feedback tools (add_comment, get_comments).
 """
 
 import pytest
-
 from ltt.models import LearnerModel, TaskCreate, TaskType
 from ltt.services.task_service import create_task
 from ltt.tools.feedback import add_comment, get_comments

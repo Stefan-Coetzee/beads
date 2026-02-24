@@ -5,7 +5,6 @@ Tests for export service.
 import json
 
 import pytest
-
 from ltt.models import BloomLevel, DependencyType, TaskCreate, TaskType
 from ltt.services.dependency_service import add_dependency
 from ltt.services.export import export_project

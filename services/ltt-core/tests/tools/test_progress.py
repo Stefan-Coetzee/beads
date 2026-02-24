@@ -3,7 +3,6 @@ Tests for progress tools (start_task, submit).
 """
 
 import pytest
-
 from ltt.models import (
     DependencyType,
     LearnerModel,
@@ -375,8 +374,11 @@ async def test_submit_increments_attempt_number(async_session):
     )
 
     # Reopen task using go_back (task is now closed after first submit)
-    from ltt.tools.control import go_back, GoBackInput
-    await go_back(GoBackInput(task_id=task.id, reason="Need to resubmit"), learner_id, async_session)
+    from ltt.tools.control import GoBackInput, go_back
+
+    await go_back(
+        GoBackInput(task_id=task.id, reason="Need to resubmit"), learner_id, async_session
+    )
 
     # Start task again
     await start_task(StartTaskInput(task_id=task.id), learner_id, async_session)

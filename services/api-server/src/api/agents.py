@@ -17,11 +17,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from langgraph.checkpoint.memory import MemorySaver
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
-
-from agent.graph import create_agent, AgentWrapper
 from agent.config import get_config
+from agent.graph import AgentWrapper, create_agent
+from langgraph.checkpoint.memory import MemorySaver
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
 from api.settings import get_settings
 
 if TYPE_CHECKING:
@@ -50,8 +50,8 @@ async def init_checkpointer() -> None:
     settings = get_settings()
 
     if settings.checkpoint_database_url:
-        from psycopg_pool import AsyncConnectionPool
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+        from psycopg_pool import AsyncConnectionPool
 
         try:
             _checkpoint_pool = AsyncConnectionPool(
@@ -111,9 +111,7 @@ def get_checkpointer() -> BaseCheckpointSaver:
     in normal FastAPI flow since lifespan runs first).
     """
     if _checkpointer is None:
-        raise RuntimeError(
-            "Checkpointer not initialised. Call init_checkpointer() first."
-        )
+        raise RuntimeError("Checkpointer not initialised. Call init_checkpointer() first.")
     return _checkpointer
 
 

@@ -13,7 +13,7 @@ mapping layer so we can answer questions like:
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -26,14 +26,10 @@ class ConversationThread(Base):
     __tablename__ = "conversation_threads"
 
     thread_id: Mapped[str] = mapped_column(String, primary_key=True)
-    learner_id: Mapped[str] = mapped_column(
-        String, ForeignKey("learners.id"), nullable=False
-    )
+    learner_id: Mapped[str] = mapped_column(String, ForeignKey("learners.id"), nullable=False)
     project_id: Mapped[str] = mapped_column(String, nullable=False)
     active_task_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

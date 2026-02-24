@@ -68,7 +68,6 @@ class TestDbInit:
     def test_db_init_failure_shows_error(self, mock_run, capsys):
         """Test that failed db init shows error message."""
         from click.exceptions import Exit
-
         from ltt.cli.main import db_init
 
         mock_run.return_value = MagicMock(

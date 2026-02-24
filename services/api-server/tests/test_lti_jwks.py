@@ -2,7 +2,6 @@
 
 
 class TestLtiJwks:
-
     async def test_jwks_returns_key_set(self, client):
         """JWKS endpoint returns JSON with 'keys' array."""
         resp = await client.get("/lti/jwks")

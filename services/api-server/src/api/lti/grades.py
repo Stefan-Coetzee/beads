@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import Optional
 
 from pylti1p3.grade import Grade
 from pylti1p3.lineitem import LineItem
@@ -29,7 +28,7 @@ def send_grade(
     max_score: float,
     activity_progress: str = "Completed",
     grading_progress: str = "FullyGraded",
-    comment: Optional[str] = None,
+    comment: str | None = None,
 ) -> bool:
     """
     Send a grade to the LMS via AGS.
@@ -39,9 +38,7 @@ def send_grade(
     tool_conf = get_tool_config()
 
     # Reconstruct message launch from cache
-    dummy_request = FastAPIRequest(
-        cookies={}, session={}, request_data={}, request_is_secure=True
-    )
+    dummy_request = FastAPIRequest(cookies={}, session={}, request_data={}, request_is_secure=True)
 
     try:
         message_launch = FastAPIMessageLaunch.from_cache(
@@ -62,9 +59,7 @@ def send_grade(
 
     # Get resource_link_id from cached launch data
     launch_data = message_launch.get_launch_data()
-    resource_link = launch_data.get(
-        "https://purl.imsglobal.org/spec/lti/claim/resource_link", {}
-    )
+    resource_link = launch_data.get("https://purl.imsglobal.org/spec/lti/claim/resource_link", {})
 
     # Build grade
     grade = Grade()
@@ -90,7 +85,10 @@ def send_grade(
         ags.put_grade(grade, line_item)
         logger.info(
             "Grade sent: %s/%s for sub=%s launch=%s",
-            score, max_score, learner_sub, launch_id,
+            score,
+            max_score,
+            learner_sub,
+            launch_id,
         )
         return True
     except Exception as e:
@@ -103,7 +101,7 @@ def maybe_send_grade(
     project_id: str,
     completed: int,
     total: int,
-    storage: Optional[RedisLaunchDataStorage] = None,
+    storage: RedisLaunchDataStorage | None = None,
 ) -> bool:
     """
     Send grade if this learner has an active LTI session.
@@ -132,5 +130,7 @@ def maybe_send_grade(
         max_score=float(total),
         activity_progress="Completed" if completed == total else "InProgress",
         grading_progress="FullyGraded" if completed == total else "Pending",
-        comment=f"Completed {completed}/{total} tasks ({completed / total * 100:.0f}%)" if total > 0 else None,
+        comment=f"Completed {completed}/{total} tasks ({completed / total * 100:.0f}%)"
+        if total > 0
+        else None,
     )

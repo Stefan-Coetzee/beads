@@ -5,8 +5,8 @@ This module handles database initialization and cleanup within
 the FastAPI event loop, ensuring connection pooling works correctly.
 """
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,

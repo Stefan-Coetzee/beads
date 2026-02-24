@@ -60,7 +60,9 @@ async def start_task(
     if progress.status == TaskStatus.IN_PROGRESS.value:
         # Get learning objectives with Bloom levels
         objectives = await get_objectives(session, input.task_id)
-        objective_dicts = [{"level": obj.level, "description": obj.description} for obj in objectives]
+        objective_dicts = [
+            {"level": obj.level, "description": obj.description} for obj in objectives
+        ]
 
         context = StartTaskContextOutput(
             task_id=task.id,
@@ -196,9 +198,7 @@ async def submit(input: SubmitInput, learner_id: str, session: AsyncSession) -> 
             message = "Validation successful, task complete!"
 
             # Try to auto-close ancestors (parent task, epic, etc.)
-            auto_closed_ids = await try_auto_close_ancestors(
-                session, input.task_id, learner_id
-            )
+            auto_closed_ids = await try_auto_close_ancestors(session, input.task_id, learner_id)
 
             if auto_closed_ids:
                 # Fetch details for auto-closed tasks

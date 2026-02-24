@@ -13,6 +13,8 @@ Supports two modes:
 """
 
 import json
+from collections.abc import Callable
+from contextlib import asynccontextmanager
 from typing import Literal
 
 from langchain_anthropic import ChatAnthropic
@@ -22,6 +24,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
+
 # Note: create_react_agent will move to langchain.agents in LangGraph 2.0
 from langgraph.prebuilt import create_react_agent
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,7 +33,6 @@ from agent.config import Config, get_config
 from agent.prompts import build_system_prompt
 from agent.state import AgentState, EpicContext, LearnerProgress, ProjectContext, TaskContext
 from agent.tools import create_tools
-
 
 # =============================================================================
 # Model Creation
@@ -176,7 +178,9 @@ async def agent_node(
 
     system_prompt = build_system_prompt(
         project_id=state.project_id,
-        narrative_context=state.project_context.narrative_context if state.project_context else None,
+        narrative_context=state.project_context.narrative_context
+        if state.project_context
+        else None,
         project_description=state.project_context.description if state.project_context else None,
         current_epic=epic_dict,
         current_task=current_task_dict,
@@ -382,10 +386,6 @@ def create_custom_graph() -> StateGraph:
 # =============================================================================
 
 
-from typing import Callable
-from contextlib import asynccontextmanager
-
-
 def create_agent(
     learner_id: str,
     project_id: str,
@@ -519,8 +519,8 @@ class AgentWrapper:
                 project = await get_task(session, self.project_id)
                 if project:
                     # Get workspace_type and tutor_persona if available
-                    workspace_type = getattr(project, 'workspace_type', None)
-                    tutor_persona = getattr(project, 'tutor_persona', None)
+                    workspace_type = getattr(project, "workspace_type", None)
+                    tutor_persona = getattr(project, "tutor_persona", None)
 
                     self._project_context = ProjectContext(
                         project_id=project.id,
@@ -543,8 +543,8 @@ class AgentWrapper:
         """
         try:
             from ltt.models import TaskType
-            from ltt.services.task_service import get_children
             from ltt.services.progress_service import get_or_create_progress
+            from ltt.services.task_service import get_children
 
             async with self.session_factory() as session:
                 # Get all epics for this project
@@ -556,10 +556,12 @@ class AgentWrapper:
 
                 # Find epic with in-progress tasks first
                 for epic in epics:
-                    progress = await get_or_create_progress(
-                        session, epic.id, self.learner_id
+                    progress = await get_or_create_progress(session, epic.id, self.learner_id)
+                    status = (
+                        progress.status.value
+                        if hasattr(progress.status, "value")
+                        else progress.status
                     )
-                    status = progress.status.value if hasattr(progress.status, "value") else progress.status
                     if status == "in_progress":
                         self._current_epic = EpicContext(
                             epic_id=epic.id,
@@ -570,10 +572,12 @@ class AgentWrapper:
 
                 # Fall back to first open epic
                 for epic in epics:
-                    progress = await get_or_create_progress(
-                        session, epic.id, self.learner_id
+                    progress = await get_or_create_progress(session, epic.id, self.learner_id)
+                    status = (
+                        progress.status.value
+                        if hasattr(progress.status, "value")
+                        else progress.status
                     )
-                    status = progress.status.value if hasattr(progress.status, "value") else progress.status
                     if status in ("open", "in_progress"):
                         self._current_epic = EpicContext(
                             epic_id=epic.id,
@@ -765,6 +769,7 @@ async def create_agent_with_context(
 
     if session_factory is None:
         from ltt.db.connection import get_session_factory
+
         session_factory = get_session_factory()
 
     # Load project context from database
@@ -776,8 +781,8 @@ async def create_agent_with_context(
     current_epic_dict = None
 
     try:
-        from ltt.services.task_service import get_task, get_children
         from ltt.services.progress_service import get_or_create_progress
+        from ltt.services.task_service import get_children, get_task
 
         async with session_factory() as session:
             project = await get_task(session, project_id)
@@ -785,8 +790,8 @@ async def create_agent_with_context(
                 project_description = project.description
                 narrative_context = project.narrative_context
                 project_content = project.content
-                workspace_type = getattr(project, 'workspace_type', None)
-                tutor_persona = getattr(project, 'tutor_persona', None)
+                workspace_type = getattr(project, "workspace_type", None)
+                tutor_persona = getattr(project, "tutor_persona", None)
 
                 # Find current epic (in-progress or first open)
                 children = await get_children(session, project_id, recursive=False)
@@ -794,7 +799,11 @@ async def create_agent_with_context(
 
                 for epic in epics:
                     progress = await get_or_create_progress(session, epic.id, learner_id)
-                    status = progress.status.value if hasattr(progress.status, "value") else progress.status
+                    status = (
+                        progress.status.value
+                        if hasattr(progress.status, "value")
+                        else progress.status
+                    )
                     if status in ("in_progress", "open"):
                         current_epic_dict = {
                             "id": epic.id,
