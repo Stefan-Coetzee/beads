@@ -422,9 +422,7 @@ def db_ensure_databases():
         primary_db = parsed.path.lstrip("/")
         checkpoint_db = f"{primary_db}_checkpoints"
 
-        typer.echo(
-            f"Connecting to postgres admin DB as {parsed.username}@{parsed.hostname} ..."
-        )
+        typer.echo(f"Connecting to postgres admin DB as {parsed.username}@{parsed.hostname} ...")
 
         conn = await asyncpg.connect(
             host=parsed.hostname,

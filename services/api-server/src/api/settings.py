@@ -104,9 +104,7 @@ class Settings(BaseSettings):
                 )
 
             if not self.anthropic_api_key:
-                errors.append(
-                    f"LTT_ANTHROPIC_API_KEY is required in env={self.env!r}"
-                )
+                errors.append(f"LTT_ANTHROPIC_API_KEY is required in env={self.env!r}")
 
             if "localhost" in self.frontend_url or "127.0.0.1" in self.frontend_url:
                 errors.append(
@@ -138,8 +136,7 @@ class Settings(BaseSettings):
 
             if not self.lti_public_key.startswith("-----BEGIN"):
                 errors.append(
-                    "LTT_LTI_PUBLIC_KEY must be a PEM string in prod "
-                    "(inject via Secrets Manager)"
+                    "LTT_LTI_PUBLIC_KEY must be a PEM string in prod (inject via Secrets Manager)"
                 )
 
         if errors:
