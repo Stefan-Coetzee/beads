@@ -1,0 +1,129 @@
+name: Deploy
+
+# Two ways to trigger:
+#
+# 1. workflow_dispatch (recommended — easiest)
+#    Push the "Run workflow" button in the GitHub Actions UI, pick an
+#    environment, and this workflow builds + deploys from the current HEAD.
+#
+# 2. GitHub Deployment event (for external orchestration / GitHub Environments)
+#    gh api repos/{owner}/{repo}/deployments \
+#      -f ref=main -f environment=env-dev -f auto_merge=false \
+#      -F required_contexts='[]'
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+  deployment:
+
+jobs:
+  ##############################################################################
+  # Resolve environment name and commit SHA for both trigger types.
+  # deployment event: parse "env-dev" → "dev", use deployment.sha
+  # workflow_dispatch: use inputs.environment, use github.sha (HEAD)
+  ##############################################################################
+  setup:
+    name: Parse environment
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.event.deployment.environment, 'env-')
+    outputs:
+      env_short: ${{ steps.parse.outputs.name }}
+      sha: ${{ steps.parse.outputs.sha }}
+
+    steps:
+      - id: parse
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+            echo "sha=${{ github.sha }}"          >> "$GITHUB_OUTPUT"
+          else
+            ENV="${{ github.event.deployment.environment }}"
+            echo "name=${ENV#env-}"                        >> "$GITHUB_OUTPUT"
+            echo "sha=${{ github.event.deployment.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  ##############################################################################
+  # Build and push Docker images to ECR
+  ##############################################################################
+  build:
+    name: Build images
+    needs: setup
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+      ecr_backend: ${{ steps.ecr-login.outputs.registry }}/ltt-backend
+      ecr_frontend: ${{ steps.ecr-login.outputs.registry }}/ltt-frontend
+
+    steps:
+      # Check out the exact commit being deployed
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.setup.outputs.sha }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-arn: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Compute image tag
+        id: meta
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push backend
+        env:
+          IMAGE: ${{ steps.ecr-login.outputs.registry }}/ltt-backend
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          docker build -f Dockerfile.backend -t "$IMAGE:$TAG" .
+          docker push "$IMAGE:$TAG"
+
+      - name: Build and push frontend
+        env:
+          IMAGE: ${{ steps.ecr-login.outputs.registry }}/ltt-frontend
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          docker build -f apps/web/Dockerfile -t "$IMAGE:$TAG" apps/web/
+          docker push "$IMAGE:$TAG"
+
+  ##############################################################################
+  # Deploy to the target environment
+  # github_environment must match the GitHub environment name so that GitHub
+  # correctly tracks deployment status and enforces protection rules.
+  ##############################################################################
+  deploy:
+    name: Deploy ${{ needs.setup.outputs.env_short }}
+    needs: [setup, build]
+    uses: ./.github/workflows/deploy-env.yml
+    with:
+      environment: ${{ needs.setup.outputs.env_short }}
+      github_environment: ${{ github.event_name == 'workflow_dispatch' && format('env-{0}', inputs.environment) || github.event.deployment.environment }}
+      image_tag: ${{ needs.build.outputs.image_tag }}
+      ecr_backend: ${{ needs.build.outputs.ecr_backend }}
+      ecr_frontend: ${{ needs.build.outputs.ecr_frontend }}
+      ecs_cluster: ltt-${{ needs.setup.outputs.env_short }}
+      backend_service: ltt-${{ needs.setup.outputs.env_short }}-backend
+      frontend_service: ltt-${{ needs.setup.outputs.env_short }}-frontend
+      migrate_task_family: ltt-${{ needs.setup.outputs.env_short }}-migrate
+      private_subnets: ${{ needs.setup.outputs.env_short == 'prod' && vars.PROD_PRIVATE_SUBNETS || needs.setup.outputs.env_short == 'staging' && vars.STAGING_PRIVATE_SUBNETS || vars.DEV_PRIVATE_SUBNETS }}
+      ecs_security_group: ${{ needs.setup.outputs.env_short == 'prod' && vars.PROD_ECS_SG_ID || needs.setup.outputs.env_short == 'staging' && vars.STAGING_ECS_SG_ID || vars.DEV_ECS_SG_ID }}
+    secrets:
+      aws_role_arn: ${{ secrets.AWS_ROLE_ARN }}

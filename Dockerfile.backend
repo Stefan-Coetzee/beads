@@ -1,0 +1,42 @@
+FROM python:3.12-slim AS base
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+# Copy workspace root files for uv
+COPY pyproject.toml uv.lock ./
+
+# Copy services
+COPY services/ltt-core/ services/ltt-core/
+COPY services/api-server/ services/api-server/
+COPY services/agent-tutor/ services/agent-tutor/
+
+# Copy content (project JSON files) and Alembic config
+COPY content/ content/
+COPY alembic.ini ./
+
+# Install production dependencies only
+RUN uv sync --frozen --no-dev
+
+# LTI public key is safe to bake into the image.
+# Private key is injected at runtime via Secrets Manager (LTT_LTI_PRIVATE_KEY).
+COPY configs/lti/public.key configs/lti/public.key
+
+ENV PYTHONPATH=/app/services/ltt-core/src
+ENV PATH="/app/.venv/bin:$PATH"
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["uvicorn", "api.app:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--app-dir", "services/api-server/src", \
+     "--workers", "2"]

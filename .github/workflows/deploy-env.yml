@@ -1,0 +1,238 @@
+##############################################################################
+# deploy-env.yml — reusable deployment workflow for a single environment
+#
+# Steps:
+#   1. Tag new images with env prefix (dev-<sha>, staging-<sha>, prod-<sha>)
+#   2. Run Alembic migrations via ECS run-task (one-off container)
+#   3. Update backend ECS service (rolling deploy)
+#   4. Update frontend ECS service (rolling deploy)
+#   5. Wait for services to stabilise
+##############################################################################
+
+name: Deploy Environment
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "Short environment name used for ECS resource names (dev, staging, prod)"
+        required: true
+        type: string
+      github_environment:
+        description: "GitHub environment name for deployment status tracking (env-dev, env-staging, env-prod)"
+        required: true
+        type: string
+      image_tag:
+        description: "Git short SHA used as image tag suffix"
+        required: true
+        type: string
+      ecr_backend:
+        description: "ECR backend repository URL (without tag)"
+        required: true
+        type: string
+      ecr_frontend:
+        description: "ECR frontend repository URL (without tag)"
+        required: true
+        type: string
+      ecs_cluster:
+        description: "ECS cluster name"
+        required: true
+        type: string
+      backend_service:
+        description: "ECS backend service name"
+        required: true
+        type: string
+      frontend_service:
+        description: "ECS frontend service name"
+        required: true
+        type: string
+      migrate_task_family:
+        description: "Migration task definition family"
+        required: true
+        type: string
+      private_subnets:
+        description: "Comma-separated private subnet IDs for migration task"
+        required: true
+        type: string
+      ecs_security_group:
+        description: "Security group ID for migration task"
+        required: true
+        type: string
+    secrets:
+      aws_role_arn:
+        description: "IAM role ARN for AWS authentication"
+        required: true
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.github_environment }}
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      ENV: ${{ inputs.environment }}
+      TAG: ${{ inputs.environment }}-${{ inputs.image_tag }}
+      BACKEND_IMAGE: ${{ inputs.ecr_backend }}
+      FRONTEND_IMAGE: ${{ inputs.ecr_frontend }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-arn: ${{ secrets.aws_role_arn }}
+          aws-region: eu-west-1
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      ##########################################################################
+      # Tag images with environment prefix
+      # dev-abc1234, staging-abc1234, prod-abc1234 + {env}-latest
+      ##########################################################################
+      - name: Tag backend image
+        run: |
+          SOURCE="${BACKEND_IMAGE}:${{ inputs.image_tag }}"
+          docker pull "$SOURCE"
+          docker tag "$SOURCE" "${BACKEND_IMAGE}:${TAG}"
+          docker tag "$SOURCE" "${BACKEND_IMAGE}:${ENV}-latest"
+          docker push "${BACKEND_IMAGE}:${TAG}"
+          docker push "${BACKEND_IMAGE}:${ENV}-latest"
+
+      - name: Tag frontend image
+        run: |
+          SOURCE="${FRONTEND_IMAGE}:${{ inputs.image_tag }}"
+          docker pull "$SOURCE"
+          docker tag "$SOURCE" "${FRONTEND_IMAGE}:${TAG}"
+          docker tag "$SOURCE" "${FRONTEND_IMAGE}:${ENV}-latest"
+          docker push "${FRONTEND_IMAGE}:${TAG}"
+          docker push "${FRONTEND_IMAGE}:${ENV}-latest"
+
+      ##########################################################################
+      # Run Alembic migrations (one-off ECS task, must complete before deploy)
+      ##########################################################################
+      - name: Run database migrations
+        run: |
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition "${{ inputs.migrate_task_family }}" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "${{ inputs.ecs_cluster }}" \
+            --task-definition "$TASK_DEF" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={
+              subnets=[${{ inputs.private_subnets }}],
+              securityGroups=[${{ inputs.ecs_security_group }}],
+              assignPublicIp=DISABLED
+            }" \
+            --query 'tasks[0].taskArn' \
+            --output text)
+
+          echo "Migration task ARN: $TASK_ARN"
+
+          # Wait for migration task to finish (polls every 6s, timeout ~10 min)
+          aws ecs wait tasks-stopped \
+            --cluster "${{ inputs.ecs_cluster }}" \
+            --tasks "$TASK_ARN"
+
+          # Check exit code — fail the workflow if migration failed
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster "${{ inputs.ecs_cluster }}" \
+            --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "Migration failed with exit code $EXIT_CODE"
+            exit 1
+          fi
+
+          echo "Migrations completed successfully"
+
+      ##########################################################################
+      # Update ECS services (rolling deploy — keeps old tasks running until
+      # new tasks pass health checks)
+      ##########################################################################
+      - name: Register new backend task definition
+        id: backend-td
+        run: |
+          # Get current task definition and update the image
+          CURRENT=$(aws ecs describe-task-definition \
+            --task-definition "${{ inputs.ecs_cluster }}-backend" \
+            --query 'taskDefinition' \
+            --output json)
+
+          NEW_TD=$(echo "$CURRENT" | jq \
+            --arg IMAGE "${BACKEND_IMAGE}:${TAG}" \
+            '.containerDefinitions[0].image = $IMAGE
+            | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                  .placementConstraints, .compatibilities, .registeredAt, .registeredBy)')
+
+          ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TD" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          echo "arn=$ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Register new frontend task definition
+        id: frontend-td
+        run: |
+          CURRENT=$(aws ecs describe-task-definition \
+            --task-definition "${{ inputs.ecs_cluster }}-frontend" \
+            --query 'taskDefinition' \
+            --output json)
+
+          NEW_TD=$(echo "$CURRENT" | jq \
+            --arg IMAGE "${FRONTEND_IMAGE}:${TAG}" \
+            '.containerDefinitions[0].image = $IMAGE
+            | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                  .placementConstraints, .compatibilities, .registeredAt, .registeredBy)')
+
+          ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TD" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          echo "arn=$ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy backend service
+        run: |
+          aws ecs update-service \
+            --cluster "${{ inputs.ecs_cluster }}" \
+            --service "${{ inputs.backend_service }}" \
+            --task-definition "${{ steps.backend-td.outputs.arn }}" \
+            --force-new-deployment \
+            --no-cli-pager
+
+      - name: Deploy frontend service
+        run: |
+          aws ecs update-service \
+            --cluster "${{ inputs.ecs_cluster }}" \
+            --service "${{ inputs.frontend_service }}" \
+            --task-definition "${{ steps.frontend-td.outputs.arn }}" \
+            --force-new-deployment \
+            --no-cli-pager
+
+      ##########################################################################
+      # Wait for both services to stabilise (all tasks healthy)
+      ##########################################################################
+      - name: Wait for services to stabilise
+        run: |
+          echo "Waiting for backend service..."
+          aws ecs wait services-stable \
+            --cluster "${{ inputs.ecs_cluster }}" \
+            --services "${{ inputs.backend_service }}"
+
+          echo "Waiting for frontend service..."
+          aws ecs wait services-stable \
+            --cluster "${{ inputs.ecs_cluster }}" \
+            --services "${{ inputs.frontend_service }}"
+
+          echo "Deployment to ${{ inputs.environment }} complete"

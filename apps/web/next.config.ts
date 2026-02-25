@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Standalone output for Docker: copies only what's needed into .next/standalone
+  output: "standalone",
   // Allow cross-origin requests from Cloudflare tunnel in dev
   allowedDevOrigins: ["*.trycloudflare.com"],
   // Turbopack config (Next.js 16+ default)
@@ -17,7 +19,14 @@ const nextConfig: NextConfig = {
   // This lets ngrok expose a single origin (Next.js on :3000)
   // while the backend runs on :8000.
   async rewrites() {
-    const apiTarget = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    // LTT_API_URL is a server-only variable (no NEXT_PUBLIC_ prefix) so it is
+    // never embedded in the client bundle.  The browser always uses relative
+    // URLs (/api/…, /lti/…) which Next.js proxies here to the FastAPI backend.
+    // In production the ALB routes those paths directly — no rewrite needed.
+    const apiTarget = process.env.LTT_API_URL;
+    if (!apiTarget) {
+      return [];
+    }
     return [
       { source: "/lti/:path*", destination: `${apiTarget}/lti/:path*` },
       { source: "/api/:path*", destination: `${apiTarget}/api/:path*` },
@@ -26,7 +35,8 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     const ltiPlatform =
-      process.env.LTI_PLATFORM_URL || "https://imbizo.alx-ai-tools.com";
+      process.env.LTI_PLATFORM_URL ||
+      "https://imbizo.alx-ai-tools.com https://*.alx-ai-tools.com";
     return [
       {
         source: "/:path*",

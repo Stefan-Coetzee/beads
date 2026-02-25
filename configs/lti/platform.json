@@ -2,11 +2,11 @@
   "https://imbizo.alx-ai-tools.com": [
     {
       "default": true,
-      "client_id": "90e002a4-80d0-4aae-90b6-029ca8bc2b2f",
+      "client_id": "aced1c40-e822-4e2f-8d94-10fe70bf1b5e",
       "auth_login_url": "https://imbizo.alx-ai-tools.com/api/lti_consumer/v1/launch/",
-      "auth_token_url": "https://imbizo.alx-ai-tools.com/api/lti_consumer/v1/token/6d6b9373-61bc-40bd-bfd8-51dc3ae54ebc",
+      "auth_token_url": "https://imbizo.alx-ai-tools.com/api/lti_consumer/v1/token/4ac07df5-e803-43a0-a145-8063415814d9",
       "auth_audience": null,
-      "key_set_url": "https://imbizo.alx-ai-tools.com/api/lti_consumer/v1/public_keysets/6d6b9373-61bc-40bd-bfd8-51dc3ae54ebc",
+      "key_set_url": "https://imbizo.alx-ai-tools.com/api/lti_consumer/v1/public_keysets/4ac07df5-e803-43a0-a145-8063415814d9",
       "key_set": null,
       "deployment_ids": ["1"]
     }

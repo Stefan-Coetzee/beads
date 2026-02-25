@@ -899,7 +899,7 @@ else:
 ## Prerequisites
 
 - **Python**: 3.12+
-- **Node.js**: 20+ (use `nvm use 24` for latest LTS)
+- **Node.js**: 24 (`nvm use 24` — v24.12.0 confirmed. Node 18 is in PATH by default on this machine; always run `nvm use 24` before frontend work or the dev server will refuse to start)
 - **Docker**: For PostgreSQL and MySQL
 - **uv**: Python package manager
 
