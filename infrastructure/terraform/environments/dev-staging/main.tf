@@ -6,10 +6,22 @@
 #
 # Usage:
 #   cd infrastructure/terraform/environments/dev-staging
-#   export TF_VAR_db_master_password='...'
-#   export TF_VAR_redis_auth_token='...'
 #   terraform init && terraform apply
+# Credentials are read automatically from ltt/infra/credentials in Secrets Manager.
 ##############################################################################
+
+##############################################################################
+# Infrastructure credentials — read from Secrets Manager (single KV secret)
+# Keys: nonprod_db_password, nonprod_redis_token
+##############################################################################
+
+data "aws_secretsmanager_secret_version" "infra" {
+  secret_id = "ltt/infra/credentials"
+}
+
+locals {
+  infra = jsondecode(data.aws_secretsmanager_secret_version.infra.secret_string)
+}
 
 ##############################################################################
 # Reference existing ALX-AI infrastructure (read-only)
@@ -67,10 +79,10 @@ module "networking" {
 ##############################################################################
 # RDS — shared dev/staging instance (separate databases per environment)
 #
-# After apply, create additional databases manually:
-#   psql -h <endpoint> -U ltt_user -d postgres -c "CREATE DATABASE ltt_dev_checkpoints;"
-#   psql -h <endpoint> -U ltt_user -d postgres -c "CREATE DATABASE ltt_staging;"
-#   psql -h <endpoint> -U ltt_user -d postgres -c "CREATE DATABASE ltt_staging_checkpoints;"
+# Terraform creates the initial ltt_dev database. All other databases
+# (ltt_dev_checkpoints, ltt_staging, ltt_staging_checkpoints) are created
+# automatically by the migrate ECS task via `db ensure-databases` before
+# Alembic runs. No manual psql steps required.
 ##############################################################################
 
 module "rds" {
@@ -86,7 +98,7 @@ module "rds" {
   max_allocated_storage = 50
   initial_db_name       = "ltt_dev"
   master_username       = "ltt_user"
-  master_password       = var.db_master_password
+  master_password       = local.infra.nonprod_db_password
   multi_az              = false
   backup_retention_days = 7
 }
@@ -103,7 +115,7 @@ module "redis" {
   subnet_ids        = module.networking.private_subnet_ids
   security_group_id = module.networking.redis_sg_id
   node_type         = "cache.t4g.micro"
-  auth_token        = var.redis_auth_token
+  auth_token        = local.infra.nonprod_redis_token
 }
 
 ##############################################################################

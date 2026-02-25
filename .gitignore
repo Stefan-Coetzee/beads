@@ -67,3 +67,9 @@ simulation_logs/
 
 # Archive (historical code)
 archive/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+crash.log

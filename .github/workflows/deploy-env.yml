@@ -236,3 +236,11 @@ jobs:
             --services "${{ inputs.frontend_service }}"
 
           echo "Deployment to ${{ inputs.environment }} complete"
+
+      ##########################################################################
+      # Output nginx bastion instructions to the Job Summary.
+      # An agent reading this run can SSH into the bastion and apply the config.
+      ##########################################################################
+      - name: Nginx bastion instructions
+        if: always()
+        run: bash tools/scripts/gen-nginx-config.sh >> "$GITHUB_STEP_SUMMARY"

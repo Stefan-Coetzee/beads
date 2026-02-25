@@ -393,5 +393,65 @@ def db_init():
         raise typer.Exit(1)
 
 
+@db_app.command("ensure-databases")
+def db_ensure_databases():
+    """
+    Create required databases if they don't exist.
+
+    Reads DATABASE_URL, then creates the primary database and its
+    checkpoints sibling (e.g. ltt_dev → ltt_dev_checkpoints).
+
+    Run before alembic upgrade head in the migrate ECS task so that
+    all required databases are guaranteed to exist — no manual psql needed.
+    """
+    import os
+    from urllib.parse import urlparse
+
+    import asyncpg
+
+    async def _ensure():
+        raw_url = os.getenv(
+            "DATABASE_URL",
+            "postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev",
+        )
+
+        # Strip SQLAlchemy driver prefix — asyncpg expects a plain postgres:// URL
+        url = raw_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        parsed = urlparse(url)
+
+        primary_db = parsed.path.lstrip("/")
+        checkpoint_db = f"{primary_db}_checkpoints"
+
+        typer.echo(
+            f"Connecting to postgres admin DB as {parsed.username}@{parsed.hostname} ..."
+        )
+
+        conn = await asyncpg.connect(
+            host=parsed.hostname,
+            port=parsed.port or 5432,
+            user=parsed.username,
+            password=parsed.password,
+            database="postgres",  # admin DB — always exists on every PostgreSQL server
+        )
+
+        try:
+            for db_name in [primary_db, checkpoint_db]:
+                exists = await conn.fetchval(
+                    "SELECT 1 FROM pg_database WHERE datname = $1", db_name
+                )
+                if exists:
+                    typer.echo(f"  ✓ {db_name} (already exists)")
+                else:
+                    # CREATE DATABASE cannot run inside a transaction in PostgreSQL.
+                    # asyncpg does not start implicit transactions, so this is fine.
+                    await conn.execute(f'CREATE DATABASE "{db_name}"')
+                    typer.echo(f"  + {db_name} (created)")
+        finally:
+            await conn.close()
+
+    run_async(_ensure())
+    typer.echo("Database check complete.")
+
+
 if __name__ == "__main__":
     app()

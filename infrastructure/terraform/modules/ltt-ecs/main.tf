@@ -237,9 +237,12 @@ resource "aws_ecs_task_definition" "migrate" {
 
   container_definitions = jsonencode([
     {
-      name    = "migrate"
-      image   = var.backend_image
-      command = ["alembic", "upgrade", "head"]
+      name  = "migrate"
+      image = var.backend_image
+      # Ensure all required databases exist (primary + checkpoints sibling),
+      # then run Alembic migrations. Uses /bin/sh so both commands run in one
+      # container without needing a separate entrypoint script.
+      command = ["/bin/sh", "-c", "python -m ltt.cli.main db ensure-databases && alembic upgrade head"]
 
       environment = [
         for k, v in var.env_vars : { name = k, value = tostring(v) }

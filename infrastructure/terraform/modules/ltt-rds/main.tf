@@ -28,8 +28,8 @@ resource "aws_db_instance" "this" {
   storage_type          = "gp3"
   storage_encrypted     = true
 
-  # Initial database. Additional databases (dev, staging checkpoints) are
-  # created via psql after the instance is live.
+  # Initial database. Additional databases (checkpoints, sibling envs) are
+  # created automatically by the migrate ECS task via `db ensure-databases`.
   db_name  = var.initial_db_name
   username = var.master_username
   password = var.master_password

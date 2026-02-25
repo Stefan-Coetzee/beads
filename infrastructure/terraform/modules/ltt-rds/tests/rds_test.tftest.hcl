@@ -21,12 +21,12 @@ run "dev_has_no_deletion_protection" {
   command = plan
 
   assert {
-    condition     = aws_db_instance.ltt.deletion_protection == false
+    condition     = aws_db_instance.this.deletion_protection == false
     error_message = "Dev environment must not enable deletion protection."
   }
 
   assert {
-    condition     = aws_db_instance.ltt.skip_final_snapshot == true
+    condition     = aws_db_instance.this.skip_final_snapshot == true
     error_message = "Dev environment must skip the final snapshot."
   }
 }
@@ -40,23 +40,70 @@ run "prod_enables_deletion_protection" {
   }
 
   assert {
-    condition     = aws_db_instance.ltt.deletion_protection == true
+    condition     = aws_db_instance.this.deletion_protection == true
     error_message = "Prod environment must enable deletion protection."
   }
 
   assert {
-    condition     = aws_db_instance.ltt.skip_final_snapshot == false
+    condition     = aws_db_instance.this.skip_final_snapshot == false
     error_message = "Prod environment must not skip the final snapshot."
   }
 }
 
-# Storage is always encrypted.
-run "storage_is_encrypted" {
+# Staging behaves like dev (no deletion protection, no Multi-AZ by default).
+run "staging_has_no_deletion_protection" {
+  command = plan
+
+  variables {
+    environment = "staging"
+  }
+
+  assert {
+    condition     = aws_db_instance.this.deletion_protection == false
+    error_message = "Staging environment must not enable deletion protection."
+  }
+}
+
+# Storage is always encrypted regardless of environment.
+run "storage_is_always_encrypted" {
   command = plan
 
   assert {
-    condition     = aws_db_instance.ltt.storage_encrypted == true
+    condition     = aws_db_instance.this.storage_encrypted == true
     error_message = "RDS storage must always be encrypted at rest."
+  }
+}
+
+# Instance is never publicly accessible.
+run "instance_is_not_publicly_accessible" {
+  command = plan
+
+  assert {
+    condition     = aws_db_instance.this.publicly_accessible == false
+    error_message = "RDS instance must never be publicly accessible."
+  }
+}
+
+# Performance Insights only enabled with Multi-AZ (prod pattern).
+run "performance_insights_disabled_without_multi_az" {
+  command = plan
+
+  assert {
+    condition     = aws_db_instance.this.performance_insights_enabled == false
+    error_message = "Performance Insights should be disabled when multi_az is false."
+  }
+}
+
+run "performance_insights_enabled_with_multi_az" {
+  command = plan
+
+  variables {
+    multi_az = true
+  }
+
+  assert {
+    condition     = aws_db_instance.this.performance_insights_enabled == true
+    error_message = "Performance Insights should be enabled when multi_az is true."
   }
 }
 

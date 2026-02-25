@@ -14,7 +14,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "~> 1.9"
+          terraform_version: "~> 1.14"
 
       - name: terraform fmt
         run: terraform fmt -check -recursive infrastructure/terraform/
@@ -31,7 +31,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "~> 1.9"
+          terraform_version: "~> 1.14"
 
       - name: terraform init
         run: terraform -chdir=infrastructure/terraform/environments/${{ matrix.env }} init -backend=false

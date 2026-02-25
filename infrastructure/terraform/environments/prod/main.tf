@@ -10,10 +10,22 @@
 #
 # Usage:
 #   cd infrastructure/terraform/environments/prod
-#   export TF_VAR_db_master_password='...'
-#   export TF_VAR_redis_auth_token='...'
 #   terraform init && terraform apply
+# Credentials are read automatically from ltt/infra/credentials in Secrets Manager.
 ##############################################################################
+
+##############################################################################
+# Infrastructure credentials — read from Secrets Manager (single KV secret)
+# Keys: prod_db_password, prod_redis_token
+##############################################################################
+
+data "aws_secretsmanager_secret_version" "infra" {
+  secret_id = "ltt/infra/credentials"
+}
+
+locals {
+  infra = jsondecode(data.aws_secretsmanager_secret_version.infra.secret_string)
+}
 
 ##############################################################################
 # Reference existing ALX-AI infrastructure (read-only)
@@ -102,7 +114,7 @@ module "rds" {
   max_allocated_storage = 100
   initial_db_name       = "ltt_prod"
   master_username       = "ltt_user"
-  master_password       = var.db_master_password
+  master_password       = local.infra.prod_db_password
   multi_az              = true
   backup_retention_days = 14
 }
@@ -119,7 +131,7 @@ module "redis" {
   subnet_ids        = data.aws_subnets.ltt_private.ids
   security_group_id = data.aws_security_group.ltt_redis.id
   node_type         = "cache.t4g.micro"
-  auth_token        = var.redis_auth_token
+  auth_token        = local.infra.prod_redis_token
 }
 
 ##############################################################################

@@ -1,17 +1,24 @@
 name: Deploy
 
-# Two ways to trigger:
+# Three ways to trigger:
 #
-# 1. workflow_dispatch (recommended — easiest)
-#    Push the "Run workflow" button in the GitHub Actions UI, pick an
-#    environment, and this workflow builds + deploys from the current HEAD.
+# 1. Push to an env-* branch (automatic — primary GitOps flow)
+#    git push origin main:env-dev      → deploys to dev
+#    git push origin main:env-staging  → deploys to staging
+#    git push origin main:env-prod     → deploys to prod
 #
-# 2. GitHub Deployment event (for external orchestration / GitHub Environments)
+# 2. workflow_dispatch (manual button in GitHub Actions UI)
+#    Actions → Deploy → Run workflow → pick environment
+#
+# 3. GitHub Deployment event (external orchestration)
 #    gh api repos/{owner}/{repo}/deployments \
 #      -f ref=main -f environment=env-dev -f auto_merge=false \
 #      -F required_contexts='[]'
 
 on:
+  push:
+    branches:
+      - env-*
   workflow_dispatch:
     inputs:
       environment:
@@ -26,30 +33,40 @@ on:
 
 jobs:
   ##############################################################################
-  # Resolve environment name and commit SHA for both trigger types.
-  # deployment event: parse "env-dev" → "dev", use deployment.sha
-  # workflow_dispatch: use inputs.environment, use github.sha (HEAD)
+  # Resolve environment name and commit SHA across all three trigger types.
+  # push:          branch env-dev → "dev", github.sha
+  # workflow_dispatch: inputs.environment, github.sha
+  # deployment:    env-dev → "dev", deployment.sha
   ##############################################################################
   setup:
     name: Parse environment
     runs-on: ubuntu-latest
     if: >
+      github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
       startsWith(github.event.deployment.environment, 'env-')
     outputs:
       env_short: ${{ steps.parse.outputs.name }}
       sha: ${{ steps.parse.outputs.sha }}
+      github_environment: ${{ steps.parse.outputs.github_environment }}
 
     steps:
       - id: parse
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "name=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
-            echo "sha=${{ github.sha }}"          >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            BRANCH="${{ github.ref_name }}"
+            echo "name=${BRANCH#env-}"        >> "$GITHUB_OUTPUT"
+            echo "sha=${{ github.sha }}"      >> "$GITHUB_OUTPUT"
+            echo "github_environment=${BRANCH}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.environment }}"                         >> "$GITHUB_OUTPUT"
+            echo "sha=${{ github.sha }}"                                  >> "$GITHUB_OUTPUT"
+            echo "github_environment=env-${{ inputs.environment }}"       >> "$GITHUB_OUTPUT"
           else
             ENV="${{ github.event.deployment.environment }}"
-            echo "name=${ENV#env-}"                        >> "$GITHUB_OUTPUT"
-            echo "sha=${{ github.event.deployment.sha }}" >> "$GITHUB_OUTPUT"
+            echo "name=${ENV#env-}"                         >> "$GITHUB_OUTPUT"
+            echo "sha=${{ github.event.deployment.sha }}"  >> "$GITHUB_OUTPUT"
+            echo "github_environment=${ENV}"                >> "$GITHUB_OUTPUT"
           fi
 
   ##############################################################################
@@ -69,7 +86,6 @@ jobs:
       ecr_frontend: ${{ steps.ecr-login.outputs.registry }}/ltt-frontend
 
     steps:
-      # Check out the exact commit being deployed
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.setup.outputs.sha }}
@@ -106,8 +122,6 @@ jobs:
 
   ##############################################################################
   # Deploy to the target environment
-  # github_environment must match the GitHub environment name so that GitHub
-  # correctly tracks deployment status and enforces protection rules.
   ##############################################################################
   deploy:
     name: Deploy ${{ needs.setup.outputs.env_short }}
@@ -115,7 +129,7 @@ jobs:
     uses: ./.github/workflows/deploy-env.yml
     with:
       environment: ${{ needs.setup.outputs.env_short }}
-      github_environment: ${{ github.event_name == 'workflow_dispatch' && format('env-{0}', inputs.environment) || github.event.deployment.environment }}
+      github_environment: ${{ needs.setup.outputs.github_environment }}
       image_tag: ${{ needs.build.outputs.image_tag }}
       ecr_backend: ${{ needs.build.outputs.ecr_backend }}
       ecr_frontend: ${{ needs.build.outputs.ecr_frontend }}
