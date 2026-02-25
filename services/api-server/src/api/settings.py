@@ -77,19 +77,77 @@ class Settings(BaseSettings):
     # ── Agent ────────────────────────────────────────────────────────
     anthropic_api_key: str = ""
 
-    # ── Prod safety checks ───────────────────────────────────────────
+    # ── Startup validation ───────────────────────────────────────────
+
     @model_validator(mode="after")
-    def _validate_prod(self) -> Settings:
+    def _validate_config(self) -> Settings:
+        """
+        Fail fast if required settings are missing or misconfigured.
+
+        All errors are collected before raising so a single startup failure
+        reveals every missing variable at once rather than one at a time.
+        """
+        errors: list[str] = []
+
+        # ── Any deployed environment (dev or prod — not local) ────────
+        if self.env != "local":
+            if "localhost" in self.database_url or "127.0.0.1" in self.database_url:
+                errors.append(
+                    "LTT_DATABASE_URL must not point to localhost "
+                    f"(env={self.env!r} — inject the RDS endpoint via Secrets Manager)"
+                )
+
+            if not self.redis_url:
+                errors.append(
+                    "LTT_REDIS_URL is required in deployed environments "
+                    "(LTI sessions and grade passback will not function)"
+                )
+
+            if not self.anthropic_api_key:
+                errors.append(
+                    f"LTT_ANTHROPIC_API_KEY is required in env={self.env!r}"
+                )
+
+            if "localhost" in self.frontend_url or "127.0.0.1" in self.frontend_url:
+                errors.append(
+                    "LTT_FRONTEND_URL must not point to localhost "
+                    f"(env={self.env!r} — LTI launch redirects will break)"
+                )
+
+        # ── Production only ───────────────────────────────────────────
         if self.env == "prod":
-            errors: list[str] = []
             if not self.auth_enabled:
                 errors.append("LTT_AUTH_ENABLED must be true in prod")
+
             if self.cors_origins == ["*"]:
                 errors.append("LTT_CORS_ORIGINS must not be ['*'] in prod")
-            if not self.redis_url:
-                errors.append("LTT_REDIS_URL is required in prod")
-            if errors:
-                raise ValueError("Production configuration errors:\n  - " + "\n  - ".join(errors))
+
+            if not self.checkpoint_database_url:
+                errors.append(
+                    "LTT_CHECKPOINT_DATABASE_URL is required in prod "
+                    "(chat history will not persist without it)"
+                )
+
+            # LTI keys must be PEM strings injected by Secrets Manager,
+            # not local file paths (those don't exist inside the container).
+            if not self.lti_private_key.startswith("-----BEGIN"):
+                errors.append(
+                    "LTT_LTI_PRIVATE_KEY must be a PEM string in prod "
+                    "(inject via Secrets Manager — local file paths don't exist in containers)"
+                )
+
+            if not self.lti_public_key.startswith("-----BEGIN"):
+                errors.append(
+                    "LTT_LTI_PUBLIC_KEY must be a PEM string in prod "
+                    "(inject via Secrets Manager)"
+                )
+
+        if errors:
+            raise ValueError(
+                f"[LTT env={self.env!r}] Configuration errors — fix before deploying:\n  - "
+                + "\n  - ".join(errors)
+            )
+
         return self
 
 

@@ -4,38 +4,38 @@
 
 # Private subnets for ECS Fargate tasks and ElastiCache Redis
 resource "aws_subnet" "private" {
-  count             = length(var.private_cidrs)
+  for_each          = zipmap(var.azs, var.private_cidrs)
   vpc_id            = var.vpc_id
-  cidr_block        = var.private_cidrs[count.index]
-  availability_zone = var.azs[count.index]
+  cidr_block        = each.value
+  availability_zone = each.key
 
   tags = {
-    Name = "${var.name_prefix}-private-${count.index + 1}"
+    Name = "${var.name_prefix}-private-${each.key}"
   }
 }
 
 # Database subnets for LTT's own RDS instance
 resource "aws_subnet" "database" {
-  count             = length(var.database_cidrs)
+  for_each          = zipmap(var.azs, var.database_cidrs)
   vpc_id            = var.vpc_id
-  cidr_block        = var.database_cidrs[count.index]
-  availability_zone = var.azs[count.index]
+  cidr_block        = each.value
+  availability_zone = each.key
 
   tags = {
-    Name = "${var.name_prefix}-database-${count.index + 1}"
+    Name = "${var.name_prefix}-database-${each.key}"
   }
 }
 
 # Associate new subnets with the existing private route table (has NAT Gateway)
 resource "aws_route_table_association" "private" {
-  count          = length(aws_subnet.private)
-  subnet_id      = aws_subnet.private[count.index].id
+  for_each       = aws_subnet.private
+  subnet_id      = each.value.id
   route_table_id = var.private_route_table_id
 }
 
 resource "aws_route_table_association" "database" {
-  count          = length(aws_subnet.database)
-  subnet_id      = aws_subnet.database[count.index].id
+  for_each       = aws_subnet.database
+  subnet_id      = each.value.id
   route_table_id = var.private_route_table_id
 }
 

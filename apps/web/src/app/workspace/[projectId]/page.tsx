@@ -16,6 +16,7 @@ import { TaskDetailDrawer } from "@/components/shared/TaskDetailDrawer";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { QueryResult, WorkspaceType } from "@/types";
 import { parseLTIContext, storeLTIContext, getLTIContext, isInIframe, devLogin } from "@/lib/lti";
+import { IS_PRODUCTION } from "@/lib/config";
 
 // SQL engine
 import {
@@ -51,7 +52,7 @@ export default function WorkspacePage() {
   // Auto dev-login: local dev only — stripped from production builds.
   // Creates a fake Redis-backed session so the same auth path is exercised.
   useEffect(() => {
-    if (process.env.NODE_ENV === "production") return;
+    if (IS_PRODUCTION) return;
     if (ltiCtx || isInIframe() || devLoginPending) return;
     setDevLoginPending(true);
     devLogin(undefined, projectId)

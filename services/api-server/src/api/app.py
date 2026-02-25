@@ -16,7 +16,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -147,9 +147,18 @@ def get_app() -> FastAPI:
     app.include_router(frontend_router)  # Frontend routes already have /api/v1 prefix
     app.include_router(lti_router)  # LTI routes at /lti/*
 
-    # Health check at root
+    # Health check — verifies DB connectivity so ECS/ALB know the task is
+    # actually ready, not just running.  Returns 503 if the DB is unreachable.
     @app.get("/health")
     async def health_check():
+        try:
+            async with get_session_factory()() as session:
+                await session.execute(text("SELECT 1"))
+        except Exception as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Database unreachable: {exc}",
+            ) from exc
         return {"status": "healthy"}
 
     return app

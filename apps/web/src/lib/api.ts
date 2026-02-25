@@ -7,10 +7,9 @@ import type {
   WorkspaceContext,
 } from "@/types";
 import { getLTIContext } from "./lti";
+import { API_BASE_URL } from "./config";
 
-// Empty string = relative URLs → proxied through Next.js → FastAPI.
-// Set NEXT_PUBLIC_API_URL to override (e.g. direct FastAPI for local dev without proxy).
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
+export { API_BASE_URL };
 
 /**
  * Thin fetch wrapper that attaches LTI headers when running inside

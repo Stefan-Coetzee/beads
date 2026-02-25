@@ -24,7 +24,7 @@ terraform/
 
 ## Prerequisites
 
-- Terraform 
+- **Terraform ~> 1.9** (required for cross-variable validation and mock provider tests)
 - AWS CLI configured with appropriate permissions
 - `jq` installed (used in CI/CD deploy scripts)
 - Existing ALX-AI VPC and monitoring stack running
@@ -160,6 +160,47 @@ server {
 Then:
 ```bash
 sudo nginx -t && sudo systemctl reload nginx
+```
+
+## Testing
+
+Each module has native `terraform test` unit tests under `tests/`. These use mock providers and require no AWS credentials.
+
+```bash
+# Run tests for a specific module
+cd modules/ltt-rds && terraform test
+cd modules/ltt-ecs && terraform test
+cd modules/ltt-networking && terraform test
+```
+
+Tests cover:
+- **ltt-rds**: prod vs dev deletion protection + snapshot behavior, encryption, validation rejection
+- **ltt-ecs**: CPU/memory Fargate validation, environment enum, desired_count floor
+- **ltt-networking**: subnet count (for_each keyed by AZ), route table association count, CIDR/AZ length mismatch rejection
+
+## CI Validation
+
+Every pull request that touches `infrastructure/terraform/**` runs the `Terraform Validate` workflow (`.github/workflows/terraform-validate.yml`):
+
+| Job | What it checks |
+|-----|----------------|
+| **fmt** | `terraform fmt -check -recursive` — canonical formatting |
+| **validate** | `terraform validate` across all 3 environments (no backend) |
+| **tflint** | AWS provider rules for all 8 modules |
+| **checkov** | Security misconfigurations; results uploaded as SARIF to GitHub Security |
+
+To run locally before pushing:
+```bash
+# Format
+terraform fmt -recursive infrastructure/terraform/
+
+# Validate (no AWS credentials needed)
+terraform -chdir=infrastructure/terraform/environments/dev-staging init -backend=false
+terraform -chdir=infrastructure/terraform/environments/dev-staging validate
+
+# Lint a module
+cd infrastructure/terraform/modules/ltt-ecs
+tflint
 ```
 
 ## Debugging ECS Tasks

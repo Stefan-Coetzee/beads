@@ -1,16 +1,24 @@
 variable "name_prefix" {
   description = "Identifier prefix for the RDS instance and related resources"
   type        = string
+  nullable    = false
 }
 
 variable "environment" {
   description = "Environment name (dev, staging, prod) — controls deletion protection and snapshots"
   type        = string
+  nullable    = false
+
+  validation {
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "environment must be one of: dev, staging, prod."
+  }
 }
 
 variable "vpc_id" {
   description = "VPC ID"
   type        = string
+  nullable    = false
 }
 
 variable "subnet_ids" {
@@ -21,12 +29,14 @@ variable "subnet_ids" {
 variable "security_group_id" {
   description = "Security group ID that grants access (ltt-rds SG from ltt-networking)"
   type        = string
+  nullable    = false
 }
 
 variable "instance_class" {
   description = "RDS instance class"
   type        = string
   default     = "db.t4g.micro"
+  nullable    = false
 }
 
 variable "allocated_storage" {
@@ -44,18 +54,21 @@ variable "max_allocated_storage" {
 variable "initial_db_name" {
   description = "Name of the initial database created on the instance"
   type        = string
+  nullable    = false
 }
 
 variable "master_username" {
   description = "Master DB username"
   type        = string
   default     = "ltt_user"
+  nullable    = false
 }
 
 variable "master_password" {
   description = "Master DB password (store in Secrets Manager, pass here via TF_VAR_)"
   type        = string
   sensitive   = true
+  nullable    = false
 }
 
 variable "multi_az" {
@@ -68,4 +81,9 @@ variable "backup_retention_days" {
   description = "Number of days to retain automated backups"
   type        = number
   default     = 7
+
+  validation {
+    condition     = var.backup_retention_days >= 1 && var.backup_retention_days <= 35
+    error_message = "backup_retention_days must be between 1 and 35 (AWS RDS limit)."
+  }
 }

@@ -1,11 +1,11 @@
 output "private_subnet_ids" {
   description = "IDs of the LTT private subnets (for ECS tasks and ElastiCache)"
-  value       = aws_subnet.private[*].id
+  value       = [for s in aws_subnet.private : s.id]
 }
 
 output "database_subnet_ids" {
   description = "IDs of the LTT database subnets (for RDS)"
-  value       = aws_subnet.database[*].id
+  value       = [for s in aws_subnet.database : s.id]
 }
 
 output "alb_sg_id" {

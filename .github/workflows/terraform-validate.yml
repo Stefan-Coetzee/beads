@@ -1,0 +1,86 @@
+name: Terraform Validate
+
+on:
+  pull_request:
+    paths:
+      - "infrastructure/terraform/**"
+
+jobs:
+  fmt:
+    name: Format check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive infrastructure/terraform/
+
+  validate:
+    name: Validate (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [shared, dev-staging, prod]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: terraform init
+        run: terraform -chdir=infrastructure/terraform/environments/${{ matrix.env }} init -backend=false
+
+      - name: terraform validate
+        run: terraform -chdir=infrastructure/terraform/environments/${{ matrix.env }} validate
+
+  tflint:
+    name: TFLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: tflint init
+        run: tflint --init
+        working-directory: infrastructure/terraform/
+
+      - name: Lint modules
+        run: |
+          for dir in infrastructure/terraform/modules/*/; do
+            echo "Linting $dir"
+            tflint --chdir="$dir"
+          done
+
+  checkov:
+    name: Checkov security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infrastructure/terraform/
+          framework: terraform
+          soft_fail: false
+          output_format: sarif
+          output_file_path: results.sarif
+          # Skip checks that don't apply to this architecture:
+          # CKV_AWS_91  — ALB access logs (internal ALB, nginx handles this)
+          # CKV_AWS_150 — ALB deletion protection (managed via lifecycle)
+          skip_check: CKV_AWS_91,CKV_AWS_150
+
+      - name: Upload SARIF results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
