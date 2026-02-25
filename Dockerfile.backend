@@ -11,17 +11,20 @@ WORKDIR /app
 # Copy workspace root files for uv
 COPY pyproject.toml uv.lock ./
 
-# Copy services
+# Copy services and tools (all workspace members required by uv)
 COPY services/ltt-core/ services/ltt-core/
 COPY services/api-server/ services/api-server/
 COPY services/agent-tutor/ services/agent-tutor/
+COPY tools/simulation/ tools/simulation/
 
 # Copy content (project JSON files) and Alembic config
 COPY content/ content/
 COPY alembic.ini ./
 
-# Install production dependencies only
-RUN uv sync --frozen --no-dev
+# Install production dependencies for all workspace members.
+# --all-packages is required because the workspace root is a virtual package;
+# without it, uv only installs the root's direct deps (none in production).
+RUN uv sync --all-packages --frozen --no-dev
 
 # LTI public key is safe to bake into the image.
 # Private key is injected at runtime via Secrets Manager (LTT_LTI_PRIVATE_KEY).
