@@ -32,7 +32,10 @@ async def get_async_session():
     # Get database URL from environment or use default
     import os
 
-    db_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://ltt:ltt@localhost:5432/ltt")
+    db_url = os.getenv(
+        "LTT_DATABASE_URL",
+        os.getenv("DATABASE_URL", "postgresql+asyncpg://ltt:ltt@localhost:5432/ltt"),
+    )
 
     engine = create_async_engine(db_url, echo=False)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -411,8 +414,10 @@ def db_ensure_databases():
 
     async def _ensure():
         raw_url = os.getenv(
-            "DATABASE_URL",
-            "postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev",
+            "LTT_DATABASE_URL",
+            os.getenv(
+                "DATABASE_URL", "postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev"
+            ),
         )
 
         # Strip SQLAlchemy driver prefix — asyncpg expects a plain postgres:// URL
