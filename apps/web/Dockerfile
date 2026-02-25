@@ -1,14 +1,9 @@
-# Stage 1: install production dependencies
-FROM node:24-alpine AS deps
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
-
-# Stage 2: build the Next.js app
+# Stage 1: build the Next.js app (all deps needed for tsc/next build)
 FROM node:24-alpine AS builder
 WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
-COPY --from=deps /app/node_modules ./node_modules
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
