@@ -58,6 +58,10 @@ on:
         description: "Security group ID for migration task"
         required: true
         type: string
+      backend_env_vars:
+        description: "JSON array of non-secret env vars for the backend container (e.g. LTT_ENV, LTT_AUTH_ENABLED)"
+        required: true
+        type: string
     secrets:
       aws_role_arn:
         description: "IAM role ARN for AWS authentication"
@@ -162,7 +166,7 @@ jobs:
       - name: Register new backend task definition
         id: backend-td
         run: |
-          # Get current task definition and update the image
+          # Get current task definition, update image and inject fresh env vars
           CURRENT=$(aws ecs describe-task-definition \
             --task-definition "${{ inputs.ecs_cluster }}-backend" \
             --query 'taskDefinition' \
@@ -170,7 +174,9 @@ jobs:
 
           NEW_TD=$(echo "$CURRENT" | jq \
             --arg IMAGE "${BACKEND_IMAGE}:${TAG}" \
+            --argjson ENVVARS '${{ inputs.backend_env_vars }}' \
             '.containerDefinitions[0].image = $IMAGE
+            | .containerDefinitions[0].environment = $ENVVARS
             | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
                   .placementConstraints, .compatibilities, .registeredAt, .registeredBy)')
 

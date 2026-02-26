@@ -206,13 +206,10 @@ module "ecs" {
 
   secret_arns = module.secrets_prod.arns
 
+  # Only LTT_ENV here — all other backend env vars are injected by the deploy pipeline.
+  # See .github/workflows/deploy.yml (setup.envvars step) to change them.
   env_vars = {
-    LTT_ENV                 = "prod"
-    LTT_AUTH_ENABLED        = "true"
-    LTT_DEBUG               = "false"
-    LTT_FRONTEND_URL        = "https://mwongozo.alx-ai-tools.com"
-    LTT_CORS_ORIGINS        = "[\"https://mwongozo.alx-ai-tools.com\"]"
-    LTT_CSP_FRAME_ANCESTORS = "https://imbizo.alx-ai-tools.com"
+    LTT_ENV = "prod"
   }
 
   enable_autoscaling = true

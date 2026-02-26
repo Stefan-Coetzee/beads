@@ -201,13 +201,11 @@ module "ecs_dev" {
 
   secret_arns = module.secrets_dev.arns
 
+  # Only LTT_ENV here — all other backend env vars are injected by the deploy pipeline.
+  # See .github/workflows/deploy.yml (setup.envvars step) to change LTT_AUTH_ENABLED,
+  # LTT_DEBUG, LTT_FRONTEND_URL, LTT_CORS_ORIGINS, LTT_CSP_FRAME_ANCESTORS.
   env_vars = {
-    LTT_ENV                 = "dev"
-    LTT_AUTH_ENABLED        = "true"
-    LTT_DEBUG               = "false"
-    LTT_FRONTEND_URL        = "https://dev-mwongozo.alx-ai-tools.com"
-    LTT_CORS_ORIGINS        = "[\"https://dev-mwongozo.alx-ai-tools.com\"]"
-    LTT_CSP_FRAME_ANCESTORS = "https://imbizo.alx-ai-tools.com"
+    LTT_ENV = "dev"
   }
 
   enable_autoscaling = false
@@ -239,15 +237,11 @@ module "ecs_staging" {
 
   secret_arns = module.secrets_staging.arns
 
+  # LTT_ENV="dev" because settings.py only accepts "local"|"dev"|"prod".
+  # All other backend env vars are injected by the deploy pipeline.
+  # See .github/workflows/deploy.yml (setup.envvars step) to change them.
   env_vars = {
-    # LTT_ENV="dev" because settings.py only accepts "local"|"dev"|"prod";
-    # staging auth is enforced via LTT_AUTH_ENABLED, not the env literal.
-    LTT_ENV                 = "dev"
-    LTT_AUTH_ENABLED        = "true"
-    LTT_DEBUG               = "false"
-    LTT_FRONTEND_URL        = "https://staging-mwongozo.alx-ai-tools.com"
-    LTT_CORS_ORIGINS        = "[\"https://staging-mwongozo.alx-ai-tools.com\"]"
-    LTT_CSP_FRAME_ANCESTORS = "https://imbizo.alx-ai-tools.com"
+    LTT_ENV = "dev"
   }
 
   enable_autoscaling = false

@@ -49,6 +49,7 @@ jobs:
       env_short: ${{ steps.parse.outputs.name }}
       sha: ${{ steps.parse.outputs.sha }}
       github_environment: ${{ steps.parse.outputs.github_environment }}
+      backend_env_vars: ${{ steps.envvars.outputs.backend }}
 
     steps:
       - id: parse
@@ -68,6 +69,40 @@ jobs:
             echo "sha=${{ github.event.deployment.sha }}"  >> "$GITHUB_OUTPUT"
             echo "github_environment=${ENV}"                >> "$GITHUB_OUTPUT"
           fi
+
+      # Compute per-environment non-secret backend env vars.
+      # Changing these here is the only step needed to update config — no terraform apply required.
+      - id: envvars
+        run: |
+          case "${{ steps.parse.outputs.name }}" in
+            prod)
+              FRONTEND_URL="https://mwongozo.alx-ai-tools.com"
+              LTT_ENV="prod"
+              ;;
+            staging)
+              FRONTEND_URL="https://staging-mwongozo.alx-ai-tools.com"
+              LTT_ENV="dev"
+              ;;
+            *)
+              FRONTEND_URL="https://dev-mwongozo.alx-ai-tools.com"
+              LTT_ENV="dev"
+              ;;
+          esac
+
+          BACKEND=$(jq -cn \
+            --arg env    "$LTT_ENV" \
+            --arg url    "$FRONTEND_URL" \
+            --arg csp    "https://imbizo.alx-ai-tools.com" \
+            '[
+              {"name":"LTT_ENV",                 "value":$env},
+              {"name":"LTT_AUTH_ENABLED",         "value":"true"},
+              {"name":"LTT_DEBUG",                "value":"false"},
+              {"name":"LTT_FRONTEND_URL",         "value":$url},
+              {"name":"LTT_CORS_ORIGINS",         "value":("[\"" + $url + "\"]")},
+              {"name":"LTT_CSP_FRAME_ANCESTORS",  "value":$csp}
+            ]')
+
+          echo "backend=$BACKEND" >> "$GITHUB_OUTPUT"
 
   ##############################################################################
   # Build and push Docker images to ECR
@@ -139,5 +174,6 @@ jobs:
       migrate_task_family: ltt-${{ needs.setup.outputs.env_short }}-migrate
       private_subnets: ${{ needs.setup.outputs.env_short == 'prod' && vars.PROD_PRIVATE_SUBNETS || needs.setup.outputs.env_short == 'staging' && vars.STAGING_PRIVATE_SUBNETS || vars.DEV_PRIVATE_SUBNETS }}
       ecs_security_group: ${{ needs.setup.outputs.env_short == 'prod' && vars.PROD_ECS_SG_ID || needs.setup.outputs.env_short == 'staging' && vars.STAGING_ECS_SG_ID || vars.DEV_ECS_SG_ID }}
+      backend_env_vars: ${{ needs.setup.outputs.backend_env_vars }}
     secrets:
       aws_role_arn: ${{ secrets.AWS_ROLE_ARN }}
