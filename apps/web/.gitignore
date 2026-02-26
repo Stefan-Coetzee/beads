@@ -34,6 +34,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Large generated data files (regenerate with: python scripts/convert_mysql_to_sqlite.py)
-/public/data/*.sql
-/public/data/*.json
+# Large generated data files (regenerate with: python tools/scripts/convert_mysql_to_sqlite.py)
+# Note: committed to git so they're included in the Docker build context.
