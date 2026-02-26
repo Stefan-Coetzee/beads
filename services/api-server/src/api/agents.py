@@ -59,6 +59,7 @@ async def init_checkpointer() -> None:
                 min_size=2,
                 max_size=10,
                 open=False,
+                kwargs={"autocommit": True},  # required: CREATE INDEX CONCURRENTLY cannot run in a tx
             )
             await _checkpoint_pool.open()
 
