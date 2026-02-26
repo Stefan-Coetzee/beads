@@ -8,40 +8,16 @@ Usage:
 """
 
 import asyncio
-from contextlib import asynccontextmanager
 from pathlib import Path
 
 import typer
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from ltt_settings import get_settings as _get_settings
 
+from ltt.db.connection import get_session as get_async_session
 from ltt.models import BloomLevel, ContentType, TaskCreate, TaskType
 
 # Main app
 app = typer.Typer(name="ltt", help="Learning Task Tracker Admin CLI")
-
-
-# ============================================================================
-# Database Session Helper
-# ============================================================================
-
-
-@asynccontextmanager
-async def get_async_session():
-    """Get async database session."""
-    # Get database URL from environment or use default
-    import os
-
-    db_url = os.getenv(
-        "LTT_DATABASE_URL",
-        os.getenv("DATABASE_URL", "postgresql+asyncpg://ltt:ltt@localhost:5432/ltt"),
-    )
-
-    engine = create_async_engine(db_url, echo=False)
-    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-    async with async_session() as session:
-        yield session
 
 
 def run_async(coro):
@@ -401,27 +377,19 @@ def db_ensure_databases():
     """
     Create required databases if they don't exist.
 
-    Reads DATABASE_URL, then creates the primary database and its
-    checkpoints sibling (e.g. ltt_dev → ltt_dev_checkpoints).
+    Reads LTT_DATABASE_URL via ltt.config, then creates the primary database
+    and its checkpoints sibling (e.g. ltt_dev → ltt_dev_checkpoints).
 
     Run before alembic upgrade head in the migrate ECS task so that
     all required databases are guaranteed to exist — no manual psql needed.
     """
-    import os
     from urllib.parse import urlparse
 
     import asyncpg
 
     async def _ensure():
-        raw_url = os.getenv(
-            "LTT_DATABASE_URL",
-            os.getenv(
-                "DATABASE_URL", "postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev"
-            ),
-        )
-
         # Strip SQLAlchemy driver prefix — asyncpg expects a plain postgres:// URL
-        url = raw_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        url = _get_settings().database_url.replace("postgresql+asyncpg://", "postgresql://", 1)
         parsed = urlparse(url)
 
         primary_db = parsed.path.lstrip("/")

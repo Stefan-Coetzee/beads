@@ -10,7 +10,6 @@ Requires ANTHROPIC_API_KEY in environment.
 """
 
 import asyncio
-import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -66,9 +65,11 @@ class SummarizationState(dict):
 
 def _get_llm() -> ChatAnthropic:
     """Get the Anthropic LLM instance."""
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    from ltt_settings import get_settings as _get_settings
+
+    api_key = _get_settings().anthropic_api_key
     if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY not set in environment")
+        raise ValueError("LTT_ANTHROPIC_API_KEY is not set in environment")
 
     return ChatAnthropic(
         model="claude-sonnet-4-20250514",

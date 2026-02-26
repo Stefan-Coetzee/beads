@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "LLM tutoring agent"
 requires-python = ">=3.12"
 dependencies = [
+    "ltt-settings",
     "ltt-core",
     "langgraph>=1.0.5",
     "langchain>=1.2.0",

@@ -1,12 +1,7 @@
-import os
 from logging.config import fileConfig
 
 from alembic import context
-from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
-
-# Load environment variables
-load_dotenv()
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -39,13 +34,10 @@ from ltt.models.base import Base
 
 target_metadata = Base.metadata
 
-# Get database URL from environment
-# Convert asyncpg:// to postgresql:// for Alembic (sync migrations)
-database_url = os.getenv(
-    "DATABASE_URL", "postgresql://ltt_user:ltt_password@localhost:5432/ltt_dev"
-)
-if database_url.startswith("postgresql+asyncpg://"):
-    database_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
+from ltt_settings import get_settings as _get_settings
+
+# Alembic needs a sync driver; asyncpg URL is used everywhere else.
+database_url = _get_settings().database_url.replace("postgresql+asyncpg://", "postgresql://", 1)
 
 # Override the sqlalchemy.url in config
 config.set_main_option("sqlalchemy.url", database_url)

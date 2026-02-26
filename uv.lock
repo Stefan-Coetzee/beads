@@ -8,6 +8,7 @@ members = [
     "api-server",
     "beadslocal",
     "ltt-core",
+    "ltt-settings",
     "simulation",
 ]
 
@@ -22,6 +23,7 @@ dependencies = [
     { name = "langchain-core" },
     { name = "langgraph" },
     { name = "ltt-core" },
+    { name = "ltt-settings" },
     { name = "rich" },
 ]
 
@@ -33,6 +35,7 @@ requires-dist = [
     { name = "langchain-core", specifier = ">=1.2.6" },
     { name = "langgraph", specifier = ">=1.0.5" },
     { name = "ltt-core", editable = "services/ltt-core" },
+    { name = "ltt-settings", editable = "services/ltt-settings" },
     { name = "rich" },
 ]
 
@@ -122,6 +125,7 @@ dependencies = [
     { name = "httpx" },
     { name = "langgraph-checkpoint-postgres" },
     { name = "ltt-core" },
+    { name = "ltt-settings" },
     { name = "pydantic-settings" },
     { name = "pylti1p3" },
     { name = "python-dotenv" },
@@ -137,6 +141,7 @@ requires-dist = [
     { name = "httpx" },
     { name = "langgraph-checkpoint-postgres", specifier = ">=2.0.0" },
     { name = "ltt-core", editable = "services/ltt-core" },
+    { name = "ltt-settings", editable = "services/ltt-settings" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "pylti1p3", specifier = ">=2.0.0" },
     { name = "python-dotenv" },
@@ -935,9 +940,9 @@ dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "greenlet" },
+    { name = "ltt-settings" },
     { name = "psycopg2-binary" },
     { name = "pydantic" },
-    { name = "python-dotenv" },
     { name = "rich" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "typer" },
@@ -948,12 +953,27 @@ requires-dist = [
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "greenlet" },
+    { name = "ltt-settings", editable = "services/ltt-settings" },
     { name = "psycopg2-binary" },
     { name = "pydantic", specifier = ">=2.0" },
-    { name = "python-dotenv" },
     { name = "rich" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
     { name = "typer" },
+]
+
+[[package]]
+name = "ltt-settings"
+version = "0.1.0"
+source = { editable = "services/ltt-settings" }
+dependencies = [
+    { name = "pydantic-settings" },
+    { name = "python-dotenv" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pydantic-settings", specifier = ">=2.0.0" },
+    { name = "python-dotenv" },
 ]
 
 [[package]]

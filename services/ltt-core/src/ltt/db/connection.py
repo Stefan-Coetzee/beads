@@ -14,11 +14,10 @@ FOR PRODUCTION (use api.database instead):
 - Pool initialized in the event loop for correct binding
 """
 
-import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from dotenv import load_dotenv
+from ltt_settings import get_settings as _get_settings
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -27,24 +26,16 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool, QueuePool
 
-# Load environment variables
-load_dotenv()
-
-# Database configuration
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://ltt_user:ltt_password@localhost:5432/ltt_dev",
-)
-
-# NullPool = no connection reuse = no async issues
-# Set DB_USE_NULL_POOL=false only if you know what you're doing
-USE_NULL_POOL = os.getenv("DB_USE_NULL_POOL", "true").lower() == "true"
+_s = _get_settings()
+DATABASE_URL: str = _s.database_url
+USE_NULL_POOL: bool = True  # NullPool is always correct for CLI/scripts; API uses its own pool
+_SQL_ECHO: bool = _s.debug
 
 
 def _create_engine() -> AsyncEngine:
     """Create the async engine with appropriate pooling."""
     engine_kwargs = {
-        "echo": os.getenv("SQL_ECHO", "false").lower() == "true",
+        "echo": _SQL_ECHO,
     }
 
     if USE_NULL_POOL:

@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 
 [tool.uv.workspace]
 members = [
+    "services/ltt-settings",
     "services/ltt-core",
     "services/api-server",
     "services/agent-tutor",
@@ -14,6 +15,7 @@ members = [
 ]
 
 [tool.uv.sources]
+ltt-settings = { workspace = true }
 ltt-core = { workspace = true }
 api-server = { workspace = true }
 agent-tutor = { workspace = true }
@@ -52,7 +54,7 @@ disallow_untyped_defs = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["services/*/tests", "tools/*/tests"]
-pythonpath = ["services/ltt-core/src", "services/api-server/src", "services/agent-tutor/src", "tools/simulation/src"]
+pythonpath = ["services/ltt-settings/src", "services/ltt-core/src", "services/api-server/src", "services/agent-tutor/src", "tools/simulation/src"]
 addopts = "-m 'not integration'"
 markers = [
     "integration: slow integration/e2e tests (run with: pytest -m integration)",
