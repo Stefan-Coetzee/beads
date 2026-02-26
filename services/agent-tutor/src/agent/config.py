@@ -75,5 +75,10 @@ def get_config() -> Config:
     return Config()
 
 
+def create_config() -> Config:
+    """Alias for get_config — kept for backwards compatibility."""
+    return Config()
+
+
 # Module-level default — graph.py imports this in a few places
 default_config = Config()
