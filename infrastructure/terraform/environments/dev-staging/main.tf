@@ -203,8 +203,8 @@ module "ecs_dev" {
 
   env_vars = {
     LTT_ENV                 = "dev"
-    LTT_AUTH_ENABLED        = "false"
-    LTT_DEBUG               = "true"
+    LTT_AUTH_ENABLED        = "true"
+    LTT_DEBUG               = "false"
     LTT_FRONTEND_URL        = "https://dev-mwongozo.alx-ai-tools.com"
     LTT_CORS_ORIGINS        = "[\"https://dev-mwongozo.alx-ai-tools.com\"]"
     LTT_CSP_FRAME_ANCESTORS = "https://imbizo.alx-ai-tools.com"

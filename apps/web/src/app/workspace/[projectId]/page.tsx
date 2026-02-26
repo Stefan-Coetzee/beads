@@ -228,6 +228,17 @@ export default function WorkspacePage() {
   // Show loading overlay for SQL workspace while DB downloads
   const showSqlLoading = workspaceType === "sql" && !isSqlReady;
 
+  // Production gate: no LTI context = not launched from LMS.
+  if (IS_PRODUCTION && !ltiCtx) {
+    return (
+      <main className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground text-sm">
+          Access this tool through your learning management system.
+        </p>
+      </main>
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
