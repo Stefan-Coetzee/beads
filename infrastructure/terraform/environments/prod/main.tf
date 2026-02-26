@@ -176,8 +176,10 @@ module "monitoring" {
   log_retention_days = 90
   alarm_email        = var.alarm_email
 
-  ecs_cluster_name     = module.ecs.cluster_name
-  backend_service_name = module.ecs.backend_service_name
+  # Derived from name_prefix — not referencing module.ecs to avoid a cycle.
+  # (module.ecs depends_on module.monitoring to ensure log groups exist first.)
+  ecs_cluster_name     = "ltt-prod"
+  backend_service_name = "ltt-prod-backend"
   alb_arn_suffix   = module.alb.alb_arn_suffix
   rds_instance_id  = module.rds.instance_id
 }
