@@ -195,9 +195,15 @@ jobs:
             --query 'taskDefinition' \
             --output json)
 
+          # Ensure HOSTNAME=0.0.0.0 is present so Next.js binds to all interfaces
+          FRONTEND_ENV='[{"name":"NEXT_PUBLIC_API_URL","value":""},{"name":"NODE_ENV","value":"production"},{"name":"HOSTNAME","value":"0.0.0.0"},{"name":"LTI_PLATFORM_URL","value":"https://imbizo.alx-ai-tools.com"}]'
+
           NEW_TD=$(echo "$CURRENT" | jq \
             --arg IMAGE "${FRONTEND_IMAGE}:${TAG}" \
+            --argjson FENV "$FRONTEND_ENV" \
             '.containerDefinitions[0].image = $IMAGE
+            | .containerDefinitions[0].environment = $FENV
+            | .containerDefinitions[0].healthCheck.command = ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/ || exit 1"]
             | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
                   .placementConstraints, .compatibilities, .registeredAt, .registeredBy)')
 

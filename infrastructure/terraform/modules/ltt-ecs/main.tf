@@ -196,11 +196,14 @@ resource "aws_ecs_task_definition" "frontend" {
         # NEXT_PUBLIC_API_URL intentionally empty — ALB handles routing
         { name = "NEXT_PUBLIC_API_URL", value = "" },
         { name = "LTI_PLATFORM_URL", value = var.lti_platform_url },
-        { name = "NODE_ENV", value = "production" }
+        { name = "NODE_ENV", value = "production" },
+        # Next.js standalone binds to HOSTNAME; ECS Fargate sets it to the
+        # task hostname by default, making localhost health checks fail.
+        { name = "HOSTNAME", value = "0.0.0.0" }
       ]
 
       healthCheck = {
-        command     = ["CMD-SHELL", "wget -q --spider http://localhost:3000/ || exit 1"]
+        command     = ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/ || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3
