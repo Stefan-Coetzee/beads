@@ -36,6 +36,10 @@ class _ModelConfig:
     def thinking_budget_tokens(self) -> int:
         return self._s.thinking_budget_tokens
 
+    @property
+    def api_key(self) -> str:
+        return self._s.anthropic_api_key
+
 
 class _AgentConfig:
     """Proxy for config.agent.* — reads from central Settings."""

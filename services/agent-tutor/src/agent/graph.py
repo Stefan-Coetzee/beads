@@ -52,12 +52,15 @@ def create_model(config: Config, model_name: str | None = None) -> ChatAnthropic
     """
     actual_model = model_name or config.model.tutor_model
 
-    # Build model kwargs
+    # api_key must be passed explicitly because the env var is
+    # LTT_ANTHROPIC_API_KEY (not ANTHROPIC_API_KEY which the SDK expects).
     model_kwargs: dict = {
         "model": actual_model,
         "temperature": config.model.tutor_temperature,
         "max_tokens": config.model.max_tokens,
     }
+    if config.model.api_key:
+        model_kwargs["api_key"] = config.model.api_key
 
     # Add extended thinking if enabled
     if config.model.thinking_enabled:
