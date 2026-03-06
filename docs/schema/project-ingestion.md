@@ -51,17 +51,34 @@ Project (Big Picture - "Build an E-commerce Site")
 
 ```json
 {
-  "title": "Build an E-commerce Website",
+  "project_id": "maji-ndogo-part1",
+  "version": 1,
+  "version_tag": "initial",
 
-  "description": "Build a full-stack e-commerce platform with product catalog, shopping cart, checkout, and admin panel. Uses FastAPI for the backend and React for the frontend. This project teaches full-stack development, database design, authentication, and deployment.",
+  "title": "Maji Ndogo Water Crisis - Part 1",
+
+  "description": "Explore survey data from President Naledi's water quality initiative. Learn to navigate databases, write SQL queries, and uncover data quality issues.",
+
+  "narrative": true,
+  "narrative_context": "You've joined President Aziza Naledi's initiative to solve Maji Ndogo's water crisis. A team of engineers, field workers, scientists, and analysts has collected 60,000 survey records...",
+
+  "workspace_type": "sql",
+
+  "tutor_config": {
+    "persona": "You are Chidi Kunto, a senior data analyst mentoring a junior team member...",
+    "teaching_style": "socratic",
+    "encouragement_level": "high"
+  },
 
   "learning_objectives": [
-    {"level": "create", "description": "Build a complete full-stack web application"},
-    {"level": "apply", "description": "Apply REST API design principles"},
-    {"level": "analyze", "description": "Analyze and optimize database queries"}
+    {"level": "analyze", "description": "Analyze survey data to identify patterns in water access"},
+    {"level": "apply", "description": "Apply SQL queries to explore and clean real-world datasets"},
+    {"level": "evaluate", "description": "Evaluate data quality and identify contradictions"}
   ],
 
-  "content": "## Project Overview\n\nYou'll build a complete e-commerce platform from scratch...\n\n### Technologies\n- Backend: FastAPI, PostgreSQL, SQLAlchemy\n- Frontend: React, TypeScript\n- Deployment: Docker, Railway",
+  "content": "## Project Overview\n\nYou'll explore a real survey database...",
+
+  "estimated_minutes": 300,
 
   "epics": [...]
 }
@@ -69,10 +86,37 @@ Project (Big Picture - "Build an E-commerce Site")
 
 #### Field Explanations
 
+**`project_id`** *(required)*
+- **What**: Stable identifier (slug) for this project
+- **Why**: Enables re-ingestion without creating duplicates, stable LTI configuration, and cross-environment references
+- **Format**: Lowercase alphanumeric with hyphens, 3–64 characters
+- **Rules**:
+  - Must start and end with a letter or number (not a hyphen)
+  - Only lowercase letters, numbers, and hyphens allowed
+  - The combination `(project_id, version)` must be unique in the system
+  - Once chosen, should never change — this is how the system identifies your project
+- **Example**: `"maji-ndogo-part1"`, `"python-fundamentals"`, `"cybersec-intro-2026"`
+- **Usage**: This value is configured in Open edX LTI custom parameters as `project_id=maji-ndogo-part1`
+
+**`version`** *(optional, default: 1)*
+- **What**: Integer version number for this project
+- **Why**: Enables publishing updated versions while preserving learner progress on older versions
+- **Rules**:
+  - Must be >= 1
+  - Increment when publishing a new version of the same `project_id`
+  - The combination `(project_id, version)` must be unique
+- **Behaviour** (planned): When ingesting version N+1, existing learner progress on version N is preserved. Learners on the old version continue with the old content.
+
+**`version_tag`** *(optional)*
+- **What**: Human-readable label for this version
+- **Why**: Gives meaningful names for communication (e.g., in admin dashboards, instructor emails)
+- **Example**: `"initial"`, `"2026-Q1"`, `"pilot"`, `"v2-revised"`
+- **Maximum length**: 100 characters
+
 **`title`** *(required)*
 - **What**: Short, action-oriented project name
 - **Why**: Immediately tells learner what they're building
-- **Example**: "Build an E-commerce Website" (not "E-commerce Project")
+- **Example**: "Maji Ndogo Water Crisis - Part 1" or "Build an E-commerce Website"
 
 **`description`** *(recommended)*
 - **What**: 2-4 paragraph overview of the entire project
@@ -82,7 +126,66 @@ Project (Big Picture - "Build an E-commerce Site")
   - Key technologies and tools
   - How components fit together
   - What makes this project valuable
-- **Example**: "Build a full-stack e-commerce platform... This project teaches..."
+- **Example**: "Explore survey data from President Naledi's water quality initiative..."
+
+**`narrative`** *(optional, default: false)*
+- **What**: Whether this project uses narrative framing
+- **Why**: Tells the platform and tutor that this project has a story woven through it
+- **When `true`**:
+  - `narrative_context` should be provided (project-level story)
+  - Epics typically have story continuity in their `content` fields
+  - Conversational subtasks carry the narrative forward (discussion, reflection, context-setting)
+  - The tutor should stay in character and reference the narrative
+- **When `false`** (default):
+  - No narrative fields expected — the project is straightforward technical exercises
+  - Conversational subtasks are still allowed but are pedagogical, not narrative
+  - No `narrative_context` needed
+
+**`narrative_context`** *(required when `narrative: true`)*
+- **What**: The story that frames the entire project
+- **Why**: Motivates learners by connecting abstract technical work to real impact
+- **Include**:
+  - Who benefits from this work
+  - Real-world scenario or problem being solved
+  - Stakes or consequences
+  - Human element (people, communities, organizations)
+- **Example**: "You've joined President Aziza Naledi's initiative to solve Maji Ndogo's water crisis. A team of engineers, field workers, scientists, and analysts has collected 60,000 survey records..."
+- **Tone**: Engaging, human-centered, makes learner feel like their work matters
+- **Where the narrative continues**: Epic `content` fields carry the story forward. Each epic's content should connect back to this context while introducing the next chapter of the journey.
+
+**`workspace_type`** *(optional)*
+- **What**: Default workspace for this project
+- **Values**: `sql`, `python`, `cybersecurity`
+- **Why**: Determines which editor/execution environment learners see
+
+**`tutor_config`** *(optional)*
+- **What**: Project-level tutor behaviour — all project-specific AI tutor settings live here
+- **Why**: Centralises tutor personality and approach instead of scattering it across every subtask
+- **Fields**:
+  - `persona` — Custom system prompt persona. For narrative projects, this is the character the tutor plays (e.g., "Chidi Kunto, senior data analyst"). For non-narrative projects, this sets the tutor's tone and expertise level.
+  - `teaching_style` — General approach: `"socratic"` (questions before answers), `"direct"` (explain then practice), `"guided"` (hints and progressive disclosure)
+  - `encouragement_level` — How much positive reinforcement: `"high"`, `"moderate"`, `"minimal"`
+- **Relationship to subtask `tutor_guidance`**: `tutor_config` sets the defaults. Subtask-level `tutor_guidance` overrides or extends for specific situations (e.g., particular hints for a tricky SQL query).
+- **Example (narrative project)**:
+  ```json
+  {
+    "persona": "You are Chidi Kunto, a senior data analyst at the Maji Ndogo water authority. You're mentoring a junior analyst who just joined the team.",
+    "teaching_style": "socratic",
+    "encouragement_level": "high"
+  }
+  ```
+- **Example (technical project)**:
+  ```json
+  {
+    "persona": "You are an experienced Python developer helping a colleague learn pandas.",
+    "teaching_style": "direct",
+    "encouragement_level": "moderate"
+  }
+  ```
+
+**`estimated_minutes`** *(optional)*
+- **What**: Total estimated time for the entire project
+- **Use**: Time planning, progress dashboards
 
 **`learning_objectives`** *(recommended)*
 - **What**: Array of learning goals using Bloom's Taxonomy
@@ -100,19 +203,6 @@ Project (Big Picture - "Build an E-commerce Site")
   - Setup/installation instructions
   - Design decisions and rationale
 - **When to use**: Large-scale explanatory content that applies to the whole project
-
-**`narrative_context`** *(optional - Project level only)*
-- **What**: Real-world story or context that makes the project meaningful
-- **Why**: Motivates learners by connecting abstract technical work to real impact
-- **Include**:
-  - Who benefits from this work
-  - Real-world scenario or problem being solved
-  - Stakes or consequences
-  - Human element (people, communities, organizations)
-- **Example**: "This data comes from President Naledi's water quality initiative. You are helping analyze survey data that will impact real communities in rural areas. The government will use your analysis to determine where to install new water purification systems."
-- **Tone**: Engaging, human-centered, makes learner feel like their work matters
-- **Length**: 2-4 sentences typically
-- **When to use**: Projects where real-world context enhances motivation and understanding
 
 **`epics`** *(array)*
 - **What**: Major feature areas or milestones
@@ -136,6 +226,10 @@ Project (Big Picture - "Build an E-commerce Site")
   ],
 
   "content": "## Backend Architecture\n\nThe API follows a layered architecture:\n- Routes (endpoints)\n- Services (business logic)\n- Models (database)\n\n### Key Patterns\n- Dependency injection for database sessions\n- Async/await for all database operations\n- Pydantic for request/response validation",
+
+  "estimated_minutes": 60,
+  "priority": 0,
+  "dependencies": ["Previous Epic Title"],
 
   "tasks": [...]
 }
@@ -165,6 +259,19 @@ Project (Big Picture - "Build an E-commerce Site")
   - Database schema explanation
   - Code organization
 - **Example**: "## Backend Architecture\n\nThe API follows a layered architecture..."
+
+**`estimated_minutes`** *(optional)*
+- **What**: Estimated time for all tasks in this epic
+- **Use**: Time planning, progress dashboards
+
+**`priority`** *(optional, default: 2)*
+- **Scale**: 0 (critical) to 4 (nice-to-have)
+- **Use**: Ordering when multiple epics are unblocked
+
+**`dependencies`** *(array of title strings, optional)*
+- **What**: Other epics or tasks that must be completed first
+- **Common pattern**: Linear epic sequencing (Epic 2 depends on Epic 1)
+- **Example**: `["Introduction"]` — this epic requires the Introduction epic to be complete
 
 **`tasks`** *(array)*
 - **What**: Cohesive units of work within this epic
@@ -240,6 +347,17 @@ Project (Big Picture - "Build an E-commerce Site")
 - **Use P0 for**: Foundational tasks that block everything else
 - **Example**: "Set up project structure" = P0
 
+**`estimated_minutes`** *(optional)*
+- **What**: Estimated time for all subtasks in this task
+- **Use**: Time planning, progress dashboards, pacing guidance
+
+**`max_grade`** *(optional)*
+- **What**: Maximum grade points for this task's exercise subtasks
+- **Why**: Allows weighting — foundational SQL tasks might be worth more than exploratory ones
+- **Distribution**: Grade points are shared across exercise subtasks within this task (conversational subtasks have zero weight)
+- **Example**: `10` — the task is worth 10 points total, split across its exercise subtasks
+- **Default**: If omitted, all tasks are weighted equally when calculating the project grade
+
 **`content`** *(optional)*
 - **Scope**: Explanations, examples, and guidance for this specific task
 - **Include**:
@@ -300,9 +418,10 @@ Project (Big Picture - "Build an E-commerce Site")
   - `"exercise"` (default) - Technical work requiring code/output, needs acceptance criteria
   - `"conversational"` - Discussion, reflection, or context-setting, no validation needed
 - **Why**: Allows explicit Socratic moments in the learning path that are tracked but not tested
+- **Grading**: Only `exercise` subtasks carry grade weight. `conversational` subtasks are engagement checkpoints with zero grade weight.
 - **Behavior by type**:
-  - **`exercise`**: Requires `acceptance_criteria`, tutor validates work, blocks progress until complete
-  - **`conversational`**: No `acceptance_criteria` needed, tutor engages in discussion, learner proceeds after engagement
+  - **`exercise`**: Requires `acceptance_criteria`, tutor validates work, earns grade points on successful submission
+  - **`conversational`**: No `acceptance_criteria` needed, tutor engages in discussion, learner proceeds after engagement, no grade impact
 - **Example conversational subtask**:
   ```json
   {
@@ -487,13 +606,44 @@ When a learner is working on subtask "Create JWT token generation function":
 ```json
 {
   // ==================== PROJECT ====================
+  "project_id": "string (required)",
+  // Stable slug identifier, e.g. "maji-ndogo-part1"
+  // Lowercase alphanumeric + hyphens, 3-64 chars
+  // Used for re-ingestion, LTI config, cross-environment references
+
+  "version": 1,  // Optional, default 1
+  // Integer version number — increment for new versions
+  // (project_id, version) must be unique
+
+  "version_tag": "string (optional)",
+  // Human-readable version label, e.g. "2026-Q1", "pilot"
+
   "title": "string (required)",
   // Short, action-oriented project name
-  // Example: "Build an E-commerce Website"
 
   "description": "string (recommended)",
   // 2-4 paragraphs: what you're building, why, how components fit
-  // Include: technologies, goals, value proposition
+
+  "narrative": true,  // Optional, default false
+  // Whether this project uses narrative framing
+  // When true: narrative_context required, tutor stays in character,
+  //   conversational subtasks carry the story forward
+  // When false: straightforward technical exercises, no story
+
+  "narrative_context": "string (required when narrative: true)",
+  // The story that frames the project
+  // Epic content fields continue the narrative per-chapter
+
+  "workspace_type": "sql|python|cybersecurity",  // Optional
+  // Default workspace for this project
+
+  "tutor_config": {  // Optional
+    "persona": "string — who the tutor is (character for narrative, tone for technical)",
+    "teaching_style": "socratic|direct|guided",
+    "encouragement_level": "high|moderate|minimal"
+  },
+  // All project-level tutor behaviour lives here
+  // Subtask tutor_guidance overrides for specific situations
 
   "learning_objectives": [
     {
@@ -506,12 +656,9 @@ When a learner is working on subtask "Create JWT token generation function":
 
   "content": "string (markdown, optional)",
   // Long-form learning materials: architecture, setup, patterns
-  // Can include diagrams, code examples, explanations
 
-  "narrative_context": "string (optional)",
-  // Real-world story or context that makes the project meaningful
-  // Example: "This data comes from President Naledi's water quality initiative..."
-  // Makes learners feel their work has real impact
+  "estimated_minutes": 300,  // Optional
+  // Total estimated time for the entire project
 
   "epics": [
     {
@@ -534,6 +681,17 @@ When a learner is working on subtask "Create JWT token generation function":
 
       "content": "string (optional)",
       // Feature-level architecture, patterns, design decisions
+
+      "estimated_minutes": 60,  // Optional
+      // Estimated time for all tasks in this epic
+
+      "priority": 0-4,  // Optional, default 2
+      // 0 = critical foundation, 4 = nice-to-have
+
+      "dependencies": ["Epic Title", "Other Epic"],
+      // Array of epic/task titles this depends on
+      // Resolved to IDs during ingestion
+      // Epics commonly depend on previous epics for sequencing
 
       "tasks": [
         {
@@ -561,6 +719,14 @@ When a learner is working on subtask "Create JWT token generation function":
           "priority": 0-4,  // Optional, default 2
           // 0 = critical foundation, 4 = nice-to-have
 
+          "estimated_minutes": 45,  // Optional
+          // Estimated time for all subtasks in this task
+
+          "max_grade": 10,  // Optional
+          // Maximum grade points for this task's subtasks
+          // Distributes across exercise subtasks (conversational = 0 weight)
+          // If omitted, defaults to equal weight across all tasks in project
+
           "content": "string (optional)",
           // Implementation guidance, examples, patterns
 
@@ -583,13 +749,19 @@ When a learner is working on subtask "Create JWT token generation function":
               // Atomic piece of work
               // Example: "Create JWT token generation function"
 
+              "subtask_type": "exercise|conversational",
+              // Optional, default "exercise"
+              // "exercise"       — technical work, requires submission + acceptance_criteria
+              // "conversational" — discussion/reflection, no submission needed
+
               "description": "string (critical)",
               // Precise specification: what to build, how, with what
               // 2-4 sentences with details
 
-              "acceptance_criteria": "string (critical)",
+              "acceptance_criteria": "string (required for exercise, omit for conversational)",
               // Specific, testable requirements
-              // Used for validation
+              // Used for validation and grading
+              // Omit entirely for conversational subtasks
 
               "learning_objectives": [
                 {
@@ -599,23 +771,36 @@ When a learner is working on subtask "Create JWT token generation function":
               ],
               // Very specific to this implementation
 
+              "estimated_minutes": 15,  // Optional
+              // Estimated time for this subtask
+
               "content": "string (valuable)",
               // Tutorial content: examples, explanations, guidance
               // This is where you teach HOW to do it
 
               "tutor_guidance": {
-                "teaching_approach": "string (optional)",
-                "discussion_prompts": ["string"],
+                // For exercise subtasks:
+                "answer_rationale": "string (optional)",
+                "hints_to_give": ["string"],
                 "common_mistakes": ["string"],
-                "hints_to_give": ["string"]
+                "teaching_approach": "string (optional)",
+                // For conversational subtasks:
+                "teaching_approach": "string (optional)",
+                "discussion_prompts": ["string"]
               },
               // Strategic tutoring guidance for this subtask
+              // Exercise subtasks emphasise answer_rationale + hints
+              // Conversational subtasks emphasise discussion_prompts
+
+              "dependencies": ["Other Subtask Title"],
+              // Subtasks can depend on sibling subtasks within the same task
+              // Common pattern: conversational subtask → exercise subtask
 
               "priority": 0-4,
               // Mark P0 for foundational subtasks
 
               "subtasks": []
-              // Can nest subtasks infinitely for complex work
+              // Can nest subtasks for complex work
             }
           ]
         }
@@ -739,6 +924,7 @@ When a learner is working on subtask "Create JWT token generation function":
 
 ```json
 {
+  "project_id": "todo-api",
   "title": "Build Todo API",
   "epics": [
     {
@@ -752,13 +938,15 @@ When a learner is working on subtask "Create JWT token generation function":
 }
 ```
 - **Use when**: Simple projects, rapid prototyping
-- **Missing**: Descriptions, objectives, acceptance criteria
+- **Missing**: Descriptions, objectives, acceptance criteria, version
 - **Trade-off**: Less guidance for learners
 
 ### Complete Project (Recommended)
 
 ```json
 {
+  "project_id": "todo-api",
+  "version": 1,
   "title": "Build Todo API",
   "description": "Full description...",
   "learning_objectives": [...],
@@ -878,6 +1066,8 @@ Output as JSON matching the schema in SCHEMA-FOR-LLM-INGESTION.md
 
 ### Quality Checklist for Generated Projects
 
+- [ ] `project_id` is set and follows slug format (lowercase, hyphens, 3–64 chars)
+- [ ] `version` is set (or defaults to 1 for new projects)
 - [ ] Every subtask has clear `acceptance_criteria`
 - [ ] Descriptions get more specific as you go down the hierarchy
 - [ ] Learning objectives use appropriate Bloom levels
@@ -913,6 +1103,23 @@ ltt ingest project my_project.json
 # Export for backup/sharing
 ltt project export proj-abc123 --output backup.json
 ```
+
+---
+
+## Re-ingestion Behaviour (Planned)
+
+The `project_id` and `version` fields enable idempotent ingestion. This behaviour is **not yet implemented** — currently each ingestion creates a new project regardless. This section documents the intended contract.
+
+When ingesting a project whose `project_id` already exists in the database:
+
+| Scenario | Behaviour |
+|---|---|
+| Same `project_id`, same `version` | Reject (or update-in-place — TBD) |
+| Same `project_id`, higher `version` | Create new version. Learner progress on older versions is preserved. |
+| Same `project_id`, lower `version` | Reject (cannot go backwards) |
+| New `project_id` | Create new project |
+
+The internal `proj-XXXX` ID (auto-generated) remains an implementation detail. External systems (LTI custom parameters, admin dashboards) use the stable `project_id` slug.
 
 ---
 

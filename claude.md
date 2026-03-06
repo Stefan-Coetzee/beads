@@ -770,6 +770,8 @@ content_id = generate_entity_id("cnt")      # cnt-xyz789
 
 ```json
 {
+  "project_id": "my-project-slug",
+  "version": 1,
   "title": "Project Title",
   "description": "What you're building and why",
   "narrative_context": "Real-world motivation (optional)",
