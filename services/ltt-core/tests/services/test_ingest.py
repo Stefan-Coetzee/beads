@@ -561,3 +561,129 @@ async def test_ingest_defaults_when_fields_omitted(async_session, tmp_path):
     epics = await get_children(async_session, project.id)
     assert epics[0].priority == 2  # default
     assert epics[0].estimated_minutes is None
+
+
+# ============================================================================
+# Phase 02: New DB fields
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_ingest_subtask_type(async_session, tmp_path):
+    """Test that subtask_type is stored on subtasks."""
+    project_data = {
+        "title": "Project",
+        "epics": [
+            {
+                "title": "Epic",
+                "tasks": [
+                    {
+                        "title": "Task",
+                        "subtasks": [
+                            {
+                                "title": "Discussion Subtask",
+                                "subtask_type": "conversational",
+                            },
+                            {
+                                "title": "Exercise Subtask",
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    epics = await get_children(async_session, project.id)
+    tasks = await get_children(async_session, epics[0].id)
+    subtasks = await get_children(async_session, tasks[0].id)
+
+    discussion = next(s for s in subtasks if s.title == "Discussion Subtask")
+    exercise = next(s for s in subtasks if s.title == "Exercise Subtask")
+
+    assert discussion.subtask_type == "conversational"
+    assert exercise.subtask_type == "exercise"  # default
+
+
+@pytest.mark.asyncio
+async def test_ingest_narrative_and_tutor_config(async_session, tmp_path):
+    """Test that narrative and tutor_config are stored on the project."""
+    project_data = {
+        "title": "Narrative Project",
+        "narrative": True,
+        "tutor_config": {
+            "persona": "Dr. Amara",
+            "teaching_style": "socratic",
+            "encouragement_level": "enthusiastic",
+        },
+        "epics": [],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    assert project.narrative is True
+    assert project.tutor_config is not None
+    assert project.tutor_config["persona"] == "Dr. Amara"
+    assert project.tutor_config["teaching_style"] == "socratic"
+
+
+@pytest.mark.asyncio
+async def test_ingest_max_grade(async_session, tmp_path):
+    """Test that max_grade is stored on tasks."""
+    project_data = {
+        "title": "Graded Project",
+        "epics": [
+            {
+                "title": "Epic",
+                "tasks": [
+                    {
+                        "title": "Graded Task",
+                        "max_grade": 10.0,
+                        "subtasks": [{"title": "Subtask"}],
+                    },
+                    {
+                        "title": "Ungraded Task",
+                    },
+                ],
+            }
+        ],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    epics = await get_children(async_session, project.id)
+    tasks = await get_children(async_session, epics[0].id)
+
+    graded = next(t for t in tasks if t.title == "Graded Task")
+    ungraded = next(t for t in tasks if t.title == "Ungraded Task")
+
+    assert graded.max_grade == 10.0
+    assert ungraded.max_grade is None
+
+
+@pytest.mark.asyncio
+async def test_ingest_project_slug(async_session, tmp_path):
+    """Test that project_id from JSON is stored as project_slug."""
+    project_data = {
+        "project_id": "maji-ndogo-part1",
+        "title": "Maji Ndogo Water Crisis",
+        "epics": [],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    assert project.project_slug == "maji-ndogo-part1"

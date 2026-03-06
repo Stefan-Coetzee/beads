@@ -123,6 +123,11 @@ async def create_task(session: AsyncSession, task_data: TaskCreate) -> Task:
         requires_submission=task_data.requires_submission,
         workspace_type=task_data.workspace_type.value if task_data.workspace_type else None,
         tutor_persona=task_data.tutor_persona,
+        subtask_type=task_data.subtask_type,
+        narrative=task_data.narrative,
+        tutor_config=task_data.tutor_config,
+        max_grade=task_data.max_grade,
+        project_slug=task_data.project_slug,
     )
 
     session.add(task_model)

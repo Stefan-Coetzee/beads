@@ -133,6 +133,9 @@ async def ingest_project_file(
             estimated_minutes=data.get("estimated_minutes"),
             version=data.get("version", 1),
             version_tag=data.get("version_tag"),
+            narrative=data.get("narrative", False),
+            tutor_config=data.get("tutor_config"),
+            project_slug=data.get("project_id"),
         ),
     )
 
@@ -342,6 +345,8 @@ async def ingest_task(
             tutor_guidance=data.get("tutor_guidance"),
             requires_submission=data.get("requires_submission"),
             estimated_minutes=data.get("estimated_minutes"),
+            subtask_type=data.get("subtask_type", "exercise"),
+            max_grade=data.get("max_grade"),
         ),
     )
 

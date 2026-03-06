@@ -11,7 +11,7 @@ from enum import StrEnum
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import ARRAY, Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import ARRAY, Boolean, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -96,6 +96,38 @@ class TaskBase(BaseModel):
         default=None,
         description="Whether this task requires a submission to close. "
         "Default: True for subtasks, False for tasks/epics/projects",
+    )
+
+    # Subtask type (subtask level only)
+    subtask_type: str = Field(
+        default="exercise",
+        description="Type of subtask: 'exercise' (requires submission) or 'conversational' (engagement checkpoint)",
+    )
+
+    # Narrative flag (project level only)
+    narrative: bool = Field(
+        default=False,
+        description="Whether the project uses a narrative/storyline context",
+    )
+
+    # Structured tutor configuration (project level only, replaces flat tutor_persona)
+    tutor_config: dict | None = Field(
+        default=None,
+        description="Structured tutor config: persona, teaching_style, encouragement_level",
+    )
+
+    # Grade ceiling (task level primarily)
+    max_grade: float | None = Field(
+        default=None,
+        ge=0,
+        description="Maximum grade points for this task's subtasks",
+    )
+
+    # Author-defined stable project identifier
+    project_slug: str | None = Field(
+        default=None,
+        max_length=64,
+        description="Stable slug from JSON project_id field (project level only)",
     )
 
 
@@ -229,6 +261,13 @@ class TaskModel(Base, TimestampMixin):
 
     # Custom tutor persona (primarily for projects)
     tutor_persona: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+
+    # Phase 02 fields
+    subtask_type: Mapped[str] = mapped_column(String(20), default="exercise")
+    narrative: Mapped[bool] = mapped_column(Boolean, default=False)
+    tutor_config: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    max_grade: Mapped[float | None] = mapped_column(Float, nullable=True)
+    project_slug: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # Relationships
     parent: Mapped[Optional["TaskModel"]] = relationship(
