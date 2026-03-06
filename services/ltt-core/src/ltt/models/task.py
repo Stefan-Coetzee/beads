@@ -108,6 +108,10 @@ class TaskCreate(TaskBase):
         description="Project ID. Required for non-project tasks. Auto-set for projects.",
     )
 
+    # Versioning (project level only)
+    version: int = Field(default=1, description="Project version number")
+    version_tag: str | None = Field(default=None, description="Human-readable version tag")
+
     # Optional: provide a custom ID (otherwise generated)
     id: str | None = Field(default=None, pattern=r"^[a-z0-9\-\.]+$")
 

@@ -130,6 +130,9 @@ async def ingest_project_file(
             requires_submission=data.get("requires_submission"),
             workspace_type=workspace_type,
             tutor_persona=tutor_persona,
+            estimated_minutes=data.get("estimated_minutes"),
+            version=data.get("version", 1),
+            version_tag=data.get("version_tag"),
         ),
     )
 
@@ -208,6 +211,8 @@ async def ingest_epic(
             content=data.get("content"),
             tutor_guidance=data.get("tutor_guidance"),
             requires_submission=data.get("requires_submission"),
+            estimated_minutes=data.get("estimated_minutes"),
+            priority=data.get("priority", 2),
         ),
     )
 
@@ -336,6 +341,7 @@ async def ingest_task(
             content=data.get("content"),
             tutor_guidance=data.get("tutor_guidance"),
             requires_submission=data.get("requires_submission"),
+            estimated_minutes=data.get("estimated_minutes"),
         ),
     )
 

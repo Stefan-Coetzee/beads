@@ -444,3 +444,120 @@ async def test_ingest_with_epic_dependencies(async_session, tmp_path):
     # Epic 1 should not be blocked
     blockers = await get_blocking_tasks(async_session, epic1.id, learner_id)
     assert len(blockers) == 0
+
+
+# ============================================================================
+# Phase 01: Fix ingest drops
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_ingest_estimated_minutes_at_all_levels(async_session, tmp_path):
+    """Test that estimated_minutes is stored at project, epic, task, and subtask levels."""
+    project_data = {
+        "title": "Timed Project",
+        "estimated_minutes": 600,
+        "epics": [
+            {
+                "title": "Epic",
+                "estimated_minutes": 300,
+                "tasks": [
+                    {
+                        "title": "Task",
+                        "estimated_minutes": 120,
+                        "subtasks": [
+                            {
+                                "title": "Subtask",
+                                "estimated_minutes": 30,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    assert project.estimated_minutes == 600
+
+    epics = await get_children(async_session, project.id)
+    assert epics[0].estimated_minutes == 300
+
+    tasks = await get_children(async_session, epics[0].id)
+    assert tasks[0].estimated_minutes == 120
+
+    subtasks = await get_children(async_session, tasks[0].id)
+    assert subtasks[0].estimated_minutes == 30
+
+
+@pytest.mark.asyncio
+async def test_ingest_epic_priority(async_session, tmp_path):
+    """Test that epic priority is passed through (not hardcoded to default)."""
+    project_data = {
+        "title": "Priority Project",
+        "epics": [
+            {
+                "title": "Critical Epic",
+                "priority": 0,
+                "tasks": [{"title": "Task"}],
+            }
+        ],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    epics = await get_children(async_session, project.id)
+    assert epics[0].priority == 0
+
+
+@pytest.mark.asyncio
+async def test_ingest_version_and_version_tag(async_session, tmp_path):
+    """Test that version and version_tag are stored on the project."""
+    project_data = {
+        "title": "Versioned Project",
+        "version": 2,
+        "version_tag": "v2-beta",
+        "epics": [],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    assert project.version == 2
+    assert project.version_tag == "v2-beta"
+
+
+@pytest.mark.asyncio
+async def test_ingest_defaults_when_fields_omitted(async_session, tmp_path):
+    """Test defaults when optional fields are omitted."""
+    project_data = {
+        "title": "Minimal Project",
+        "epics": [
+            {
+                "title": "Epic",
+                "tasks": [{"title": "Task"}],
+            }
+        ],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    assert project.estimated_minutes is None
+    assert project.version == 1
+    assert project.version_tag is None
+
+    epics = await get_children(async_session, project.id)
+    assert epics[0].priority == 2  # default
+    assert epics[0].estimated_minutes is None

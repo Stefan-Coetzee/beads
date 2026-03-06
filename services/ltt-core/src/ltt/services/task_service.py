@@ -117,6 +117,12 @@ async def create_task(session: AsyncSession, task_data: TaskCreate) -> Task:
         content_refs=task_data.content_refs or [],
         tutor_guidance=task_data.tutor_guidance,
         narrative_context=task_data.narrative_context,
+        summary=task_data.summary,
+        version=task_data.version,
+        version_tag=task_data.version_tag,
+        requires_submission=task_data.requires_submission,
+        workspace_type=task_data.workspace_type.value if task_data.workspace_type else None,
+        tutor_persona=task_data.tutor_persona,
     )
 
     session.add(task_model)
