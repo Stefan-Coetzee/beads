@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     dev_learner_id: str = "learner-dev-001"
     dev_project_id: str = ""
 
+    # Admin API key for privileged operations (project ingestion, etc.).
+    # Empty string → admin endpoints disabled.
+    admin_api_key: str = ""
+
     # ── LTI ───────────────────────────────────────────────────────────────────
     # Values starting with "-----BEGIN" are PEM strings; otherwise file paths.
     # Platform config starting with "{" or "[" is parsed as JSON directly.
@@ -123,6 +127,14 @@ class Settings(BaseSettings):
                 errors.append(
                     "LTT_FRONTEND_URL must not point to localhost "
                     f"(env={self.env!r} — LTI launch redirects will break)"
+                )
+
+        # ── Admin API key — reject placeholders in any deployed env ────────
+        if self.env != "local" and self.admin_api_key:
+            if self.admin_api_key.startswith("PLACEHOLDER"):
+                errors.append(
+                    "LTT_ADMIN_API_KEY still contains the Terraform placeholder — "
+                    "set a real value in Secrets Manager before deploying"
                 )
 
         # ── Production only ───────────────────────────────────────────────────

@@ -21,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from api.admin_routes import router as admin_router
 from api.agents import close_checkpointer, init_checkpointer
 from api.database import close_database, get_session_factory, init_database
 from api.frontend_routes import router as frontend_router
@@ -145,6 +146,7 @@ def get_app() -> FastAPI:
     # Include routes
     app.include_router(router, prefix="/api/v1")
     app.include_router(frontend_router)  # Frontend routes already have /api/v1 prefix
+    app.include_router(admin_router)  # Admin routes already have /api/v1 prefix
     app.include_router(lti_router)  # LTI routes at /lti/*
 
     # Health check — verifies DB connectivity so ECS/ALB know the task is

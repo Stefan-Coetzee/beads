@@ -16,6 +16,7 @@ locals {
     lti_private_key     = "RSA private key PEM for LTI 1.3 JWT signing"
     lti_public_key      = "RSA public key PEM for LTI 1.3 JWKS"
     lti_platform_config = "JSON: LTI platform registration (issuer, client_id, endpoints)"
+    admin_api_key       = "Admin API key for privileged operations (project ingestion)"
   }
 }
 

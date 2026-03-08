@@ -111,6 +111,7 @@ locals {
     lti_private_key     = "LTT_LTI_PRIVATE_KEY"
     lti_public_key      = "LTT_LTI_PUBLIC_KEY"
     lti_platform_config = "LTT_LTI_PLATFORM_CONFIG"
+    admin_api_key       = "LTT_ADMIN_API_KEY"
   }
 
   # Only inject secrets that are provided (allows partial secret sets in dev)
