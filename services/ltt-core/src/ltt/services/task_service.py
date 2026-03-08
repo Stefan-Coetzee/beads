@@ -396,3 +396,33 @@ async def get_task_count(session: AsyncSession, project_id: str | None = None) -
 
     result = await session.execute(query)
     return result.scalar() or 0
+
+
+async def get_project_by_slug(
+    session: AsyncSession,
+    slug: str,
+    version: int | None = None,
+) -> Task | None:
+    """
+    Get a project by its stable slug. Returns latest version if version not specified.
+
+    Args:
+        session: Database session
+        slug: Project slug (e.g. "maji-ndogo-part1")
+        version: Optional specific version number
+
+    Returns:
+        Task if found, None otherwise
+    """
+    query = select(TaskModel).where(
+        TaskModel.project_slug == slug,
+        TaskModel.task_type == "project",
+    )
+    if version is not None:
+        query = query.where(TaskModel.version == version)
+    else:
+        query = query.order_by(TaskModel.version.desc())
+
+    result = await session.execute(query.limit(1))
+    task_model = result.scalar_one_or_none()
+    return Task.model_validate(task_model) if task_model else None

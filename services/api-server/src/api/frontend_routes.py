@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ltt.models import TaskStatus
 from ltt.services.dependency_service import get_ready_work, is_task_blocked
 from ltt.services.progress_service import get_or_create_progress, update_status
-from ltt.services.task_service import TaskNotFoundError, get_children, get_task
+from ltt.services.task_service import TaskNotFoundError, get_children, get_project_by_slug, get_task
 from pydantic import BaseModel, Field
 
 from api.auth import LearnerContext, get_learner_context
@@ -46,6 +46,17 @@ class TaskNode(BaseModel):
     acceptance_criteria: str | None = None
     children: list["TaskNode"] = []
     progress: dict[str, int] | None = None
+
+
+class ProjectBySlugResponse(BaseModel):
+    """Response for project lookup by slug."""
+
+    project_id: str = Field(..., description="The stable slug")
+    internal_id: str = Field(..., description="Internal auto-generated ID (proj-XXXX)")
+    version: int
+    title: str
+    description: str | None = None
+    workspace_type: str | None = None
 
 
 class ProjectInfo(BaseModel):
@@ -183,6 +194,33 @@ async def list_projects() -> list[dict]:
             return projects
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/projects/{slug}", response_model=ProjectBySlugResponse)
+async def get_project_by_slug_endpoint(
+    slug: str,
+    version: int | None = Query(default=None, description="Specific version number"),
+) -> ProjectBySlugResponse:
+    """
+    Get a project by its stable slug.
+
+    Returns the latest version unless a specific version is requested.
+    """
+    session_factory = get_session_factory()
+
+    async with session_factory() as session:
+        project = await get_project_by_slug(session, slug, version=version)
+        if not project:
+            raise HTTPException(status_code=404, detail=f"Project '{slug}' not found")
+
+        return ProjectBySlugResponse(
+            project_id=project.project_slug or slug,
+            internal_id=project.id,
+            version=project.version,
+            title=project.title,
+            description=project.description,
+            workspace_type=project.workspace_type,
+        )
 
 
 @router.get("/project/{project_id}/tree", response_model=ProjectTreeResponse)
