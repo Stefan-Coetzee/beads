@@ -547,3 +547,105 @@ async def test_create_manual_validation(async_session):
     assert validation.passed is False
     assert validation.error_message == "Needs more detail"
     assert validation.validator_type == ValidatorType.MANUAL
+
+
+# ============================================================================
+# Grade Storage Tests (Phase 04)
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_validation_stores_grade_on_pass(async_session):
+    """Test that passing validation stores grade=1.0 and grader_type='auto'."""
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
+    submission = await create_submission(
+        async_session, project.id, learner_id, "Valid content", SubmissionType.TEXT
+    )
+
+    validation = await validate_submission(async_session, submission.id)
+
+    assert validation.passed is True
+    assert validation.grade == 1.0
+    assert validation.grader_type == "auto"
+    assert validation.feedback == "Passed: non-empty submission"
+
+
+@pytest.mark.asyncio
+async def test_validation_stores_grade_on_fail(async_session):
+    """Test that failing validation stores grade=0.0."""
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
+    submission = await create_submission(
+        async_session, project.id, learner_id, "   ", SubmissionType.TEXT
+    )
+
+    validation = await validate_submission(async_session, submission.id)
+
+    assert validation.passed is False
+    assert validation.grade == 0.0
+    assert validation.grader_type == "auto"
+    assert validation.feedback == "Submission is empty"
+
+
+@pytest.mark.asyncio
+async def test_manual_validation_stores_grade(async_session):
+    """Test that manual validation stores grade and feedback."""
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
+    submission = await create_submission(
+        async_session, project.id, learner_id, "Content", SubmissionType.TEXT
+    )
+
+    validation = await create_manual_validation(
+        async_session,
+        submission.id,
+        passed=True,
+        grade=0.85,
+        feedback="Good work, minor issues with formatting",
+    )
+
+    assert validation.grade == 0.85
+    assert validation.grader_type == "manual"
+    assert validation.feedback == "Good work, minor issues with formatting"
+
+
+@pytest.mark.asyncio
+async def test_manual_validation_defaults_grade(async_session):
+    """Test that manual validation defaults grade to 1.0/0.0 when not provided."""
+    learner_id = generate_entity_id(PREFIX_LEARNER)
+    learner = LearnerModel(id=learner_id, learner_metadata="{}")
+    async_session.add(learner)
+    await async_session.commit()
+
+    project = await create_task(
+        async_session, TaskCreate(title="Project", task_type=TaskType.PROJECT)
+    )
+    submission = await create_submission(
+        async_session, project.id, learner_id, "Content", SubmissionType.TEXT
+    )
+
+    # Pass without explicit grade
+    validation = await create_manual_validation(
+        async_session, submission.id, passed=True
+    )
+    assert validation.grade == 1.0
+    assert validation.grader_type == "manual"

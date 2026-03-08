@@ -82,7 +82,7 @@ async def validate_submission(
         submission_type=submission.submission_type,
     )
 
-    # 3. Create validation record
+    # 3. Create validation record with grade
     validation_id = generate_entity_id(PREFIX_VALIDATION)
     validation = ValidationModel(
         id=validation_id,
@@ -91,6 +91,9 @@ async def validate_submission(
         passed=passed,
         error_message=error_message,
         validator_type=validator_type.value,
+        grade=1.0 if passed else 0.0,
+        grader_type="auto",
+        feedback="Passed: non-empty submission" if passed else error_message,
     )
     session.add(validation)
 
@@ -252,6 +255,8 @@ async def create_manual_validation(
     passed: bool,
     error_message: str | None = None,
     actor: str = "manual",
+    grade: float | None = None,
+    feedback: str | None = None,
 ) -> Validation:
     """
     Create a manual validation (for human review).
@@ -287,6 +292,9 @@ async def create_manual_validation(
         passed=passed,
         error_message=error_message,
         validator_type=ValidatorType.MANUAL.value,
+        grade=grade if grade is not None else (1.0 if passed else 0.0),
+        grader_type="manual",
+        feedback=feedback,
     )
     session.add(validation)
 

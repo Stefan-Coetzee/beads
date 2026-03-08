@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -35,6 +35,9 @@ class ValidationBase(BaseModel):
         default=None, description="Error details if validation failed"
     )
     validator_type: ValidatorType = Field(default=ValidatorType.AUTOMATED)
+    grade: float | None = Field(default=None, description="Normalised score 0.0–1.0")
+    grader_type: str = Field(default="auto", description="auto / llm / manual")
+    feedback: str | None = Field(default=None, description="Grader explanation")
 
 
 class ValidationCreate(ValidationBase):
@@ -76,6 +79,9 @@ class ValidationModel(Base):
     passed: Mapped[bool] = mapped_column(Boolean, nullable=False)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     validator_type: Mapped[str] = mapped_column(String, default="automated")
+    grade: Mapped[float | None] = mapped_column(Float, nullable=True)
+    grader_type: Mapped[str] = mapped_column(String(20), default="auto")
+    feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     validated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
