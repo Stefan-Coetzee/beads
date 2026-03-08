@@ -43,9 +43,22 @@ async def export_project(session: AsyncSession, project_id: str, format: str = "
         "epics": [],
     }
 
-    # Add narrative_context if present (primarily for projects)
-    if project.narrative_context:
-        data["narrative_context"] = project.narrative_context
+    # Add optional project-level fields (omit None values)
+    optional_fields = {
+        "project_id": project.project_slug,
+        "version": project.version,
+        "version_tag": project.version_tag,
+        "workspace_type": project.workspace_type,
+        "narrative": project.narrative if project.narrative else None,
+        "narrative_context": project.narrative_context,
+        "tutor_persona": project.tutor_persona,
+        "tutor_config": project.tutor_config,
+        "estimated_minutes": project.estimated_minutes,
+        "requires_submission": project.requires_submission,
+    }
+    for key, value in optional_fields.items():
+        if value is not None:
+            data[key] = value
 
     # Get epics (direct children)
     children = await get_children(session, project_id)
@@ -93,9 +106,22 @@ async def export_task_tree(session: AsyncSession, task_id: str) -> dict:
         "content": task.content,
     }
 
-    # Add tutor_guidance if present
+    # Add optional task-level fields (omit None values)
+    optional_fields: dict = {}
+    if task.estimated_minutes is not None:
+        optional_fields["estimated_minutes"] = task.estimated_minutes
+    if task.requires_submission is not None:
+        optional_fields["requires_submission"] = task.requires_submission
     if task.tutor_guidance:
-        data["tutor_guidance"] = task.tutor_guidance
+        optional_fields["tutor_guidance"] = task.tutor_guidance
+    # subtask_type only on subtasks (non-default)
+    if task.task_type == TaskType.SUBTASK and task.subtask_type and task.subtask_type != "exercise":
+        optional_fields["subtask_type"] = task.subtask_type
+    # max_grade on tasks
+    if task.max_grade is not None:
+        optional_fields["max_grade"] = task.max_grade
+
+    data.update(optional_fields)
 
     # Add dependencies (export as titles for readability)
     # Note: We only export blocking dependencies, not parent_child (implicit in hierarchy)
