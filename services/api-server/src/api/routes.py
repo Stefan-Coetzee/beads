@@ -212,6 +212,66 @@ async def _register_thread(thread_id: str, learner_id: str, project_id: str) -> 
         logger.debug("Failed to register thread %s (table may not exist yet)", thread_id)
 
 
+async def _try_grade_passback(
+    new_messages: list, learner_id: str, project_id: str
+) -> None:
+    """
+    Check if any submit tool calls in this turn closed a task.
+    If so, compute progress and send grade to the LMS.
+
+    Failures are logged but never block the learner experience.
+    """
+    # Look for tool result messages from the "submit" tool that indicate closure
+    has_closure = False
+    for msg in new_messages:
+        if not hasattr(msg, "name") or msg.name != "submit":
+            continue
+        content = msg.content if hasattr(msg, "content") else ""
+        if isinstance(content, str) and "closed" in content.lower():
+            has_closure = True
+            break
+
+    if not has_closure:
+        return
+
+    try:
+        import asyncio
+
+        from api.lti.grades import get_active_launch, send_grade
+        from api.lti.routes import get_launch_data_storage
+
+        storage = get_launch_data_storage()
+        launch = get_active_launch(storage, learner_id, project_id)
+        if not launch:
+            return
+
+        # Compute current progress
+        from ltt.services.learning import get_progress
+
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            progress = await get_progress(session, learner_id, project_id)
+
+        completed = progress.completed_tasks
+        total = progress.total_tasks
+
+        await asyncio.to_thread(
+            send_grade,
+            launch_id=launch.launch_id,
+            storage=storage,
+            learner_sub=launch.learner_sub,
+            score=float(completed),
+            max_score=float(total),
+            activity_progress="Completed" if completed == total else "InProgress",
+            grading_progress="FullyGraded" if completed == total else "Pending",
+            comment=f"Completed {completed}/{total} tasks ({completed / total * 100:.0f}%)"
+            if total > 0
+            else None,
+        )
+    except Exception:
+        logger.debug("Grade passback skipped (LTI not available or error)", exc_info=True)
+
+
 # =============================================================================
 # Endpoints
 # =============================================================================
@@ -283,6 +343,9 @@ async def chat(
                 response_text = msg.content
                 break
 
+        # Fire-and-forget grade passback if a task was closed
+        await _try_grade_passback(new_messages, ctx.learner_id, ctx.project_id or "")
+
         return ChatResponse(
             response=response_text,
             thread_id=thread_id,
@@ -322,11 +385,15 @@ async def chat_stream(
                 session_factory=get_session_factory(),
             )
 
+            # Collect streamed messages for grade passback check
+            all_messages: list = []
+
             # full_message and thread_id are built outside the generator
             async for event in agent.astream(full_message, thread_id=thread_id):
                 messages = event.get("messages", [])
                 if messages:
                     last_msg = messages[-1]
+                    all_messages.append(last_msg)
 
                     # Skip HumanMessages - only stream AI responses and tool results
                     # LangGraph streams ALL messages including user input
@@ -349,6 +416,9 @@ async def chat_stream(
                         else:
                             chunk = StreamChunk(type="text", content=last_msg.content)
                         yield f"data: {chunk.model_dump_json()}\n\n"
+
+            # Fire-and-forget grade passback if a task was closed
+            await _try_grade_passback(all_messages, learner_id, project_id)
 
             # Send done signal
             yield f"data: {StreamChunk(type='done', content=None).model_dump_json()}\n\n"
