@@ -687,3 +687,120 @@ async def test_ingest_project_slug(async_session, tmp_path):
 
     project = await get_task(async_session, result.project_id)
     assert project.project_slug == "maji-ndogo-part1"
+
+
+# ============================================================================
+# Re-Ingestion Tests (Phase 06)
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_reingest_same_slug_same_version_rejected(async_session, tmp_path):
+    """Ingesting the same slug+version twice raises ValueError."""
+    project_data = {
+        "project_id": "reingest-test",
+        "version": 1,
+        "title": "Reingest Test",
+        "epics": [],
+    }
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+
+    await ingest_project_file(async_session, file_path)
+
+    with pytest.raises(ValueError, match="already exists"):
+        await ingest_project_file(async_session, file_path)
+
+
+@pytest.mark.asyncio
+async def test_reingest_same_slug_higher_version_creates_new(async_session, tmp_path):
+    """Ingesting a higher version of the same slug creates a new project."""
+    v1_data = {
+        "project_id": "versioned-proj",
+        "version": 1,
+        "title": "Project v1",
+        "epics": [],
+    }
+    v2_data = {
+        "project_id": "versioned-proj",
+        "version": 2,
+        "title": "Project v2",
+        "epics": [],
+    }
+
+    f1 = tmp_path / "v1.json"
+    f1.write_text(json.dumps(v1_data))
+    r1 = await ingest_project_file(async_session, f1)
+
+    f2 = tmp_path / "v2.json"
+    f2.write_text(json.dumps(v2_data))
+    r2 = await ingest_project_file(async_session, f2)
+
+    assert r1.project_id != r2.project_id
+
+    p1 = await get_task(async_session, r1.project_id)
+    p2 = await get_task(async_session, r2.project_id)
+    assert p1.version == 1
+    assert p2.version == 2
+    assert p1.project_slug == p2.project_slug == "versioned-proj"
+
+
+@pytest.mark.asyncio
+async def test_reingest_same_slug_lower_version_rejected(async_session, tmp_path):
+    """Ingesting a lower version than the latest raises ValueError."""
+    v2_data = {
+        "project_id": "version-order",
+        "version": 2,
+        "title": "Project v2",
+        "epics": [],
+    }
+    v1_data = {
+        "project_id": "version-order",
+        "version": 1,
+        "title": "Project v1",
+        "epics": [],
+    }
+
+    f2 = tmp_path / "v2.json"
+    f2.write_text(json.dumps(v2_data))
+    await ingest_project_file(async_session, f2)
+
+    f1 = tmp_path / "v1.json"
+    f1.write_text(json.dumps(v1_data))
+    with pytest.raises(ValueError, match="must be higher"):
+        await ingest_project_file(async_session, f1)
+
+
+@pytest.mark.asyncio
+async def test_reingest_no_slug_allows_duplicates(async_session, tmp_path):
+    """Projects without project_id can be ingested multiple times."""
+    project_data = {
+        "title": "No Slug Project",
+        "epics": [],
+    }
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+
+    r1 = await ingest_project_file(async_session, file_path)
+    r2 = await ingest_project_file(async_session, file_path)
+
+    assert r1.project_id != r2.project_id
+
+
+@pytest.mark.asyncio
+async def test_dry_run_reingest_reports_conflict(async_session, tmp_path):
+    """Dry run on existing slug+version reports the conflict in errors."""
+    project_data = {
+        "project_id": "dry-run-conflict",
+        "version": 1,
+        "title": "Dry Run Test",
+        "epics": [],
+    }
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+
+    await ingest_project_file(async_session, file_path)
+
+    result = await ingest_project_file(async_session, file_path, dry_run=True)
+    assert result.project_id == "(dry-run)"
+    assert any("already exists" in e for e in result.errors)

@@ -19,7 +19,7 @@ from ltt.services.learning.llm_summarization import (
     generate_epic_summary,
     generate_task_summary,
 )
-from ltt.services.task_service import create_task, update_task_summary
+from ltt.services.task_service import create_task, get_project_by_slug, update_task_summary
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +91,34 @@ async def ingest_project_file(
     errors = validate_project_structure(data)
     if errors and not dry_run:
         raise ValueError(f"Invalid project structure: {', '.join(errors)}")
+
+    # Check for duplicate slug before any DB changes (also during dry_run)
+    slug = data.get("project_id")
+    version = data.get("version", 1)
+
+    if slug:
+        existing = await get_project_by_slug(session, slug, version)
+        if existing:
+            msg = (
+                f"Project '{slug}' version {version} already exists "
+                f"(internal ID: {existing.id}). "
+                f"Bump the version number in your JSON to create a new version."
+            )
+            if dry_run:
+                errors.append(msg)
+            else:
+                raise ValueError(msg)
+
+        latest = await get_project_by_slug(session, slug)  # no version → latest
+        if latest and version <= latest.version:
+            msg = (
+                f"Project '{slug}' already has version {latest.version}. "
+                f"New version must be higher (got {version})."
+            )
+            if dry_run:
+                errors.append(msg)
+            else:
+                raise ValueError(msg)
 
     if dry_run:
         return IngestResult(
