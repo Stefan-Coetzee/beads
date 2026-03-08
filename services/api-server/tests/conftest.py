@@ -158,7 +158,10 @@ def _build_test_app(
     test_app = FastAPI(title="Test")
 
     # Only include routers that don't pull in the agent stack
+    from api.admin_routes import router as admin_router
+
     test_app.include_router(frontend_router)  # has its own /api/v1 prefix
+    test_app.include_router(admin_router)  # has its own /api/v1 prefix
     test_app.include_router(lti_router)  # has its own /lti prefix
 
     @test_app.get("/health")

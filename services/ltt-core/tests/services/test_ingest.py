@@ -444,3 +444,363 @@ async def test_ingest_with_epic_dependencies(async_session, tmp_path):
     # Epic 1 should not be blocked
     blockers = await get_blocking_tasks(async_session, epic1.id, learner_id)
     assert len(blockers) == 0
+
+
+# ============================================================================
+# Phase 01: Fix ingest drops
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_ingest_estimated_minutes_at_all_levels(async_session, tmp_path):
+    """Test that estimated_minutes is stored at project, epic, task, and subtask levels."""
+    project_data = {
+        "title": "Timed Project",
+        "estimated_minutes": 600,
+        "epics": [
+            {
+                "title": "Epic",
+                "estimated_minutes": 300,
+                "tasks": [
+                    {
+                        "title": "Task",
+                        "estimated_minutes": 120,
+                        "subtasks": [
+                            {
+                                "title": "Subtask",
+                                "estimated_minutes": 30,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    assert project.estimated_minutes == 600
+
+    epics = await get_children(async_session, project.id)
+    assert epics[0].estimated_minutes == 300
+
+    tasks = await get_children(async_session, epics[0].id)
+    assert tasks[0].estimated_minutes == 120
+
+    subtasks = await get_children(async_session, tasks[0].id)
+    assert subtasks[0].estimated_minutes == 30
+
+
+@pytest.mark.asyncio
+async def test_ingest_epic_priority(async_session, tmp_path):
+    """Test that epic priority is passed through (not hardcoded to default)."""
+    project_data = {
+        "title": "Priority Project",
+        "epics": [
+            {
+                "title": "Critical Epic",
+                "priority": 0,
+                "tasks": [{"title": "Task"}],
+            }
+        ],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    epics = await get_children(async_session, project.id)
+    assert epics[0].priority == 0
+
+
+@pytest.mark.asyncio
+async def test_ingest_version_and_version_tag(async_session, tmp_path):
+    """Test that version and version_tag are stored on the project."""
+    project_data = {
+        "title": "Versioned Project",
+        "version": 2,
+        "version_tag": "v2-beta",
+        "epics": [],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    assert project.version == 2
+    assert project.version_tag == "v2-beta"
+
+
+@pytest.mark.asyncio
+async def test_ingest_defaults_when_fields_omitted(async_session, tmp_path):
+    """Test defaults when optional fields are omitted."""
+    project_data = {
+        "title": "Minimal Project",
+        "epics": [
+            {
+                "title": "Epic",
+                "tasks": [{"title": "Task"}],
+            }
+        ],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    assert project.estimated_minutes is None
+    assert project.version == 1
+    assert project.version_tag is None
+
+    epics = await get_children(async_session, project.id)
+    assert epics[0].priority == 2  # default
+    assert epics[0].estimated_minutes is None
+
+
+# ============================================================================
+# Phase 02: New DB fields
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_ingest_subtask_type(async_session, tmp_path):
+    """Test that subtask_type is stored on subtasks."""
+    project_data = {
+        "title": "Project",
+        "epics": [
+            {
+                "title": "Epic",
+                "tasks": [
+                    {
+                        "title": "Task",
+                        "subtasks": [
+                            {
+                                "title": "Discussion Subtask",
+                                "subtask_type": "conversational",
+                            },
+                            {
+                                "title": "Exercise Subtask",
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    epics = await get_children(async_session, project.id)
+    tasks = await get_children(async_session, epics[0].id)
+    subtasks = await get_children(async_session, tasks[0].id)
+
+    discussion = next(s for s in subtasks if s.title == "Discussion Subtask")
+    exercise = next(s for s in subtasks if s.title == "Exercise Subtask")
+
+    assert discussion.subtask_type == "conversational"
+    assert exercise.subtask_type == "exercise"  # default
+
+
+@pytest.mark.asyncio
+async def test_ingest_narrative_and_tutor_config(async_session, tmp_path):
+    """Test that narrative and tutor_config are stored on the project."""
+    project_data = {
+        "title": "Narrative Project",
+        "narrative": True,
+        "tutor_config": {
+            "persona": "Dr. Amara",
+            "teaching_style": "socratic",
+            "encouragement_level": "enthusiastic",
+        },
+        "epics": [],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    assert project.narrative is True
+    assert project.tutor_config is not None
+    assert project.tutor_config["persona"] == "Dr. Amara"
+    assert project.tutor_config["teaching_style"] == "socratic"
+
+
+@pytest.mark.asyncio
+async def test_ingest_max_grade(async_session, tmp_path):
+    """Test that max_grade is stored on tasks."""
+    project_data = {
+        "title": "Graded Project",
+        "epics": [
+            {
+                "title": "Epic",
+                "tasks": [
+                    {
+                        "title": "Graded Task",
+                        "max_grade": 10.0,
+                        "subtasks": [{"title": "Subtask"}],
+                    },
+                    {
+                        "title": "Ungraded Task",
+                    },
+                ],
+            }
+        ],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    epics = await get_children(async_session, project.id)
+    tasks = await get_children(async_session, epics[0].id)
+
+    graded = next(t for t in tasks if t.title == "Graded Task")
+    ungraded = next(t for t in tasks if t.title == "Ungraded Task")
+
+    assert graded.max_grade == 10.0
+    assert ungraded.max_grade is None
+
+
+@pytest.mark.asyncio
+async def test_ingest_project_slug(async_session, tmp_path):
+    """Test that project_id from JSON is stored as project_slug."""
+    project_data = {
+        "project_id": "maji-ndogo-part1",
+        "title": "Maji Ndogo Water Crisis",
+        "epics": [],
+    }
+
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+    result = await ingest_project_file(async_session, file_path)
+
+    project = await get_task(async_session, result.project_id)
+    assert project.project_slug == "maji-ndogo-part1"
+
+
+# ============================================================================
+# Re-Ingestion Tests (Phase 06)
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_reingest_same_slug_same_version_rejected(async_session, tmp_path):
+    """Ingesting the same slug+version twice raises ValueError."""
+    project_data = {
+        "project_id": "reingest-test",
+        "version": 1,
+        "title": "Reingest Test",
+        "epics": [],
+    }
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+
+    await ingest_project_file(async_session, file_path)
+
+    with pytest.raises(ValueError, match="already exists"):
+        await ingest_project_file(async_session, file_path)
+
+
+@pytest.mark.asyncio
+async def test_reingest_same_slug_higher_version_creates_new(async_session, tmp_path):
+    """Ingesting a higher version of the same slug creates a new project."""
+    v1_data = {
+        "project_id": "versioned-proj",
+        "version": 1,
+        "title": "Project v1",
+        "epics": [],
+    }
+    v2_data = {
+        "project_id": "versioned-proj",
+        "version": 2,
+        "title": "Project v2",
+        "epics": [],
+    }
+
+    f1 = tmp_path / "v1.json"
+    f1.write_text(json.dumps(v1_data))
+    r1 = await ingest_project_file(async_session, f1)
+
+    f2 = tmp_path / "v2.json"
+    f2.write_text(json.dumps(v2_data))
+    r2 = await ingest_project_file(async_session, f2)
+
+    assert r1.project_id != r2.project_id
+
+    p1 = await get_task(async_session, r1.project_id)
+    p2 = await get_task(async_session, r2.project_id)
+    assert p1.version == 1
+    assert p2.version == 2
+    assert p1.project_slug == p2.project_slug == "versioned-proj"
+
+
+@pytest.mark.asyncio
+async def test_reingest_same_slug_lower_version_rejected(async_session, tmp_path):
+    """Ingesting a lower version than the latest raises ValueError."""
+    v2_data = {
+        "project_id": "version-order",
+        "version": 2,
+        "title": "Project v2",
+        "epics": [],
+    }
+    v1_data = {
+        "project_id": "version-order",
+        "version": 1,
+        "title": "Project v1",
+        "epics": [],
+    }
+
+    f2 = tmp_path / "v2.json"
+    f2.write_text(json.dumps(v2_data))
+    await ingest_project_file(async_session, f2)
+
+    f1 = tmp_path / "v1.json"
+    f1.write_text(json.dumps(v1_data))
+    with pytest.raises(ValueError, match="must be higher"):
+        await ingest_project_file(async_session, f1)
+
+
+@pytest.mark.asyncio
+async def test_reingest_no_slug_allows_duplicates(async_session, tmp_path):
+    """Projects without project_id can be ingested multiple times."""
+    project_data = {
+        "title": "No Slug Project",
+        "epics": [],
+    }
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+
+    r1 = await ingest_project_file(async_session, file_path)
+    r2 = await ingest_project_file(async_session, file_path)
+
+    assert r1.project_id != r2.project_id
+
+
+@pytest.mark.asyncio
+async def test_dry_run_reingest_reports_conflict(async_session, tmp_path):
+    """Dry run on existing slug+version reports the conflict in errors."""
+    project_data = {
+        "project_id": "dry-run-conflict",
+        "version": 1,
+        "title": "Dry Run Test",
+        "epics": [],
+    }
+    file_path = tmp_path / "project.json"
+    file_path.write_text(json.dumps(project_data))
+
+    await ingest_project_file(async_session, file_path)
+
+    result = await ingest_project_file(async_session, file_path, dry_run=True)
+    assert result.project_id == "(dry-run)"
+    assert any("already exists" in e for e in result.errors)

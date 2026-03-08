@@ -13,6 +13,7 @@ from ltt.services.task_service import (
     get_ancestors,
     get_children,
     get_comments,
+    get_project_by_slug,
     get_task,
     get_task_count,
     update_task,
@@ -324,3 +325,89 @@ async def test_get_task_count(async_session):
     # Count for project 1
     proj1_count = await get_task_count(async_session, project_id=proj1.id)
     assert proj1_count == 2  # Project + 1 task
+
+
+# ============================================================================
+# Slug Lookup Tests (Phase 05)
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_get_project_by_slug_found(async_session):
+    """Test retrieving a project by its slug."""
+    project = await create_task(
+        async_session,
+        TaskCreate(
+            title="Maji Ndogo Part 1",
+            task_type=TaskType.PROJECT,
+            project_slug="maji-ndogo-part1",
+        ),
+    )
+
+    result = await get_project_by_slug(async_session, "maji-ndogo-part1")
+    assert result is not None
+    assert result.id == project.id
+    assert result.project_slug == "maji-ndogo-part1"
+
+
+@pytest.mark.asyncio
+async def test_get_project_by_slug_not_found(async_session):
+    """Test that non-existent slug returns None."""
+    result = await get_project_by_slug(async_session, "nonexistent-slug")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_project_by_slug_latest_version(async_session):
+    """Test that unversioned query returns the latest version."""
+    await create_task(
+        async_session,
+        TaskCreate(
+            title="Project v1",
+            task_type=TaskType.PROJECT,
+            project_slug="versioned-proj",
+            version=1,
+        ),
+    )
+    v2 = await create_task(
+        async_session,
+        TaskCreate(
+            title="Project v2",
+            task_type=TaskType.PROJECT,
+            project_slug="versioned-proj",
+            version=2,
+        ),
+    )
+
+    result = await get_project_by_slug(async_session, "versioned-proj")
+    assert result is not None
+    assert result.id == v2.id
+    assert result.version == 2
+
+
+@pytest.mark.asyncio
+async def test_get_project_by_slug_specific_version(async_session):
+    """Test querying a specific version by number."""
+    v1 = await create_task(
+        async_session,
+        TaskCreate(
+            title="Project v1",
+            task_type=TaskType.PROJECT,
+            project_slug="versioned-proj",
+            version=1,
+        ),
+    )
+    await create_task(
+        async_session,
+        TaskCreate(
+            title="Project v2",
+            task_type=TaskType.PROJECT,
+            project_slug="versioned-proj",
+            version=2,
+        ),
+    )
+
+    result = await get_project_by_slug(async_session, "versioned-proj", version=1)
+    assert result is not None
+    assert result.id == v1.id
+    assert result.version == 1

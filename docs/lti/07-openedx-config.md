@@ -65,9 +65,11 @@ Alternatively, use JWKS URL instead of pasting the public key:
 Add custom parameters to pass the project ID and workspace type:
 
 ```
-project_id=proj-9b46
+project_id=maji-ndogo-part1
 workspace_type=sql
 ```
+
+The `project_id` value is the stable slug defined in the project JSON's `project_id` field (e.g., `"maji-ndogo-part1"`) — not the auto-generated internal ID (like `proj-9b46`). This ensures the LTI configuration remains stable across re-ingestion.
 
 These arrive in the JWT under `https://purl.imsglobal.org/spec/lti/claim/custom`.
 

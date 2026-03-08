@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+from dataclasses import dataclass
 
 from pylti1p3.grade import Grade
 from pylti1p3.lineitem import LineItem
@@ -18,6 +19,37 @@ from .config import get_tool_config
 from .storage import RedisLaunchDataStorage
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ActiveLaunch:
+    """An active LTI launch session resolved from Redis."""
+
+    launch_id: str
+    learner_sub: str
+
+
+def get_active_launch(
+    storage: RedisLaunchDataStorage,
+    learner_id: str,
+    project_id: str,
+) -> ActiveLaunch | None:
+    """
+    Look up the active LTI launch for a learner/project pair.
+
+    Returns None if there is no active LTI session (e.g. dev mode, no Redis).
+    """
+    key = f"active:{learner_id}:{project_id}"
+    result = storage.get_value(key)
+    if not result or not isinstance(result, dict):
+        return None
+
+    launch_id = result.get("launch_id")
+    learner_sub = result.get("sub")
+    if not launch_id or not learner_sub:
+        return None
+
+    return ActiveLaunch(launch_id=launch_id, learner_sub=learner_sub)
 
 
 def send_grade(
@@ -94,43 +126,3 @@ def send_grade(
     except Exception as e:
         logger.error("AGS grade passback failed: %s", e)
         return False
-
-
-def maybe_send_grade(
-    learner_id: str,
-    project_id: str,
-    completed: int,
-    total: int,
-    storage: RedisLaunchDataStorage | None = None,
-) -> bool:
-    """
-    Send grade if this learner has an active LTI session.
-
-    No-op for standalone (non-LTI) sessions.
-    """
-    if storage is None:
-        return False
-
-    # Look up active launch mapping from Redis
-    key = f"active:{learner_id}:{project_id}"
-    result = storage.get_value(key)
-    if not result or not isinstance(result, dict):
-        return False
-
-    launch_id = result.get("launch_id")
-    learner_sub = result.get("sub")
-    if not launch_id or not learner_sub:
-        return False
-
-    return send_grade(
-        launch_id=launch_id,
-        storage=storage,
-        learner_sub=learner_sub,
-        score=float(completed),
-        max_score=float(total),
-        activity_progress="Completed" if completed == total else "InProgress",
-        grading_progress="FullyGraded" if completed == total else "Pending",
-        comment=f"Completed {completed}/{total} tasks ({completed / total * 100:.0f}%)"
-        if total > 0
-        else None,
-    )

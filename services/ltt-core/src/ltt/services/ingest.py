@@ -19,7 +19,7 @@ from ltt.services.learning.llm_summarization import (
     generate_epic_summary,
     generate_task_summary,
 )
-from ltt.services.task_service import create_task, update_task_summary
+from ltt.services.task_service import create_task, get_project_by_slug, update_task_summary
 
 logger = logging.getLogger(__name__)
 
@@ -61,36 +61,64 @@ class IngestResult:
     errors: list[str] = field(default_factory=list)
 
 
-async def ingest_project_file(
+async def ingest_project_data(
     session: AsyncSession,
-    file_path: Path,
+    data: dict,
     dry_run: bool = False,
     use_llm_summaries: bool = True,
+    require_slug: bool = False,
 ) -> IngestResult:
     """
-    Ingest a project from a JSON file.
+    Ingest a project from an already-parsed dict.
+
+    This is the core ingestion function used by both the CLI (via
+    ``ingest_project_file``) and the REST endpoint.
 
     Args:
         session: Database session
-        file_path: Path to JSON file
-        dry_run: If True, validate without creating
+        data: Parsed project JSON dict
+        dry_run: If True, validate without persisting
         use_llm_summaries: If True, use LLM to generate hierarchical summaries
+        require_slug: If True, ``project_id`` slug is mandatory (admin endpoint)
 
     Returns:
         IngestResult with project_id and counts
 
     Raises:
-        ValueError: If structure is invalid
-        FileNotFoundError: If file doesn't exist
+        ValueError: If structure is invalid (and not dry_run)
     """
-    # Load and parse file
-    with open(file_path) as f:
-        data = json.load(f)
-
     # Validate structure
-    errors = validate_project_structure(data)
+    errors = validate_project_structure(data, require_slug=require_slug)
     if errors and not dry_run:
-        raise ValueError(f"Invalid project structure: {', '.join(errors)}")
+        raise ValueError(f"Invalid project structure: {'; '.join(errors)}")
+
+    # Check for duplicate slug before any DB changes (also during dry_run)
+    slug = data.get("project_id")
+    version = data.get("version", 1)
+
+    if slug:
+        existing = await get_project_by_slug(session, slug, version)
+        if existing:
+            msg = (
+                f"Project '{slug}' version {version} already exists "
+                f"(internal ID: {existing.id}). "
+                f"Bump the version number in your JSON to create a new version."
+            )
+            if dry_run:
+                errors.append(msg)
+            else:
+                raise ValueError(msg)
+
+        latest = await get_project_by_slug(session, slug)  # no version → latest
+        if latest and version <= latest.version:
+            msg = (
+                f"Project '{slug}' already has version {latest.version}. "
+                f"New version must be higher (got {version})."
+            )
+            if dry_run:
+                errors.append(msg)
+            else:
+                raise ValueError(msg)
 
     if dry_run:
         return IngestResult(
@@ -130,6 +158,12 @@ async def ingest_project_file(
             requires_submission=data.get("requires_submission"),
             workspace_type=workspace_type,
             tutor_persona=tutor_persona,
+            estimated_minutes=data.get("estimated_minutes"),
+            version=data.get("version", 1),
+            version_tag=data.get("version_tag"),
+            narrative=data.get("narrative", False),
+            tutor_config=data.get("tutor_config"),
+            project_slug=data.get("project_id"),
         ),
     )
 
@@ -147,7 +181,7 @@ async def ingest_project_file(
     # Track tasks by title for dependency resolution
     dependency_map: dict[str, str] = {data["title"]: project.id}
 
-    # Process epics (sequentially to maintain dependency order, but tasks within can be parallel)
+    # Process epics (sequentially to maintain dependency order)
     task_count = 1  # Count project itself
     for epic_data in data.get("epics", []):
         epic_count, epic_obj_count = await ingest_epic(
@@ -165,6 +199,35 @@ async def ingest_project_file(
     return IngestResult(
         project_id=project.id, task_count=task_count, objective_count=obj_count, errors=[]
     )
+
+
+async def ingest_project_file(
+    session: AsyncSession,
+    file_path: Path,
+    dry_run: bool = False,
+    use_llm_summaries: bool = True,
+) -> IngestResult:
+    """
+    Ingest a project from a JSON file.
+
+    Args:
+        session: Database session
+        file_path: Path to JSON file
+        dry_run: If True, validate without creating
+        use_llm_summaries: If True, use LLM to generate hierarchical summaries
+
+    Returns:
+        IngestResult with project_id and counts
+
+    Raises:
+        ValueError: If structure is invalid
+        FileNotFoundError: If file doesn't exist
+    """
+    # Load and parse file
+    with open(file_path) as f:
+        data = json.load(f)
+
+    return await ingest_project_data(session, data, dry_run=dry_run, use_llm_summaries=use_llm_summaries)
 
 
 async def ingest_epic(
@@ -208,6 +271,8 @@ async def ingest_epic(
             content=data.get("content"),
             tutor_guidance=data.get("tutor_guidance"),
             requires_submission=data.get("requires_submission"),
+            estimated_minutes=data.get("estimated_minutes"),
+            priority=data.get("priority", 2),
         ),
     )
 
@@ -336,6 +401,9 @@ async def ingest_task(
             content=data.get("content"),
             tutor_guidance=data.get("tutor_guidance"),
             requires_submission=data.get("requires_submission"),
+            estimated_minutes=data.get("estimated_minutes"),
+            subtask_type=data.get("subtask_type", "exercise"),
+            max_grade=data.get("max_grade"),
         ),
     )
 
@@ -427,30 +495,163 @@ async def ingest_task(
     return task_count, obj_count, task_info
 
 
-def validate_project_structure(data: dict) -> list[str]:
+VALID_BLOOM_LEVELS = {"remember", "understand", "apply", "analyze", "evaluate", "create"}
+VALID_WORKSPACE_TYPES = {"sql", "python", "jupyter", "terminal", "mixed"}
+VALID_SUBTASK_TYPES = {"exercise", "conversational"}
+
+
+def validate_project_structure(data: dict, *, require_slug: bool = False) -> list[str]:
     """
-    Validate project structure.
+    Validate project structure with descriptive, remedial error messages.
+
+    Args:
+        data: Parsed project JSON dict.
+        require_slug: If True, ``project_id`` is required (admin endpoint).
+            If False (default / CLI), a missing slug is tolerated.
 
     Returns list of error messages (empty if valid).
+    Each message includes the exact location and a fix suggestion.
     """
-    errors = []
+    errors: list[str] = []
 
     if not isinstance(data, dict):
-        errors.append("Root must be an object")
+        errors.append("Root must be a JSON object, got " + type(data).__name__)
         return errors
 
+    # ── Required fields ──────────────────────────────────────────────────
     if "title" not in data:
-        errors.append("Project must have 'title' field")
+        errors.append('Project: missing required field "title"')
 
-    # Validate epics if present
+    if "project_id" in data:
+        if not isinstance(data["project_id"], str):
+            errors.append(
+                f'Project: "project_id" must be a string, got {type(data["project_id"]).__name__}'
+            )
+        else:
+            slug = data["project_id"]
+            import re
+
+            if not re.match(r"^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$", slug):
+                errors.append(
+                    f'Project: "project_id" value "{slug}" is invalid — '
+                    "must be 3–64 chars, lowercase alphanumeric + hyphens, "
+                    "starting and ending with a letter or digit"
+                )
+    elif require_slug:
+        errors.append(
+            'Project: missing required field "project_id" — '
+            'add a stable slug like "project_id": "my-project-slug"'
+        )
+
+    # ── Optional typed fields ────────────────────────────────────────────
+    if "version" in data and (not isinstance(data["version"], int) or data["version"] < 1):
+        errors.append('Project: "version" must be a positive integer (got {!r})'.format(data["version"]))
+
+    if "workspace_type" in data and data["workspace_type"] not in VALID_WORKSPACE_TYPES:
+        errors.append(
+            f'Project: "workspace_type" value "{data["workspace_type"]}" is invalid — '
+            f"choose from: {', '.join(sorted(VALID_WORKSPACE_TYPES))}"
+        )
+
+    # ── Learning objectives ──────────────────────────────────────────────
+    _validate_objectives(data.get("learning_objectives", []), "project", errors)
+
+    # ── Collect all task titles for dependency validation ─────────────────
+    all_titles: set[str] = set()
+    _collect_titles(data, all_titles)
+
+    # ── Epics ────────────────────────────────────────────────────────────
     for i, epic in enumerate(data.get("epics", [])):
         if not isinstance(epic, dict):
-            errors.append(f"Epic {i} must be an object")
+            errors.append(f"epics[{i}]: must be an object, got {type(epic).__name__}")
             continue
-        if "title" not in epic:
-            errors.append(f"Epic {i} missing 'title'")
+        _validate_epic(epic, i, all_titles, errors)
 
     return errors
+
+
+def _validate_objectives(objectives: list, path: str, errors: list[str]) -> None:
+    """Validate a list of learning objectives at the given path."""
+    if not isinstance(objectives, list):
+        errors.append(f'{path}: "learning_objectives" must be a list')
+        return
+    for j, obj in enumerate(objectives):
+        if not isinstance(obj, dict):
+            errors.append(f"{path}.learning_objectives[{j}]: must be an object")
+            continue
+        if "description" not in obj:
+            errors.append(f'{path}.learning_objectives[{j}]: missing "description"')
+        level = obj.get("level", "apply")
+        if level not in VALID_BLOOM_LEVELS:
+            errors.append(
+                f'{path}.learning_objectives[{j}]: Bloom level "{level}" is invalid — '
+                f"choose from: {', '.join(sorted(VALID_BLOOM_LEVELS))}"
+            )
+
+
+def _validate_epic(epic: dict, idx: int, all_titles: set[str], errors: list[str]) -> None:
+    """Validate a single epic and its tasks."""
+    path = f"epics[{idx}]"
+    if "title" not in epic:
+        errors.append(f'{path}: missing required field "title"')
+    _validate_objectives(epic.get("learning_objectives", []), path, errors)
+    _validate_dependencies(epic.get("dependencies", []), path, all_titles, errors)
+
+    for j, task in enumerate(epic.get("tasks", [])):
+        if not isinstance(task, dict):
+            errors.append(f"{path}.tasks[{j}]: must be an object")
+            continue
+        _validate_task(task, f"{path}.tasks[{j}]", all_titles, errors)
+
+
+def _validate_task(task: dict, path: str, all_titles: set[str], errors: list[str]) -> None:
+    """Validate a single task/subtask recursively."""
+    if "title" not in task:
+        errors.append(f'{path}: missing required field "title"')
+    _validate_objectives(task.get("learning_objectives", []), path, errors)
+    _validate_dependencies(task.get("dependencies", []), path, all_titles, errors)
+
+    if "subtask_type" in task and task["subtask_type"] not in VALID_SUBTASK_TYPES:
+        errors.append(
+            f'{path}: "subtask_type" value "{task["subtask_type"]}" is invalid — '
+            f"choose from: {', '.join(sorted(VALID_SUBTASK_TYPES))}"
+        )
+
+    for k, sub in enumerate(task.get("subtasks", [])):
+        if not isinstance(sub, dict):
+            errors.append(f"{path}.subtasks[{k}]: must be an object")
+            continue
+        _validate_task(sub, f"{path}.subtasks[{k}]", all_titles, errors)
+
+
+def _validate_dependencies(deps: list, path: str, all_titles: set[str], errors: list[str]) -> None:
+    """Validate that dependency references exist within the project."""
+    if not isinstance(deps, list):
+        errors.append(f'{path}: "dependencies" must be a list of task title strings')
+        return
+    for k, dep in enumerate(deps):
+        if not isinstance(dep, str):
+            errors.append(f"{path}.dependencies[{k}]: must be a string (task title), got {type(dep).__name__}")
+        elif dep not in all_titles:
+            errors.append(
+                f'{path}.dependencies[{k}]: references "{dep}" which does not exist in this project — '
+                "check spelling or add a task/epic with that exact title"
+            )
+
+
+def _collect_titles(data: dict, titles: set[str]) -> None:
+    """Recursively collect all task/epic titles for dependency validation."""
+    if "title" in data:
+        titles.add(data["title"])
+    for epic in data.get("epics", []):
+        if isinstance(epic, dict):
+            _collect_titles(epic, titles)
+    for task in data.get("tasks", []):
+        if isinstance(task, dict):
+            _collect_titles(task, titles)
+    for sub in data.get("subtasks", []):
+        if isinstance(sub, dict):
+            _collect_titles(sub, titles)
 
 
 def count_tasks(data: dict) -> int:

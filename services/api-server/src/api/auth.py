@@ -19,9 +19,38 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, Security
+from fastapi.security import APIKeyHeader
 
 from api.settings import get_settings
+
+# ── Admin API key auth ────────────────────────────────────────────────────────
+
+_admin_key_header = APIKeyHeader(name="X-Admin-API-Key", auto_error=False)
+
+
+async def require_admin(api_key: str | None = Security(_admin_key_header)) -> str:
+    """FastAPI dependency — require a valid admin API key.
+
+    Returns the validated key on success.
+    Raises 403 if the key is wrong, 503 if admin endpoints are disabled.
+    """
+    settings = get_settings()
+
+    key = settings.admin_api_key
+    if not key or key.startswith("PLACEHOLDER"):
+        raise HTTPException(
+            status_code=503,
+            detail="Admin endpoints are disabled (LTT_ADMIN_API_KEY not configured)",
+        )
+
+    if not api_key:
+        raise HTTPException(status_code=401, detail="Missing X-Admin-API-Key header")
+
+    if api_key != key:
+        raise HTTPException(status_code=403, detail="Invalid admin API key")
+
+    return api_key
 
 
 @dataclass

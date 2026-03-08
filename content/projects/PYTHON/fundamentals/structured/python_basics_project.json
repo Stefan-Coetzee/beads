@@ -1,4 +1,6 @@
 {
+  "project_id": "python-fundamentals",
+  "version": 1,
   "title": "Python Programming Fundamentals",
   "description": "Learn the basics of Python programming through hands-on coding exercises. You'll start with simple output statements and progress through variables, data types, operators, and control flow.",
   "workspace_type": "python",

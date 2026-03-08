@@ -177,9 +177,22 @@ async def lti_launch(request: Request):
             email=email,
         )
 
-    # Determine project_id from custom params
-    project_id = custom.get("project_id", "")
+    # Determine project_id from custom params — try slug lookup first, fall back to internal ID
+    raw_project_id = custom.get("project_id", "")
     workspace_type = custom.get("workspace_type", "sql")
+
+    project_id = raw_project_id
+    if raw_project_id:
+        from ltt.services.task_service import get_project_by_slug
+
+        async with get_session() as session:
+            project = await get_project_by_slug(session, raw_project_id)
+            if project:
+                project_id = project.id
+                workspace_type = custom.get("workspace_type") or project.workspace_type or "sql"
+                logger.info(
+                    "Resolved slug '%s' -> internal ID '%s'", raw_project_id, project_id
+                )
 
     # Persist active launch for grade passback to DB (survives Redis expiry/restart)
     import json as _json
