@@ -2,7 +2,7 @@
 
 > Export includes all fields so that export → ingest is lossless.
 
-**Status**: Not started
+**Status**: Done
 **Depends on**: Phase 01 (all fields passed through), Phase 02 (new columns), Phase 04 (grade fields)
 **Unblocks**: Nothing (final phase)
 

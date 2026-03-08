@@ -2,7 +2,7 @@
 
 > Store numeric grades locally, not just binary pass/fail.
 
-**Status**: Not started
+**Status**: Done
 **Depends on**: Phase 02 (`max_grade` column), Phase 03 (grade passback wired)
 **Unblocks**: Phase 07
 

@@ -2,7 +2,7 @@
 
 > When a learner submits work and it passes validation, send grade to the LMS.
 
-**Status**: Not started
+**Status**: Done
 **Depends on**: Phase 02 (project_slug for project identification)
 **Unblocks**: Phase 04
 

@@ -2,7 +2,7 @@
 
 > Add fields that exist in the JSON schema but have no corresponding DB column.
 
-**Status**: Not started
+**Status**: Done
 **Depends on**: Phase 01 (TaskCreate additions)
 **Unblocks**: Phase 03, Phase 04, Phase 05, Phase 06, Phase 07
 

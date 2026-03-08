@@ -2,7 +2,7 @@
 
 > Fetch a project by its stable `project_id` slug instead of the internal `proj-XXXX` ID.
 
-**Status**: Not started
+**Status**: Done
 **Depends on**: Phase 02 (`project_slug` column + index)
 **Unblocks**: Phase 06
 

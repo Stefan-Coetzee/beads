@@ -2,7 +2,7 @@
 
 > Pass through fields that already exist on TaskCreate/TaskModel but are currently ignored by ingest.py.
 
-**Status**: Not started
+**Status**: Done
 **Depends on**: None
 **Unblocks**: Phase 02, Phase 07
 

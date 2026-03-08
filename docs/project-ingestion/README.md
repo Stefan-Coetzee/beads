@@ -2,45 +2,20 @@
 
 > What needs to happen to make ingestion, retrieval, and grading work end-to-end.
 
-**Status**: Schema and docs designed. Code not yet updated.
+**Status**: All 7 phases implemented on `feature/project-ingestion-pipeline`.
 
 ---
 
-## The Gap
+## The Gap (Resolved)
 
-The project JSON schema (`ProjectSchema`) and docs are ahead of the code. Fields exist in JSON and in the Pydantic validation model but are silently dropped during ingestion.
+The project JSON schema and code are now aligned. All fields flow through the full pipeline:
 
 ```
 project.json ──→ ProjectSchema ──→ ingest.py ──→ TaskCreate ──→ TaskModel ──→ DB
-     ✅                ✅              ❌            ❌             ⚠️          ⚠️
-  (has fields)    (validates)     (ignores)    (missing fields) (some exist) (some exist)
+     ✅                ✅              ✅            ✅             ✅          ✅
 ```
 
-### What the JSON has but ingest.py drops
-
-| Field | JSON level | On TaskCreate? | On TaskModel/DB? | ingest.py passes it? |
-|---|---|---|---|---|
-| `project_id` (slug) | project | No | No | No |
-| `version` | project | No | Yes (`version` column, always 1) | No |
-| `version_tag` | project | No | Yes (`version_tag` column, always null) | No |
-| `narrative` | project | No | No | No |
-| `tutor_config` | project | No | No | No |
-| `estimated_minutes` | all levels | Yes (on TaskBase) | Yes | No — silently dropped |
-| `priority` | epic | Yes (on TaskBase) | Yes | No — epics hardcode default |
-| `subtask_type` | subtask | No | No | No |
-| `max_grade` | task | No | No | No |
-
-### What works today
-
-- `title`, `description`, `acceptance_criteria`, `content` — all passed through
-- `tutor_guidance` — passed for tasks/subtasks (not epics, which is correct)
-- `narrative_context` — passed at project level
-- `workspace_type` — passed at project level
-- `tutor_persona` — passed at project level (legacy, replaced by `tutor_config`)
-- `learning_objectives` — attached at all levels
-- `dependencies` — resolved by title at all levels
-- `priority` — passed for tasks/subtasks only (not epics)
-- `requires_submission` — passed at all levels
+All fields are ingested, stored, exported, and survive round-trip (export → ingest → export).
 
 ---
 
@@ -48,13 +23,13 @@ project.json ──→ ProjectSchema ──→ ingest.py ──→ TaskCreate �
 
 | Phase | Title | Status | Depends On | Unblocks |
 |-------|-------|--------|------------|----------|
-| [01](01-fix-ingest-drops.md) | Fix ingest drops | Not started | — | 02, 07 |
-| [02](02-add-new-db-fields.md) | Add new DB fields | Not started | 01 | 03, 04, 05, 06, 07 |
-| [03](03-wire-grade-passback.md) | Wire grade passback | Not started | 02 | 04 |
-| [04](04-grade-storage.md) | Grade storage on validations | Not started | 02, 03 | 07 |
-| [05](05-project-retrieval-by-slug.md) | Project retrieval by slug | Not started | 02 | 06 |
-| [06](06-re-ingestion-logic.md) | Re-ingestion logic | Not started | 02, 05 | 07 |
-| [07](07-export-round-trip.md) | Export round-trip | Not started | 01, 02, 04 | — |
+| [01](01-fix-ingest-drops.md) | Fix ingest drops | Done | — | 02, 07 |
+| [02](02-add-new-db-fields.md) | Add new DB fields | Done | 01 | 03, 04, 05, 06, 07 |
+| [03](03-wire-grade-passback.md) | Wire grade passback | Done | 02 | 04 |
+| [04](04-grade-storage.md) | Grade storage on validations | Done | 02, 03 | 07 |
+| [05](05-project-retrieval-by-slug.md) | Project retrieval by slug | Done | 02 | 06 |
+| [06](06-re-ingestion-logic.md) | Re-ingestion logic | Done | 02, 05 | 07 |
+| [07](07-export-round-trip.md) | Export round-trip | Done | 01, 02, 04 | — |
 
 ### Dependency Graph
 
@@ -88,7 +63,7 @@ Phase 07: Export round-trip               [completeness — lossless export ↔ 
 |---|---|
 | [01-fix-ingest-drops.md](01-fix-ingest-drops.md) | Pass through `estimated_minutes`, `priority` (epic), `version`, `version_tag` |
 | [02-add-new-db-fields.md](02-add-new-db-fields.md) | Add `subtask_type`, `narrative`, `tutor_config`, `max_grade`, `project_slug` to DB |
-| [03-wire-grade-passback.md](03-wire-grade-passback.md) | Call `maybe_send_grade()` after successful task submission |
+| [03-wire-grade-passback.md](03-wire-grade-passback.md) | Wire grade passback into chat endpoints after task closure |
 | [04-grade-storage.md](04-grade-storage.md) | Add `grade`, `grader_type`, `feedback` to validations table |
 | [05-project-retrieval-by-slug.md](05-project-retrieval-by-slug.md) | `get_project_by_slug()` service + API endpoint + LTI launch update |
 | [06-re-ingestion-logic.md](06-re-ingestion-logic.md) | Duplicate detection + version increment on re-ingest |
@@ -139,8 +114,8 @@ Every file that needs changes, grouped by phase.
 - `services/ltt-core/tests/` — tests for new fields
 
 ### Phase 03 (grade passback)
-- `services/api-server/src/api/routes.py` — call `maybe_send_grade()` after submit
-- `services/api-server/tests/` — test grade passback wiring
+- `services/api-server/src/api/routes.py` — `_try_grade_passback()` wired into `/chat` and `/chat/stream`
+- `services/api-server/src/api/lti/grades.py` — refactored: `get_active_launch()` + `send_grade()`
 
 ### Phase 04 (grade storage)
 - `services/ltt-core/src/ltt/models/validation.py` — add grade fields to Validation

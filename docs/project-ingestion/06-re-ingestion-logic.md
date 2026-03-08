@@ -2,7 +2,7 @@
 
 > Ingesting a project with an existing slug creates a new version instead of a duplicate.
 
-**Status**: Not started
+**Status**: Done
 **Depends on**: Phase 02 (`project_slug` + `version`), Phase 05 (`get_project_by_slug()`)
 **Unblocks**: Phase 07
 
