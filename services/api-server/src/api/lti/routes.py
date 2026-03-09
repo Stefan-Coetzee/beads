@@ -617,7 +617,7 @@ def _handle_deep_link(message_launch, launch_data: dict):
     resource.set_url(
         launch_data.get("https://purl.imsglobal.org/spec/lti/claim/target_link_uri", "")
     )
-    resource.set_custom_params({"project_id": "proj-9b46"})
+    resource.set_custom_params({"project_id": "maji-ndogo-part1"})
     resource.set_title("Maji Ndogo Water Analysis")
 
     html = deep_link.output_response_form([resource])

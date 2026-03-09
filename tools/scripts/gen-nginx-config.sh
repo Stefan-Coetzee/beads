@@ -32,15 +32,10 @@ PROD_DNS=$(get_alb_dns "ltt-prod")
 # remain as literal text in the output rather than being shell-expanded.
 
 nginx_config() {
-  printf 'upstream ltt_nonprod_alb {\n'
-  printf '    server %s:80;\n' "$NONPROD_DNS"
-  printf '    keepalive 32;\n'
-  printf '}\n'
-  printf '\n'
-  printf 'upstream ltt_prod_alb {\n'
-  printf '    server %s:80;\n' "$PROD_DNS"
-  printf '    keepalive 32;\n'
-  printf '}\n'
+  # Use VPC DNS resolver so nginx re-resolves ALB DNS on each request.
+  # AWS ALBs rotate IPs — caching them at startup causes stale-IP failures.
+  printf '# VPC DNS resolver (AmazonProvidedDNS at VPC CIDR base + 2)\n'
+  printf 'resolver 10.0.0.2 valid=10s;\n'
   printf '\n'
   printf 'server {\n'
   printf '    listen 443 ssl;\n'
@@ -50,7 +45,8 @@ nginx_config() {
   printf '    ssl_certificate_key /etc/letsencrypt/live/dev-mwongozo.alx-ai-tools.com/privkey.pem;\n'
   printf '\n'
   printf '    location / {\n'
-  printf '        proxy_pass         http://ltt_nonprod_alb;\n'
+  printf '        set $nonprod_backend http://%s;\n' "$NONPROD_DNS"
+  printf '        proxy_pass         $nonprod_backend;\n'
   printf '        proxy_set_header   Host              $host;\n'
   printf '        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;\n'
   printf '        proxy_set_header   X-Forwarded-Proto $scheme;\n'
@@ -68,7 +64,8 @@ nginx_config() {
   printf '    ssl_certificate_key /etc/letsencrypt/live/mwongozo.alx-ai-tools.com/privkey.pem;\n'
   printf '\n'
   printf '    location / {\n'
-  printf '        proxy_pass         http://ltt_prod_alb;\n'
+  printf '        set $prod_backend http://%s;\n' "$PROD_DNS"
+  printf '        proxy_pass         $prod_backend;\n'
   printf '        proxy_set_header   Host              $host;\n'
   printf '        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;\n'
   printf '        proxy_set_header   X-Forwarded-Proto $scheme;\n'
