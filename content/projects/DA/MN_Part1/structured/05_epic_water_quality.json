@@ -17,8 +17,8 @@
   "content": "The quality of our water sources is the whole point of this survey. We have a table that contains a quality score for each visit made about a water source that was assigned by a Field surveyor. They assigned a score to each source from 1, being terrible, to 10 for a good, clean water source in a home. Shared taps are not rated as high, and the score also depends on how long the queue times are.",
   "tasks": [
     {
-      "title": "Explore the water_quality table",
-      "description": "Examine the water_quality table structure and understand scoring",
+      "title": "Explore the quality_score table",
+      "description": "Examine the quality_score table structure and understand scoring",
       "estimated_minutes": 10,
       "priority": 0,
       "learning_objectives": [
@@ -27,19 +27,18 @@
           "description": "Understand how water quality is scored and recorded"
         }
       ],
-      "content": "The quality of water sources is a pretty big deal. We'll turn to the water_quality table to find records where the subjective_quality_score is within a certain range and the visit_count is above a certain threshold.",
+      "content": "The quality of water sources is a pretty big deal. We'll turn to the quality_score table to find records where the subjective_quality_score is within a certain range and the visit_count is above a certain threshold.",
       "subtasks": [
         {
-          "title": "Query the water_quality table",
+          "title": "Query the quality_score table",
           "subtask_type": "exercise",
-          "description": "Explore the water_quality table to see its structure",
+          "description": "Explore the quality_score table to see its structure",
           "estimated_minutes": 5,
-          "acceptance_criteria": "- Query uses SELECT * FROM water_quality\n- Student can identify columns: record_id, subjective_quality_score, visit_count\n- Student understands the scoring system (1-10)",
-          "content": "Look through the table records to find the water quality table.\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_quality\n```",
+          "acceptance_criteria": "- Query uses SELECT * FROM quality_score\n- Student can identify columns: record_id, subjective_quality_score, visit_count\n- Student understands the scoring system (1-10)",
+          "content": "Look through the table records to find the quality score table.\n\n**Expected query:**\n```sql\nSELECT *\nFROM quality_score\n```",
           "checks": [
             {
-              "query": "SELECT * FROM water_quality",
-              "sqlite_query": "SELECT * FROM quality_score",
+              "query": "SELECT * FROM quality_score",
               "expect": {
                 "min_rows": 1,
                 "columns": ["record_id", "subjective_quality_score", "visit_count"]
@@ -49,7 +48,7 @@
           "learning_objectives": [
             {
               "level": "understand",
-              "description": "Understand the water_quality table structure"
+              "description": "Understand the quality_score table structure"
             }
           ]
         }
@@ -60,7 +59,7 @@
       "description": "Identify records where perfect scores appear for sources that were visited multiple times",
       "estimated_minutes": 20,
       "priority": 0,
-      "dependencies": ["Explore the water_quality table"],
+      "dependencies": ["Explore the quality_score table"],
       "learning_objectives": [
         {
           "level": "apply",
@@ -93,7 +92,7 @@
           "estimated_minutes": 10,
           "dependencies": ["Discuss why this query matters"],
           "acceptance_criteria": "- Query uses WHERE with AND to combine both conditions\n- Query returns 218 suspicious rows\n- Student understands why these records indicate errors",
-          "content": "So please write a query to find records where the subjective_quality_score is 10 -- only looking for home taps -- and where the source was visited a second time. What will this tell us?\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_quality\nWHERE visit_count = 2\nAND subjective_quality_score = 10\n```\n\nI get 218 rows of data. But this should not be happening! I think some of our employees may have made mistakes. To be honest, I'll be surprised if there are no errors in our data at this scale! I'm going to send Pres. Naledi a message that we have to recheck some of these sources. We can appoint an Auditor to check some of the data independently, and make sure we have the right information!",
+          "content": "So please write a query to find records where the subjective_quality_score is 10 -- only looking for home taps -- and where the source was visited a second time. What will this tell us?\n\n**Expected query:**\n```sql\nSELECT *\nFROM quality_score\nWHERE visit_count = 2\nAND subjective_quality_score = 10\n```\n\nI get 218 rows of data. But this should not be happening! I think some of our employees may have made mistakes. To be honest, I'll be surprised if there are no errors in our data at this scale! I'm going to send Pres. Naledi a message that we have to recheck some of these sources. We can appoint an Auditor to check some of the data independently, and make sure we have the right information!",
           "learning_objectives": [
             {
               "level": "apply",
@@ -106,8 +105,7 @@
           ],
           "checks": [
             {
-              "query": "SELECT * FROM water_quality WHERE visit_count = 2 AND subjective_quality_score = 10",
-              "sqlite_query": "SELECT * FROM quality_score WHERE visit_count = 2 AND subjective_quality_score = 10",
+              "query": "SELECT * FROM quality_score WHERE visit_count = 2 AND subjective_quality_score = 10",
               "expect": { "row_count": 218 }
             }
           ],

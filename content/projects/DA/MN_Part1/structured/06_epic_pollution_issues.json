@@ -226,7 +226,7 @@
           "estimated_minutes": 5,
           "dependencies": ["Discuss the responsibility of modifying data"],
           "acceptance_criteria": "- Copy table well_pollution_copy created successfully\n- Contains same data as original well_pollution table\n- Student understands why testing on a copy is essential",
-          "content": "The CREATE TABLE new_table AS (query) approach is a neat trick that allows you to create a new table from the results set of a query. This method is especially useful for creating backup tables or subsets without the need for a separate CREATE TABLE and INSERT INTO statement.\n\nSo if we run:\n\n**Expected query:**\n```sql\nCREATE TABLE well_pollution_copy AS (\n    SELECT *\n    FROM well_pollution\n)\n```\n\nWe will get a copy of well_pollution called well_pollution_copy. Now we can make the changes, and if we discover there is a mistake in our code, we can just delete this table, and run it again.",
+          "content": "The CREATE TABLE new_table AS query approach is a neat trick that allows you to create a new table from the results set of a query. This method is especially useful for creating backup tables or subsets without the need for a separate CREATE TABLE and INSERT INTO statement.\n\nSo if we run:\n\n**Expected query:**\n```sql\nCREATE TABLE well_pollution_copy AS\n    SELECT *\n    FROM well_pollution\n```\n\nWe will get a copy of well_pollution called well_pollution_copy. Now we can make the changes, and if we discover there is a mistake in our code, we can just delete this table, and run it again.",
           "learning_objectives": [
             {
               "level": "apply",
@@ -235,8 +235,7 @@
           ],
           "checks": [
             {
-              "query": "CREATE TABLE well_pollution_copy AS (SELECT * FROM well_pollution)",
-              "sqlite_query": "CREATE TABLE well_pollution_copy AS SELECT * FROM well_pollution",
+              "query": "CREATE TABLE well_pollution_copy AS SELECT * FROM well_pollution",
               "expect": { "modifies": true }
             }
           ],
