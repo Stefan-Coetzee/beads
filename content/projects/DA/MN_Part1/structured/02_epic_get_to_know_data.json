@@ -42,6 +42,13 @@
               "description": "Apply SHOW TABLES to explore database structure"
             }
           ],
+          "checks": [
+            {
+              "query": "SHOW TABLES",
+              "sqlite_query": "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
+              "expect": { "min_rows": 8 }
+            }
+          ],
           "tutor_guidance": {
             "teaching_approach": "Emphasize this as a foundational habit for database exploration",
             "hints_to_give": [
@@ -77,6 +84,15 @@
             {
               "level": "apply",
               "description": "Apply SELECT * with LIMIT to preview table data"
+            }
+          ],
+          "checks": [
+            {
+              "query": "SELECT * FROM location LIMIT 5",
+              "expect": {
+                "row_count": 5,
+                "columns": ["location_id", "address", "province_name", "town_name", "location_type"]
+              }
             }
           ],
           "tutor_guidance": {
@@ -117,6 +133,15 @@
               "description": "Understand how tables relate through foreign keys"
             }
           ],
+          "checks": [
+            {
+              "query": "SELECT * FROM visits LIMIT 5",
+              "expect": {
+                "row_count": 5,
+                "columns": ["record_id", "location_id", "source_id", "time_of_record", "visit_count", "time_in_queue", "assigned_employee_id"]
+              }
+            }
+          ],
           "tutor_guidance": {
             "answer_rationale": "The visits table logs each time an employee visited a location to record data about a water source",
             "hints_to_give": [
@@ -152,6 +177,15 @@
             {
               "level": "understand",
               "description": "Understand the water_source table structure and its relationship to visits"
+            }
+          ],
+          "checks": [
+            {
+              "query": "SELECT * FROM water_source LIMIT 5",
+              "expect": {
+                "row_count": 5,
+                "columns": ["source_id", "type_of_water_source", "number_of_people_served"]
+              }
             }
           ],
           "tutor_guidance": {

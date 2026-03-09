@@ -72,6 +72,12 @@
               "description": "Apply WHERE with greater-than comparison"
             }
           ],
+          "checks": [
+            {
+              "query": "SELECT * FROM visits WHERE time_in_queue > 500",
+              "expect": { "min_rows": 1 }
+            }
+          ],
           "tutor_guidance": {
             "answer_rationale": "WHERE time_in_queue > 500 filters to only rows where the queue time exceeds 500 minutes",
             "hints_to_give": [
@@ -129,6 +135,15 @@
             {
               "level": "analyze",
               "description": "Analyze patterns between source types and queue times"
+            }
+          ],
+          "checks": [
+            {
+              "query": "SELECT * FROM water_source WHERE source_id IN('AkRu05234224', 'AkKi00881224', 'SoRu37635224', 'SoRu36096224', 'HaZa21742224', 'AkLu01628224', 'SoRu38776224')",
+              "expect": {
+                "min_rows": 5,
+                "columns": ["source_id", "type_of_water_source", "number_of_people_served"]
+              }
             }
           ],
           "tutor_guidance": {

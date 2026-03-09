@@ -36,6 +36,16 @@
           "estimated_minutes": 5,
           "acceptance_criteria": "- Query uses SELECT * FROM water_quality\n- Student can identify columns: record_id, subjective_quality_score, visit_count\n- Student understands the scoring system (1-10)",
           "content": "Look through the table records to find the water quality table.\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_quality\n```",
+          "checks": [
+            {
+              "query": "SELECT * FROM water_quality",
+              "sqlite_query": "SELECT * FROM quality_score",
+              "expect": {
+                "min_rows": 1,
+                "columns": ["record_id", "subjective_quality_score", "visit_count"]
+              }
+            }
+          ],
           "learning_objectives": [
             {
               "level": "understand",
@@ -92,6 +102,13 @@
             {
               "level": "analyze",
               "description": "Analyze data for logical inconsistencies"
+            }
+          ],
+          "checks": [
+            {
+              "query": "SELECT * FROM water_quality WHERE visit_count = 2 AND subjective_quality_score = 10",
+              "sqlite_query": "SELECT * FROM quality_score WHERE visit_count = 2 AND subjective_quality_score = 10",
+              "expect": { "row_count": 218 }
             }
           ],
           "tutor_guidance": {

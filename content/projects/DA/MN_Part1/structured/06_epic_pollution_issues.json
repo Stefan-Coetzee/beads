@@ -50,6 +50,15 @@
               "description": "Understand pollution data structure and contamination thresholds"
             }
           ],
+          "checks": [
+            {
+              "query": "SELECT * FROM well_pollution LIMIT 5",
+              "expect": {
+                "row_count": 5,
+                "columns": ["source_id", "date", "description", "pollutant_ppm", "biological", "results"]
+              }
+            }
+          ],
           "tutor_guidance": {
             "teaching_approach": "Emphasize the health implications - this data determines if water is safe to drink",
             "hints_to_give": [
@@ -101,6 +110,12 @@
               "description": "Analyze data for contradictory values"
             }
           ],
+          "checks": [
+            {
+              "query": "SELECT * FROM well_pollution WHERE results = 'Clean' AND biological > 0.01",
+              "expect": { "min_rows": 1 }
+            }
+          ],
           "tutor_guidance": {
             "answer_rationale": "If results = 'Clean' the description is saying the well is clean, but AND biological > 0.01 says it is polluted. So this query finds the records that say clean, but are actually dirty."
           }
@@ -146,6 +161,12 @@
             {
               "level": "apply",
               "description": "Apply LIKE with wildcard patterns"
+            }
+          ],
+          "checks": [
+            {
+              "query": "SELECT * FROM well_pollution WHERE description LIKE 'Clean_%'",
+              "expect": { "row_count": 38 }
             }
           ],
           "tutor_guidance": {
@@ -212,6 +233,13 @@
               "description": "Apply CREATE TABLE AS SELECT to create backup copies"
             }
           ],
+          "checks": [
+            {
+              "query": "CREATE TABLE well_pollution_copy AS (SELECT * FROM well_pollution)",
+              "sqlite_query": "CREATE TABLE well_pollution_copy AS SELECT * FROM well_pollution",
+              "expect": { "modifies": true }
+            }
+          ],
           "tutor_guidance": {
             "teaching_approach": "Emphasize this as a professional best practice",
             "hints_to_give": [
@@ -234,6 +262,20 @@
               "description": "Create UPDATE statements with WHERE conditions"
             }
           ],
+          "checks": [
+            {
+              "query": "UPDATE well_pollution_copy SET description = 'Bacteria: E. coli' WHERE description = 'Clean Bacteria: E. coli'",
+              "expect": { "modifies": true }
+            },
+            {
+              "query": "UPDATE well_pollution_copy SET description = 'Bacteria: Giardia Lamblia' WHERE description = 'Clean Bacteria: Giardia Lamblia'",
+              "expect": { "modifies": true }
+            },
+            {
+              "query": "UPDATE well_pollution_copy SET results = 'Contaminated: Biological' WHERE biological > 0.01 AND results = 'Clean'",
+              "expect": { "modifies": true }
+            }
+          ],
           "tutor_guidance": {
             "answer_rationale": "Case 1a and 1b fix the description field by removing the erroneous 'Clean ' prefix. Case 2 fixes the results column by setting it to 'Contaminated: Biological' where the data shows contamination but was incorrectly marked as Clean."
           }
@@ -246,6 +288,12 @@
           "dependencies": ["Write UPDATE queries for the copy table"],
           "acceptance_criteria": "- Verification query returns 0 rows\n- Student understands how to verify data corrections",
           "content": "We can then check if our errors are fixed using a SELECT query on the well_pollution_copy table:\n\n**Expected query:**\n```sql\nSELECT *\nFROM well_pollution_copy\nWHERE description LIKE 'Clean_%'\nOR (results = 'Clean' AND biological > 0.01)\n```\n\nThis should return 0 rows if all our fixes worked correctly.",
+          "checks": [
+            {
+              "query": "SELECT * FROM well_pollution_copy WHERE description LIKE 'Clean_%' OR (results = 'Clean' AND biological > 0.01)",
+              "expect": { "row_count": 0 }
+            }
+          ],
           "learning_objectives": [
             {
               "level": "evaluate",
@@ -265,6 +313,24 @@
             {
               "level": "apply",
               "description": "Apply DROP TABLE to clean up temporary tables"
+            }
+          ],
+          "checks": [
+            {
+              "query": "UPDATE well_pollution SET description = 'Bacteria: E. coli' WHERE description = 'Clean Bacteria: E. coli'",
+              "expect": { "modifies": true }
+            },
+            {
+              "query": "UPDATE well_pollution SET description = 'Bacteria: Giardia Lamblia' WHERE description = 'Clean Bacteria: Giardia Lamblia'",
+              "expect": { "modifies": true }
+            },
+            {
+              "query": "UPDATE well_pollution SET results = 'Contaminated: Biological' WHERE biological > 0.01 AND results = 'Clean'",
+              "expect": { "modifies": true }
+            },
+            {
+              "query": "DROP TABLE well_pollution_copy",
+              "expect": { "modifies": true }
             }
           ],
           "tutor_guidance": {
