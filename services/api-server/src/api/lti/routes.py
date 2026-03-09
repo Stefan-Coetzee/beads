@@ -174,7 +174,7 @@ async def lti_launch(request: Request):
                     email = email or _resolved(member.get("email"))
                     logger.info("NRPS resolved name=%s email=%s for sub=%s", name, email, sub)
                     break
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("NRPS lookup timed out after 5s — skipping")
         except Exception as exc:
             logger.warning("NRPS lookup failed: %s", exc)
