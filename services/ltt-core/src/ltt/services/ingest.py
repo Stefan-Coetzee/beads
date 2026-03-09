@@ -227,7 +227,9 @@ async def ingest_project_file(
     with open(file_path) as f:
         data = json.load(f)
 
-    return await ingest_project_data(session, data, dry_run=dry_run, use_llm_summaries=use_llm_summaries)
+    return await ingest_project_data(
+        session, data, dry_run=dry_run, use_llm_summaries=use_llm_summaries
+    )
 
 
 async def ingest_epic(
@@ -545,7 +547,9 @@ def validate_project_structure(data: dict, *, require_slug: bool = False) -> lis
 
     # ── Optional typed fields ────────────────────────────────────────────
     if "version" in data and (not isinstance(data["version"], int) or data["version"] < 1):
-        errors.append('Project: "version" must be a positive integer (got {!r})'.format(data["version"]))
+        errors.append(
+            'Project: "version" must be a positive integer (got {!r})'.format(data["version"])
+        )
 
     if "workspace_type" in data and data["workspace_type"] not in VALID_WORKSPACE_TYPES:
         errors.append(
@@ -631,7 +635,9 @@ def _validate_dependencies(deps: list, path: str, all_titles: set[str], errors: 
         return
     for k, dep in enumerate(deps):
         if not isinstance(dep, str):
-            errors.append(f"{path}.dependencies[{k}]: must be a string (task title), got {type(dep).__name__}")
+            errors.append(
+                f"{path}.dependencies[{k}]: must be a string (task title), got {type(dep).__name__}"
+            )
         elif dep not in all_titles:
             errors.append(
                 f'{path}.dependencies[{k}]: references "{dep}" which does not exist in this project — '

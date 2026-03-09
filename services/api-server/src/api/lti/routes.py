@@ -207,9 +207,7 @@ async def lti_launch(request: Request):
             if project:
                 project_id = project.id
                 workspace_type = custom.get("workspace_type") or project.workspace_type or "sql"
-                logger.info(
-                    "Resolved slug '%s' -> internal ID '%s'", raw_project_id, project_id
-                )
+                logger.info("Resolved slug '%s' -> internal ID '%s'", raw_project_id, project_id)
 
     # Persist active launch for grade passback to DB (survives Redis expiry/restart)
     import json as _json

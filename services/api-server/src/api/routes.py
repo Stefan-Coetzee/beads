@@ -212,9 +212,7 @@ async def _register_thread(thread_id: str, learner_id: str, project_id: str) -> 
         logger.debug("Failed to register thread %s (table may not exist yet)", thread_id)
 
 
-async def _try_grade_passback(
-    new_messages: list, learner_id: str, project_id: str
-) -> None:
+async def _try_grade_passback(new_messages: list, learner_id: str, project_id: str) -> None:
     """
     Check if any submit tool calls in this turn closed a task.
     If so, compute progress and send grade to the LMS.

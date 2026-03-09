@@ -181,7 +181,9 @@ async def ingest_project(
                 data["version"] = next_version
                 logger.info(
                     "Project '%s' exists at version %d — auto-setting version to %d",
-                    slug, latest.version, next_version,
+                    slug,
+                    latest.version,
+                    next_version,
                 )
 
     # ── Full ingestion ───────────────────────────────────────────────────

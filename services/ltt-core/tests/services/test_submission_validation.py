@@ -644,8 +644,6 @@ async def test_manual_validation_defaults_grade(async_session):
     )
 
     # Pass without explicit grade
-    validation = await create_manual_validation(
-        async_session, submission.id, passed=True
-    )
+    validation = await create_manual_validation(async_session, submission.id, passed=True)
     assert validation.grade == 1.0
     assert validation.grader_type == "manual"
