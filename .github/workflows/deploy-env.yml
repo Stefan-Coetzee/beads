@@ -119,16 +119,37 @@ jobs:
       ##########################################################################
       # Run Alembic migrations (one-off ECS task, must complete before deploy)
       ##########################################################################
-      - name: Run database migrations
+      - name: Register migrate task definition
+        id: migrate-td
         run: |
-          TASK_DEF=$(aws ecs describe-task-definition \
+          # Update the migrate task definition with the new image and env vars,
+          # same as we do for the backend service. This ensures the migration
+          # container passes settings validation (LTT_FRONTEND_URL, etc.).
+          CURRENT=$(aws ecs describe-task-definition \
             --task-definition "${{ inputs.migrate_task_family }}" \
+            --query 'taskDefinition' \
+            --output json)
+
+          NEW_TD=$(echo "$CURRENT" | jq \
+            --arg IMAGE "${BACKEND_IMAGE}:${TAG}" \
+            --argjson ENVVARS '${{ inputs.backend_env_vars }}' \
+            '.containerDefinitions[0].image = $IMAGE
+            | .containerDefinitions[0].environment = $ENVVARS
+            | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                  .placementConstraints, .compatibilities, .registeredAt, .registeredBy)')
+
+          ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TD" \
             --query 'taskDefinition.taskDefinitionArn' \
             --output text)
 
+          echo "arn=$ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Run database migrations
+        run: |
           TASK_ARN=$(aws ecs run-task \
             --cluster "${{ inputs.ecs_cluster }}" \
-            --task-definition "$TASK_DEF" \
+            --task-definition "${{ steps.migrate-td.outputs.arn }}" \
             --launch-type FARGATE \
             --network-configuration "awsvpcConfiguration={
               subnets=[${{ inputs.private_subnets }}],
