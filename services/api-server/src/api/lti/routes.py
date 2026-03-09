@@ -8,7 +8,9 @@ GET  /lti/jwks    - Tool's public key set
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -111,13 +113,20 @@ async def lti_launch(request: Request):
     request_data = await _get_request_data(request)
     fastapi_request = _make_request(request, request_data)
 
+    t_start = time.monotonic()
+
     message_launch = FastAPIMessageLaunch(
         fastapi_request,
         tool_conf,
         launch_data_storage=storage,
     )
 
-    launch_data = message_launch.get_launch_data()
+    # get_launch_data() validates the JWT and fetches the platform's JWKS
+    # via synchronous HTTP — run in a thread to avoid blocking the event loop.
+    launch_data = await asyncio.to_thread(message_launch.get_launch_data)
+    t_jwt = time.monotonic()
+    logger.info("LTI launch: JWT validation took %.3fs", t_jwt - t_start)
+
     launch_id = message_launch.get_launch_id()
 
     # Handle Deep Linking (instructor content selection)
@@ -142,13 +151,16 @@ async def lti_launch(request: Request):
     email = _resolved(launch_data.get("email")) or _resolved(custom.get("user_email"))
     name = _resolved(launch_data.get("name")) or _resolved(custom.get("user_name"))
 
-    # NRPS fallback: if name/email still missing and NRPS is available, fetch from platform
+    # NRPS fallback: if name/email still missing and NRPS is available, fetch from platform.
+    # Uses a 5s timeout — Open edX NRPS can be very slow and often returns no PII anyway.
     if (not name or not email) and message_launch.has_nrps():
+        t_nrps_start = time.monotonic()
         try:
-            import asyncio
-
             nrps = message_launch.get_nrps()
-            members = await asyncio.to_thread(nrps.get_members)
+            members = await asyncio.wait_for(
+                asyncio.to_thread(nrps.get_members),
+                timeout=5.0,
+            )
             for member in members:
                 if member.get("user_id") == sub:
                     name = (
@@ -162,10 +174,15 @@ async def lti_launch(request: Request):
                     email = email or _resolved(member.get("email"))
                     logger.info("NRPS resolved name=%s email=%s for sub=%s", name, email, sub)
                     break
+        except asyncio.TimeoutError:
+            logger.warning("NRPS lookup timed out after 5s — skipping")
         except Exception as exc:
             logger.warning("NRPS lookup failed: %s", exc)
+        finally:
+            logger.info("LTI launch: NRPS took %.3fs", time.monotonic() - t_nrps_start)
 
     # Map LTI user to LTT learner
+    t_db_start = time.monotonic()
     from api.database import get_session
 
     async with get_session() as session:
@@ -297,6 +314,8 @@ async def lti_launch(request: Request):
         list(launch_data.keys()),
     )
 
+    logger.info("LTI launch: DB + Redis ops took %.3fs", time.monotonic() - t_db_start)
+
     # Detect instructor/admin role for frontend privilege gating
     instructor_role_prefixes = (
         "http://purl.imsglobal.org/vocab/lis/v2/membership#Instructor",
@@ -318,6 +337,7 @@ async def lti_launch(request: Request):
         f"&platform_origin={settings.lti_platform_url}"
     )
 
+    logger.info("LTI launch: total handler time %.3fs", time.monotonic() - t_start)
     return RedirectResponse(url=redirect_url, status_code=302)
 
 
@@ -454,8 +474,6 @@ async def lti_debug_grade_test(request: Request):
     sub = info.get("sub")
     if not sub:
         return JSONResponse(content={"ok": False, "error": "No sub in launch data"})
-
-    import asyncio
 
     from .grades import send_grade
 

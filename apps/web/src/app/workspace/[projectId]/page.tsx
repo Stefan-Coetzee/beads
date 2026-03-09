@@ -244,7 +244,7 @@ export default function WorkspacePage() {
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-4">
-          <Link href={`/project/${projectId}`}>
+          <Link href={`/project/${projectId}`} prefetch={false}>
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -276,7 +276,7 @@ export default function WorkspacePage() {
               Reset Env
             </Button>
           )}
-          <Link href={`/project/${projectId}`}>
+          <Link href={`/project/${projectId}`} prefetch={false}>
             <Button variant="outline" size="sm">
               <BookOpen className="h-4 w-4 mr-1" />
               Overview
