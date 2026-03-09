@@ -151,35 +151,29 @@ async def lti_launch(request: Request):
     email = _resolved(launch_data.get("email")) or _resolved(custom.get("user_email"))
     name = _resolved(launch_data.get("name")) or _resolved(custom.get("user_name"))
 
-    # NRPS fallback: if name/email still missing and NRPS is available, fetch from platform.
-    # Uses a 5s timeout — Open edX NRPS can be very slow and often returns no PII anyway.
-    if (not name or not email) and message_launch.has_nrps():
-        t_nrps_start = time.monotonic()
-        try:
-            nrps = message_launch.get_nrps()
-            members = await asyncio.wait_for(
-                asyncio.to_thread(nrps.get_members),
-                timeout=5.0,
-            )
-            for member in members:
-                if member.get("user_id") == sub:
-                    name = (
-                        name
-                        or _resolved(member.get("name"))
-                        or " ".join(
-                            filter(None, [member.get("given_name"), member.get("family_name")])
-                        )
-                        or None
-                    )
-                    email = email or _resolved(member.get("email"))
-                    logger.info("NRPS resolved name=%s email=%s for sub=%s", name, email, sub)
-                    break
-        except TimeoutError:
-            logger.warning("NRPS lookup timed out after 5s — skipping")
-        except Exception as exc:
-            logger.warning("NRPS lookup failed: %s", exc)
-        finally:
-            logger.info("LTI launch: NRPS took %.3fs", time.monotonic() - t_nrps_start)
+    # NRPS fallback disabled — Open edX NRPS is slow (up to 5s+) and returns
+    # name=None email=None on our platform. The name/email from JWT claims and
+    # custom param substitution above are sufficient. To re-enable, uncomment below.
+    #
+    # if (not name or not email) and message_launch.has_nrps():
+    #     t_nrps_start = time.monotonic()
+    #     try:
+    #         nrps = message_launch.get_nrps()
+    #         members = await asyncio.wait_for(
+    #             asyncio.to_thread(nrps.get_members), timeout=5.0,
+    #         )
+    #         for member in members:
+    #             if member.get("user_id") == sub:
+    #                 name = name or _resolved(member.get("name")) or None
+    #                 email = email or _resolved(member.get("email"))
+    #                 logger.info("NRPS resolved name=%s email=%s", name, email)
+    #                 break
+    #     except TimeoutError:
+    #         logger.warning("NRPS lookup timed out — skipping")
+    #     except Exception as exc:
+    #         logger.warning("NRPS lookup failed: %s", exc)
+    #     finally:
+    #         logger.info("LTI launch: NRPS took %.3fs", time.monotonic() - t_nrps_start)
 
     # Map LTI user to LTT learner
     t_db_start = time.monotonic()
