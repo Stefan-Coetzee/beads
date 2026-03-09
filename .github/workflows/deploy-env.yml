@@ -214,6 +214,38 @@ jobs:
 
           echo "arn=$ARN" >> "$GITHUB_OUTPUT"
 
+      - name: Validate backend secrets
+        run: |
+          # Fail fast if the task definition is missing required secrets.
+          # This catches Terraform drift (new secret added but terraform apply
+          # not run on ECS module) before we attempt a rolling deploy.
+          SECRETS=$(aws ecs describe-task-definition \
+            --task-definition "${{ steps.backend-td.outputs.arn }}" \
+            --query 'taskDefinition.containerDefinitions[0].secrets[*].name' \
+            --output json)
+
+          REQUIRED=(
+            LTT_DATABASE_URL
+            LTT_REDIS_URL
+            LTT_ANTHROPIC_API_KEY
+            LTT_ADMIN_API_KEY
+          )
+
+          MISSING=()
+          for SECRET in "${REQUIRED[@]}"; do
+            if ! echo "$SECRETS" | jq -e --arg s "$SECRET" 'index($s) != null' > /dev/null 2>&1; then
+              MISSING+=("$SECRET")
+            fi
+          done
+
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "::error::Backend task definition is missing required secrets: ${MISSING[*]}"
+            echo "Run 'terraform apply' on the ECS module to update the task definition, then redeploy."
+            exit 1
+          fi
+
+          echo "All required secrets present: ${REQUIRED[*]}"
+
       - name: Deploy backend service
         run: |
           aws ecs update-service \

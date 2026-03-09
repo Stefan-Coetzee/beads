@@ -129,9 +129,12 @@ class Settings(BaseSettings):
                     f"(env={self.env!r} — LTI launch redirects will break)"
                 )
 
-        # ── Admin API key — reject placeholders in any deployed env ────────
-        if self.env != "local" and self.admin_api_key:
-            if self.admin_api_key.startswith("PLACEHOLDER"):
+            if not self.admin_api_key:
+                errors.append(
+                    "LTT_ADMIN_API_KEY is required in deployed environments "
+                    "(project ingestion endpoint will not function)"
+                )
+            elif self.admin_api_key.startswith("PLACEHOLDER"):
                 errors.append(
                     "LTT_ADMIN_API_KEY still contains the Terraform placeholder — "
                     "set a real value in Secrets Manager before deploying"
