@@ -149,6 +149,12 @@ def get_app() -> FastAPI:
     app.include_router(admin_router)  # Admin routes already have /api/v1 prefix
     app.include_router(lti_router)  # LTI routes at /lti/*
 
+    # Debug tools (inspector, etc.) — only when LTT_DEBUG=true
+    if settings.debug:
+        from api.inspector_routes import router as inspector_router
+
+        app.include_router(inspector_router)
+
     # Health check — verifies DB connectivity so ECS/ALB know the task is
     # actually ready, not just running.  Returns 503 if the DB is unreachable.
     @app.get("/health")
