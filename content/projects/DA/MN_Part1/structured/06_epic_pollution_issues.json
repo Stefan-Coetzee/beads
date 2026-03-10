@@ -50,6 +50,15 @@
               "description": "Understand pollution data structure and contamination thresholds"
             }
           ],
+          "checks": [
+            {
+              "query": "SELECT * FROM well_pollution LIMIT 5",
+              "expect": {
+                "row_count": 5,
+                "columns": ["source_id", "date", "description", "pollutant_ppm", "biological", "results"]
+              }
+            }
+          ],
           "tutor_guidance": {
             "teaching_approach": "Emphasize the health implications - this data determines if water is safe to drink",
             "hints_to_give": [
@@ -94,11 +103,17 @@
           "estimated_minutes": 10,
           "dependencies": ["Discuss the health implications of mislabeled wells"],
           "acceptance_criteria": "- Query returns rows where results='Clean' AND biological > 0.01\n- Uses WHERE with AND to combine both conditions\n- Student understands why these records are dangerous",
-          "content": "So, write a query that checks if the results is Clean but the biological column is > 0.01.\n\n**Expected query:**\n```sql\nSELECT *\nFROM well_pollution\nWHERE results = 'Clean'\nAND biological > 0.01\n```\n\nI got this:\n\n| source_id | date | description | pollutant_ppm | biological | results |\n|-----------|------|-------------|---------------|------------|--------|\n| AkRu08936224 | 2021-01-08 09:22:00 | Bacteria: E. coli | 0.0406458 | 35.0068 | Clean |\n| AkRu06489224 | 2021-01-10 09:44:00 | Clean Bacteria: Giardia Lamblia | 0.0897904 | 38.467 | Clean |\n| SoRu38011224 | 2021-01-14 15:35:00 | Bacteria: E. coli | 0.0425095 | 19.2897 | Clean |\n\nIf we compare the results of this query to the entire table it seems like we have some inconsistencies in how the well statuses are recorded. Specifically, it seems that some data input personnel might have mistaken the description field for determining the cleanliness of the water.",
+          "content": "So, write a query that checks if the results is Clean but the biological column is > 0.01.\n\n**Expected query:**\n```sql\nSELECT *\nFROM well_pollution\nWHERE results = 'Clean'\nAND biological > 0.01\n```\n\nI got this:\n\n| source_id | date | description | pollutant_ppm | biological | results |\n|-----------|------|-------------|---------------|------------|--------|\n| AkRu08936224 | 2021-01-08 09:22:00 | Bacteria: E. coli | 0.0406458 | 35.0068 | Clean |\n| AkRu06489224 | 2021-01-10 09:44:00 | Clean Bacteria: Giardia Lamblia | 0.0897904 | 38.467 | Clean |\n| SoRu38011224 | 2021-01-14 15:35:00 | Bacteria: E. coli | 0.0425095 | 19.2897 | Clean |\n| AkKi00955224 | 2021-01-22 12:47:00 | Bacteria: E. coli | 0.0812092 | 40.2273 | Clean |\n| KiHa22929224 | 2021-02-06 13:54:00 | Bacteria: E. coli | 0.0722537 | 18.4482 | Clean |\n| KiRu25473224 | 2021-02-07 15:51:00 | Clean Bacteria: Giardia Lamblia | 0.0630094 | 24.4536 | Clean |\n| HaRu17401224 | 2021-03-01 13:44:00 | Clean Bacteria: Giardia Lamblia | 0.0649209 | 25.8129 | Clean |\n\nIf we compare the results of this query to the entire table it seems like we have some inconsistencies in how the well statuses are recorded. Specifically, it seems that some data input personnel might have mistaken the description field for determining the cleanliness of the water.",
           "learning_objectives": [
             {
               "level": "analyze",
               "description": "Analyze data for contradictory values"
+            }
+          ],
+          "checks": [
+            {
+              "query": "SELECT * FROM well_pollution WHERE results = 'Clean' AND biological > 0.01",
+              "expect": { "min_rows": 1 }
             }
           ],
           "tutor_guidance": {
@@ -148,6 +163,12 @@
               "description": "Apply LIKE with wildcard patterns"
             }
           ],
+          "checks": [
+            {
+              "query": "SELECT * FROM well_pollution WHERE description LIKE 'Clean_%'",
+              "expect": { "row_count": 38 }
+            }
+          ],
           "tutor_guidance": {
             "answer_rationale": "'Clean_%' means it starts with 'Clean', (_) have at least one character after 'Clean' and (%) can have any other characters after that.",
             "common_mistakes": [
@@ -182,7 +203,7 @@
           "subtask_type": "conversational",
           "description": "Understand the risks and best practices for UPDATE statements",
           "estimated_minutes": 5,
-          "content": "Before we make any changes, here is another nugget of advice: Begin complex queries by commenting on what you will do. This helps us to think through the problem before we write code to solve it, and once we're done, we have a well-documented code.\n\nNow, when we change any data on the database, we need to be SURE there are no errors, as this could fill the database with incorrect values. A safer way to do the UPDATE is by testing the changes on a copy of the table first.",
+          "content": "Before we make any changes, here is another nugget of advice: Begin complex queries by commenting on what you will do. This helps us to think through the problem before we write code to solve it, and once we're done, we have a well-documented code.\n\nNow, when we change any data on the database, we need to be SURE there are no errors, as this could fill the database with incorrect values. A safer way to do the UPDATE is by testing the changes on a copy of the table first.\n\n**Don't worry about breaking things:** If anything goes wrong with your data modifications, you can always reset the database back to its original state. The system can reload a fresh copy of the database for you, so feel free to experiment - that's how you learn! The copy-table approach we're about to use is how professionals do it, but knowing you have a safety net means you can focus on learning without fear.",
           "learning_objectives": [
             {
               "level": "understand",
@@ -205,11 +226,17 @@
           "estimated_minutes": 5,
           "dependencies": ["Discuss the responsibility of modifying data"],
           "acceptance_criteria": "- Copy table well_pollution_copy created successfully\n- Contains same data as original well_pollution table\n- Student understands why testing on a copy is essential",
-          "content": "The CREATE TABLE new_table AS (query) approach is a neat trick that allows you to create a new table from the results set of a query. This method is especially useful for creating backup tables or subsets without the need for a separate CREATE TABLE and INSERT INTO statement.\n\nSo if we run:\n\n**Expected query:**\n```sql\nCREATE TABLE well_pollution_copy AS (\n    SELECT *\n    FROM well_pollution\n)\n```\n\nWe will get a copy of well_pollution called well_pollution_copy. Now we can make the changes, and if we discover there is a mistake in our code, we can just delete this table, and run it again.",
+          "content": "The CREATE TABLE new_table AS query approach is a neat trick that allows you to create a new table from the results set of a query. This method is especially useful for creating backup tables or subsets without the need for a separate CREATE TABLE and INSERT INTO statement.\n\nSo if we run:\n\n**Expected query:**\n```sql\nCREATE TABLE well_pollution_copy AS\n    SELECT *\n    FROM well_pollution\n```\n\nWe will get a copy of well_pollution called well_pollution_copy. Now we can make the changes, and if we discover there is a mistake in our code, we can just delete this table, and run it again.\n\n**Tip:** If you ever need to start completely fresh, you can reset the database to its original state. But the copy-table approach is good practice - it's what you'll do in the real world where there is no reset button!",
           "learning_objectives": [
             {
               "level": "apply",
               "description": "Apply CREATE TABLE AS SELECT to create backup copies"
+            }
+          ],
+          "checks": [
+            {
+              "query": "CREATE TABLE well_pollution_copy AS SELECT * FROM well_pollution",
+              "expect": { "modifies": true }
             }
           ],
           "tutor_guidance": {
@@ -221,11 +248,37 @@
           }
         },
         {
+          "title": "Plan the UPDATE with comments first",
+          "subtask_type": "exercise",
+          "description": "Practice the professional habit of planning SQL changes by writing comments before code",
+          "estimated_minutes": 10,
+          "dependencies": ["Create a copy table for safe testing"],
+          "acceptance_criteria": "- Student writes comment outlines before filling in SQL\n- Student understands the three cases to fix\n- Student can articulate what each UPDATE will do before writing it",
+          "content": "Before we write the UPDATE queries, here is another nugget of advice: Begin complex queries by commenting on what you will do. This helps us to think through the problem before we write code to solve it, and once we're done, we have a well-documented code.\n\n**Step 1 - Write comments describing what we need to do:**\n```sql\n-- Case 1a: Update descriptions that mistakenly mention\n-- 'Clean Bacteria: E. coli' to 'Bacteria: E. coli'\n-- Case 1b: Update the descriptions that mistakenly mention\n-- 'Clean Bacteria: Giardia Lamblia' to 'Bacteria: Giardia Lamblia'\n-- Case 2: Update the 'results' to 'Contaminated: Biological' where\n-- 'biological' is greater than 0.01 plus current results is 'Clean'\n```\n\n**Step 2 - Add the SQL structure with comments as guides:**\n```sql\n-- Case 1a\nUPDATE\n   -- Update well_pollution_copy table\nSET\n   -- Change description to 'Bacteria: E. coli'\nWHERE\n   -- Where the description is 'Clean Bacteria: E. coli'\n\n-- Case 1b\n   -- Try to fill this in\n-- Case 2\n   -- Try to fill this in\n```\n\n**Step 3 - Fill in the actual SQL:**\n```sql\n-- Case 1a\nUPDATE\n   well_pollution_copy\nSET\n   description = 'Bacteria: E. coli'\nWHERE\n   description = 'Clean Bacteria: E. coli';\n\n-- Case 1b\n   -- Try to fill this in\n-- Case 2\n   -- Try to fill this in\n```\n\nOk, go ahead and fill in the rest.",
+          "learning_objectives": [
+            {
+              "level": "apply",
+              "description": "Apply the practice of planning SQL modifications with comments before writing code"
+            }
+          ],
+          "tutor_guidance": {
+            "teaching_approach": "Walk through the progression from comments to code - this is a professional habit that prevents mistakes on production data",
+            "discussion_prompts": [
+              "Why is it helpful to write comments before the actual SQL?",
+              "How does this approach reduce errors?"
+            ],
+            "hints_to_give": [
+              "Case 1b follows the same pattern as 1a but for Giardia Lamblia",
+              "Case 2 needs to check both the biological value AND the current results"
+            ]
+          }
+        },
+        {
           "title": "Write UPDATE queries for the copy table",
           "subtask_type": "exercise",
           "description": "Write and test UPDATE queries on the copy table",
           "estimated_minutes": 15,
-          "dependencies": ["Create a copy table for safe testing"],
+          "dependencies": ["Plan the UPDATE with comments first"],
           "acceptance_criteria": "- All three UPDATE queries written correctly\n- Updates tested on well_pollution_copy first\n- Student can explain what each UPDATE does",
           "content": "So if we now run our query on the copy table:\n\n**Case 1a - Fix E. coli descriptions:**\n```sql\nUPDATE well_pollution_copy\nSET description = 'Bacteria: E. coli'\nWHERE description = 'Clean Bacteria: E. coli'\n```\n\n**Case 1b - Fix Giardia descriptions:**\n```sql\nUPDATE well_pollution_copy\nSET description = 'Bacteria: Giardia Lamblia'\nWHERE description = 'Clean Bacteria: Giardia Lamblia'\n```\n\n**Case 2 - Fix results column:**\n```sql\nUPDATE well_pollution_copy\nSET results = 'Contaminated: Biological'\nWHERE biological > 0.01 AND results = 'Clean'\n```",
           "learning_objectives": [
@@ -234,8 +287,22 @@
               "description": "Create UPDATE statements with WHERE conditions"
             }
           ],
+          "checks": [
+            {
+              "query": "UPDATE well_pollution_copy SET description = 'Bacteria: E. coli' WHERE description = 'Clean Bacteria: E. coli'",
+              "expect": { "modifies": true }
+            },
+            {
+              "query": "UPDATE well_pollution_copy SET description = 'Bacteria: Giardia Lamblia' WHERE description = 'Clean Bacteria: Giardia Lamblia'",
+              "expect": { "modifies": true }
+            },
+            {
+              "query": "UPDATE well_pollution_copy SET results = 'Contaminated: Biological' WHERE biological > 0.01 AND results = 'Clean'",
+              "expect": { "modifies": true }
+            }
+          ],
           "tutor_guidance": {
-            "answer_rationale": "Case 1a and 1b fix the description field by removing the erroneous 'Clean ' prefix. Case 2 fixes the results column by setting it to 'Contaminated: Biological' where the data shows contamination but was incorrectly marked as Clean."
+            "answer_rationale": "Case 1a and 1b fix the description field by removing the erroneous 'Clean ' prefix. Case 2 fixes the results column by setting it to 'Contaminated: Biological' where the data shows contamination but was incorrectly marked as Clean.\n\n**Advanced approach (MEMO):** For stronger students, show that Cases 1a/1b and Case 2 can be combined into single UPDATE statements that fix both columns at once:\n```sql\nUPDATE well_pollution_copy\nSET results = 'Contaminated: Biological',\n    description = 'Bacteria: E. coli'\nWHERE description = 'Clean Bacteria: E. coli';\n\nUPDATE well_pollution_copy\nSET results = 'Contaminated: Biological',\n    description = 'Bacteria: Giardia Lamblia'\nWHERE description = 'Clean Bacteria: Giardia Lamblia';\n```\nThis is more efficient because it updates both the description and results in one pass, rather than requiring a separate Case 2 UPDATE."
           }
         },
         {
@@ -246,6 +313,12 @@
           "dependencies": ["Write UPDATE queries for the copy table"],
           "acceptance_criteria": "- Verification query returns 0 rows\n- Student understands how to verify data corrections",
           "content": "We can then check if our errors are fixed using a SELECT query on the well_pollution_copy table:\n\n**Expected query:**\n```sql\nSELECT *\nFROM well_pollution_copy\nWHERE description LIKE 'Clean_%'\nOR (results = 'Clean' AND biological > 0.01)\n```\n\nThis should return 0 rows if all our fixes worked correctly.",
+          "checks": [
+            {
+              "query": "SELECT * FROM well_pollution_copy WHERE description LIKE 'Clean_%' OR (results = 'Clean' AND biological > 0.01)",
+              "expect": { "row_count": 0 }
+            }
+          ],
           "learning_objectives": [
             {
               "level": "evaluate",
@@ -260,11 +333,29 @@
           "estimated_minutes": 10,
           "dependencies": ["Verify the fixes worked"],
           "acceptance_criteria": "- Updates applied to well_pollution table\n- Copy table dropped with DROP TABLE\n- Student understands the complete safe modification workflow",
-          "content": "Then if we're sure it works as intended, we can change the table back to the well_pollution and delete the well_pollution_copy table.\n\n```sql\nUPDATE well_pollution\nSET description = 'Bacteria: E. coli'\nWHERE description = 'Clean Bacteria: E. coli';\n\nUPDATE well_pollution\nSET description = 'Bacteria: Giardia Lamblia'\nWHERE description = 'Clean Bacteria: Giardia Lamblia';\n\nUPDATE well_pollution\nSET results = 'Contaminated: Biological'\nWHERE biological > 0.01 AND results = 'Clean';\n\nDROP TABLE well_pollution_copy;\n```\n\nSo I hope that today helped you to see what the survey data is all about. I hope that you are as excited as I am to get stuck in! Until then, keep well!",
+          "content": "Then if we're sure it works as intended, we can change the table back to the well_pollution and delete the well_pollution_copy table.\n\n```sql\nUPDATE well_pollution\nSET description = 'Bacteria: E. coli'\nWHERE description = 'Clean Bacteria: E. coli';\n\nUPDATE well_pollution\nSET description = 'Bacteria: Giardia Lamblia'\nWHERE description = 'Clean Bacteria: Giardia Lamblia';\n\nUPDATE well_pollution\nSET results = 'Contaminated: Biological'\nWHERE biological > 0.01 AND results = 'Clean';\n\nDROP TABLE well_pollution_copy;\n```\n\n**Remember:** These changes modify the real `well_pollution` table. If something doesn't look right after running these, you can reset the database to its original state and try again from scratch. In the real world you wouldn't have this luxury, which is exactly why we practised on a copy first!\n\nSo I hope that today helped you to see what the survey data is all about. I hope that you are as excited as I am to get stuck in! Until then, keep well!",
           "learning_objectives": [
             {
               "level": "apply",
               "description": "Apply DROP TABLE to clean up temporary tables"
+            }
+          ],
+          "checks": [
+            {
+              "query": "UPDATE well_pollution SET description = 'Bacteria: E. coli' WHERE description = 'Clean Bacteria: E. coli'",
+              "expect": { "modifies": true }
+            },
+            {
+              "query": "UPDATE well_pollution SET description = 'Bacteria: Giardia Lamblia' WHERE description = 'Clean Bacteria: Giardia Lamblia'",
+              "expect": { "modifies": true }
+            },
+            {
+              "query": "UPDATE well_pollution SET results = 'Contaminated: Biological' WHERE biological > 0.01 AND results = 'Clean'",
+              "expect": { "modifies": true }
+            },
+            {
+              "query": "DROP TABLE well_pollution_copy",
+              "expect": { "modifies": true }
             }
           ],
           "tutor_guidance": {

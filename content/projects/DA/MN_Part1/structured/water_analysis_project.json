@@ -1,16 +1,6 @@
 {
-  "project_id": "maji-ndogo-part1",
-  "version": 1,
-  "version_tag": "initial",
   "title": "Maji Ndogo Water Crisis - Part 1: Beginning Your Data Driven Journey",
   "description": "Explore survey data from President Naledi's water quality initiative. Learn to navigate databases, understand water source types, identify data quality issues, and make corrections using SQL.",
-  "narrative": true,
-  "workspace_type": "sql",
-  "tutor_config": {
-    "persona": "You are Chidi Kunto, a senior data analyst at the Maji Ndogo water authority. You're mentoring a junior analyst who just joined President Naledi's initiative. You're warm, encouraging, and passionate about using data to improve lives. You share professional tips and relate technical work back to the real communities affected.",
-    "teaching_style": "socratic",
-    "encouragement_level": "high"
-  },
   "estimated_minutes": 300,
   "learning_objectives": [
     {
@@ -31,7 +21,7 @@
     }
   ],
   "narrative_context": "You've joined President Aziza Naledi's initiative to solve Maji Ndogo's water crisis. A team of engineers, field workers, scientists, and analysts has collected 60,000 survey records about water sources across the country. Your mentor Chidi Kunto will guide you through this data - every query you write helps uncover the story of communities struggling for clean water. The insights you extract will shape real decisions about where to install water purification systems.",
-  "content": "# Welcome to the Maji Ndogo Water Analysis Project\n\nThis project takes you through a real-world data analysis scenario where you'll explore survey data about water sources in the fictional country of Maji Ndogo.\n\n## Database: md_water_services\n\nThe database contains the following tables:\n- **column_legend**: Data dictionary explaining each column\n- **employee**: Survey team member information\n- **global_water_access**: Comparative water access statistics\n- **location**: Geographic information (address, province, town, urban/rural)\n- **water_quality**: Subjective quality scores from surveyors\n- **visits**: Log of visits to water sources with queue times\n- **water_source**: Types of water sources and people served\n- **well_pollution**: Contamination test results for wells\n\n## Your Mentor: Chidi Kunto\n\nChidi is a senior data analyst who will guide you through this project. He'll break down President Naledi's instructions into clear tasks, share professional tips, and help you develop good data analysis habits.\n\n## What You'll Learn\n\n1. **Database exploration** - Using SHOW TABLES and SELECT to understand unfamiliar data\n2. **Data filtering** - Using WHERE clauses to find specific records\n3. **Pattern matching** - Using LIKE for text pattern searches\n4. **Data integrity** - Identifying contradictions and errors in data\n5. **Safe modifications** - Using backup tables and tested UPDATE queries",
+  "content": "# Welcome to the Maji Ndogo Water Analysis Project\n\nThis project takes you through a real-world data analysis scenario where you'll explore survey data about water sources in the fictional country of Maji Ndogo.\n\n## Database: md_water_services\n\nThe database contains the following tables:\n- **column_legend**: Data dictionary explaining each column\n- **employee**: Survey team member information\n- **global_water_access**: Comparative water access statistics\n- **location**: Geographic information (address, province, town, urban/rural)\n- **quality_score**: Subjective quality scores from surveyors\n- **visits**: Log of visits to water sources with queue times\n- **water_source**: Types of water sources and people served\n- **well_pollution**: Contamination test results for wells\n\n## Your Mentor: Chidi Kunto\n\nChidi is a senior data analyst who will guide you through this project. He'll break down President Naledi's instructions into clear tasks, share professional tips, and help you develop good data analysis habits.\n\n## What You'll Learn\n\n1. **Database exploration** - Querying sqlite_master and using SELECT to understand unfamiliar data\n2. **Data filtering** - Using WHERE clauses to find specific records\n3. **Pattern matching** - Using LIKE for text pattern searches\n4. **Data integrity** - Identifying contradictions and errors in data\n5. **Safe modifications** - Using backup tables and tested UPDATE queries",
   "epics": [
     {
       "title": "Introduction",
@@ -68,6 +58,7 @@
               "subtask_type": "conversational",
               "description": "Absorb the context and motivation for this data analysis project",
               "estimated_minutes": 5,
+              "acceptance_criteria": "- Learner has read and acknowledged the message\n- Learner shows understanding of the mission (analyzing 60,000 water survey records)\n- Learner expresses readiness or curiosity to proceed",
               "content": "Dear Team,\n\nCongratulations on the successful completion of our extensive survey. Your dedication and hard work have resulted in an invaluable asset - a database of 60,000 records, meticulously collected by our devoted team of engineers, field workers, scientists, and analysts.\n\nNow, the next crucial phase of our mission begins. We need to make sense of this immense data trove and extract meaningful insights. We must breathe life into these records and listen to the story they are telling us.\n\nI urge you to load this database and thoroughly acquaint yourselves with it. Dive deep, explore its structure, understand the variables and the connections between them. Each record is a chapter of our story; each query you run is a thread weaving that story together. This is a process of discovery - to uncover the patterns and nuances in our data. It's a chance to ask the right questions, to identify the pressing problems, and to set the course for our data-driven solutions.\n\nAs you proceed, always remember that every bit of information is a piece of the bigger puzzle. Every insight, no matter how small, brings us one step closer to solving our water crisis. Together, we have embarked on this journey to bring about change. Let's continue to march ahead with the same determination and resolve.\n\nI believe in our collective potential. Together, we will unravel the secrets held within these records, and use this knowledge to shape a brighter future for Maji Ndogo.\n\nBest regards,\nAziza Naledi",
               "learning_objectives": [
                 {
@@ -108,7 +99,8 @@
               "dependencies": [
                 "Meet your mentor Chidi Kunto"
               ],
-              "content": "Hey there,\n\nYou've probably seen President Naledi's message by now. She has emphasised the importance of our newly collected survey data and how vital it is for us to dive in and start making sense of it. As the senior data analyst, I've taken a close look at her message and have broken it down into **5 major phases** - think of them as chapters in our journey. Each phase has its own set of tasks we'll work through together.\n\n**Here are the 5 phases (epics) of our project:**\n\n**Epic 1: Get to know our data** - Before we do anything else, let's take a good look at our data. We'll load up the database and pull up the first few records from each table. It's like getting to know a new city - we need to explore the lay of the land before we can start our journey.\n\n**Epic 2: Dive into the water sources** - We've got a whole table dedicated to the types of water sources in our database. Let's dig into it and figure out all the unique types of water sources we're dealing with.\n\n**Epic 3: Unpack the visits to water sources** - The 'visits' table in our database is like a logbook of all the trips made to different water sources. We need to unravel this logbook to understand the frequency and distribution of these visits.\n\n**Epic 4: Assess the quality of water sources** - The quality of our water sources is a pretty big deal. We'll turn to the water_quality table to find records and spot the water sources that are frequently visited and have a decent quality score.\n\n**Epic 5: Investigate any pollution issues** - We can't overlook the pollution status of our water sources. Let's find those water sources where the pollution_tests result came back as 'dirty' or 'biologically contaminated'.\n\n**Important:** Right now, we're just previewing the road ahead. You don't need to do anything with these epics yet - each one has its own tasks that we'll tackle one by one when we get there. Think of this as looking at a map before a journey.\n\nSo, are you ready to start the journey? Once you understand the roadmap, we'll begin with Epic 1.\n\nLet's do this!",
+              "acceptance_criteria": "- Learner understands there are 5 major phases (epics) ahead\n- Learner can name at least 3 of the 5 epics\n- Learner understands this is just a preview - actual work happens in each epic separately",
+              "content": "Hey there,\n\nYou've probably seen President Naledi's message by now. She has emphasised the importance of our newly collected survey data and how vital it is for us to dive in and start making sense of it. As the senior data analyst, I've taken a close look at her message and have broken it down into **5 major phases** - think of them as chapters in our journey. Each phase has its own set of tasks we'll work through together.\n\n**Here are the 5 phases (epics) of our project:**\n\n**Epic 1: Get to know our data** - Before we do anything else, let's take a good look at our data. We'll load up the database and pull up the first few records from each table. It's like getting to know a new city - we need to explore the lay of the land before we can start our journey.\n\n**Epic 2: Dive into the water sources** - We've got a whole table dedicated to the types of water sources in our database. Let's dig into it and figure out all the unique types of water sources we're dealing with.\n\n**Epic 3: Unpack the visits to water sources** - The 'visits' table in our database is like a logbook of all the trips made to different water sources. We need to unravel this logbook to understand the frequency and distribution of these visits.\n\n**Epic 4: Assess the quality of water sources** - The quality of our water sources is a pretty big deal. We'll turn to the quality_score table to find records and spot the water sources that are frequently visited and have a decent quality score.\n\n**Epic 5: Investigate any pollution issues** - We can't overlook the pollution status of our water sources. Let's find those water sources where the pollution_tests result came back as 'dirty' or 'biologically contaminated'.\n\n**Important:** Right now, we're just previewing the road ahead. You don't need to do anything with these epics yet - each one has its own tasks that we'll tackle one by one when we get there. Think of this as looking at a map before a journey.\n\nSo, are you ready to start the journey? Once you understand the roadmap, we'll begin with Epic 1.\n\nLet's do this!",
               "learning_objectives": [
                 {
                   "level": "remember",
@@ -158,34 +150,42 @@
       "tasks": [
         {
           "title": "Discover what tables exist",
-          "description": "Use SHOW TABLES to explore an unfamiliar database",
+          "description": "Query sqlite_master to explore an unfamiliar database",
           "estimated_minutes": 10,
           "priority": 0,
           "learning_objectives": [
             {
               "level": "remember",
-              "description": "Recall SHOW TABLES as a database exploration command"
+              "description": "Recall how to query sqlite_master to list tables in a database"
             }
           ],
           "content": "Start by retrieving the first few records from each table. How many tables are there in our database? What are the names of these tables? Once you've identified the tables, write a SELECT statement to retrieve the first five records from each table. As you look at the data, take note of the columns and their respective data types in each table. What information does each table contain?",
           "subtasks": [
             {
-              "title": "Run SHOW TABLES command",
+              "title": "List all tables in the database",
               "subtask_type": "exercise",
-              "description": "Use SHOW TABLES to see all tables in the md_water_services database",
+              "description": "Query sqlite_master to see all tables in the md_water_services database",
               "estimated_minutes": 5,
-              "acceptance_criteria": "- Student runs SHOW TABLES\n- Student can list the 8 tables discovered\n- Student understands this is the first step when exploring unfamiliar databases",
-              "content": "I don't think they showed you this at the Academy, but when you access a new database in MySQL, a handy initial query to run is SHOW TABLES. This will give you a list of all the tables in the database.\n\n```sql\nSHOW TABLES\n```\n\nYou should see something like this:\n\n| Tables_in_md_water_services |\n|-----------------------------|\n| column_legend |\n| employee |\n| global_water_access |\n| location |\n| water_quality |\n| visits |\n| water_source |\n| well_pollution |\n\nIt looks like someone took the time to name all of these tables pretty well because we can kind of figure out what each table is about without really having to think too hard. water_source probably logs information about each source like where it is, what type of source it is and so on.",
+              "acceptance_criteria": "- Student queries sqlite_master to list tables\n- Student can list the 8 tables discovered\n- Student understands this is the first step when exploring unfamiliar databases",
+              "content": "I don't think they showed you this at the Academy, but when you access a new database, a handy first step is to find out what tables exist. In SQLite, every database has a special system table called `sqlite_master` that keeps track of all the tables. We can query it like this:\n\n```sql\nSELECT name FROM sqlite_master WHERE type='table' ORDER BY name\n```\n\nYou should see something like this:\n\n| name |\n|-----------------------------|\n| column_legend |\n| employee |\n| global_water_access |\n| location |\n| quality_score |\n| visits |\n| water_source |\n| well_pollution |\n\nIt looks like someone took the time to name all of these tables pretty well because we can kind of figure out what each table is about without really having to think too hard. water_source probably logs information about each source like where it is, what type of source it is and so on.",
               "learning_objectives": [
                 {
                   "level": "apply",
-                  "description": "Apply SHOW TABLES to explore database structure"
+                  "description": "Apply sqlite_master query to explore database structure"
+                }
+              ],
+              "checks": [
+                {
+                  "query": "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
+                  "expect": {
+                    "min_rows": 8
+                  }
                 }
               ],
               "tutor_guidance": {
                 "teaching_approach": "Emphasize this as a foundational habit for database exploration",
                 "hints_to_give": [
-                  "SHOW TABLES is helpful when dealing with unfamiliar databases",
+                  "Querying sqlite_master is helpful when dealing with unfamiliar databases",
                   "Keep a data dictionary handy for quick reference"
                 ]
               }
@@ -219,6 +219,21 @@
                 {
                   "level": "apply",
                   "description": "Apply SELECT * with LIMIT to preview table data"
+                }
+              ],
+              "checks": [
+                {
+                  "query": "SELECT * FROM location LIMIT 5",
+                  "expect": {
+                    "row_count": 5,
+                    "columns": [
+                      "location_id",
+                      "address",
+                      "province_name",
+                      "town_name",
+                      "location_type"
+                    ]
+                  }
                 }
               ],
               "tutor_guidance": {
@@ -261,6 +276,23 @@
                   "description": "Understand how tables relate through foreign keys"
                 }
               ],
+              "checks": [
+                {
+                  "query": "SELECT * FROM visits LIMIT 5",
+                  "expect": {
+                    "row_count": 5,
+                    "columns": [
+                      "record_id",
+                      "location_id",
+                      "source_id",
+                      "time_of_record",
+                      "visit_count",
+                      "time_in_queue",
+                      "assigned_employee_id"
+                    ]
+                  }
+                }
+              ],
               "tutor_guidance": {
                 "answer_rationale": "The visits table logs each time an employee visited a location to record data about a water source",
                 "hints_to_give": [
@@ -293,11 +325,24 @@
               "description": "Write a SELECT query to view the first 5 records from the water_source table",
               "estimated_minutes": 10,
               "acceptance_criteria": "- Query uses SELECT * FROM water_source LIMIT 5\n- Student can identify columns: source_id, type_of_water_source, number_of_people_served\n- Student understands that water sources serve different numbers of people",
-              "content": "Query the water_source table:\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_source\nLIMIT 5\n```\n\nI get:\n\n| source_id | type_of_water_source | number_of_people_served |\n|-----------|----------------------|-------------------------|\n| AkHa00000224 | tap_in_home | 956 |\n| AkHa00001224 | tap_in_home_broken | 930 |\n| AkHa00002224 | tap_in_home_broken | 486 |\n| AkHa00003224 | clean_well | 364 |\n| AkHa00004224 | tap_in_home_broken | 94 |\n\nNice! Ok, we're getting somewhere now... Water sources are where people get their water from! Ok, this database is actually complex, so maybe a good idea for you is to look at the rest of the tables quickly. You can just select them, but remember in good SQL there would be a data dictionary somewhere that documents all of this information, so you should read that as well, and even keep a copy of that close if we need to find information quickly.\n\nA data dictionary has been embedded into the database. If you query the data_dictionary table, an explanation of each column is given there.",
+              "content": "Query the water_source table:\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_source\nLIMIT 5\n```\n\nI get:\n\n| source_id | type_of_water_source | number_of_people_served |\n|-----------|----------------------|-------------------------|\n| AkHa00000224 | tap_in_home | 956 |\n| AkHa00001224 | tap_in_home_broken | 930 |\n| AkHa00002224 | tap_in_home_broken | 486 |\n| AkHa00003224 | clean_well | 364 |\n| AkHa00004224 | tap_in_home_broken | 94 |\n\nNice! Ok, we're getting somewhere now... Water sources are where people get their water from! Ok, this database is actually complex, so maybe a good idea for you is to look at the rest of the tables quickly. You can just select them, but remember in good SQL there would be a data dictionary somewhere that documents all of this information, so you should read that as well, and even keep a copy of that close if we need to find information quickly.\n\nA data dictionary has been embedded into the database. If you query the column_legend table, an explanation of each column is given there.",
               "learning_objectives": [
                 {
                   "level": "understand",
                   "description": "Understand the water_source table structure and its relationship to visits"
+                }
+              ],
+              "checks": [
+                {
+                  "query": "SELECT * FROM water_source LIMIT 5",
+                  "expect": {
+                    "row_count": 5,
+                    "columns": [
+                      "source_id",
+                      "type_of_water_source",
+                      "number_of_people_served"
+                    ]
+                  }
                 }
               ],
               "tutor_guidance": {
@@ -305,7 +350,7 @@
                 "hints_to_give": [
                   "Notice the different types of water sources",
                   "number_of_people_served tells us the scale of impact",
-                  "The data_dictionary table can help explain columns"
+                  "The column_legend table can help explain columns"
                 ]
               }
             }
@@ -357,6 +402,17 @@
                 {
                   "level": "apply",
                   "description": "Apply SELECT DISTINCT to find unique values"
+                }
+              ],
+              "checks": [
+                {
+                  "query": "SELECT DISTINCT type_of_water_source FROM water_source",
+                  "expect": {
+                    "min_rows": 5,
+                    "columns": [
+                      "type_of_water_source"
+                    ]
+                  }
                 }
               ],
               "tutor_guidance": {
@@ -571,6 +627,14 @@
                   "description": "Apply WHERE with greater-than comparison"
                 }
               ],
+              "checks": [
+                {
+                  "query": "SELECT * FROM visits WHERE time_in_queue > 500",
+                  "expect": {
+                    "min_rows": 1
+                  }
+                }
+              ],
               "tutor_guidance": {
                 "answer_rationale": "WHERE time_in_queue > 500 filters to only rows where the queue time exceeds 500 minutes",
                 "hints_to_give": [
@@ -634,6 +698,19 @@
                   "description": "Analyze patterns between source types and queue times"
                 }
               ],
+              "checks": [
+                {
+                  "query": "SELECT * FROM water_source WHERE source_id IN('AkRu05234224', 'AkKi00881224', 'SoRu37635224', 'SoRu36096224', 'HaZa21742224', 'AkLu01628224', 'SoRu38776224')",
+                  "expect": {
+                    "min_rows": 5,
+                    "columns": [
+                      "source_id",
+                      "type_of_water_source",
+                      "number_of_people_served"
+                    ]
+                  }
+                }
+              ],
               "tutor_guidance": {
                 "answer_rationale": "Using IN is more elegant than multiple OR conditions. The results show that shared_tap sources are the ones with extreme queue times - they serve thousands of people!",
                 "common_mistakes": [
@@ -671,8 +748,8 @@
       "content": "The quality of our water sources is the whole point of this survey. We have a table that contains a quality score for each visit made about a water source that was assigned by a Field surveyor. They assigned a score to each source from 1, being terrible, to 10 for a good, clean water source in a home. Shared taps are not rated as high, and the score also depends on how long the queue times are.",
       "tasks": [
         {
-          "title": "Explore the water_quality table",
-          "description": "Examine the water_quality table structure and understand scoring",
+          "title": "Explore the quality_score table",
+          "description": "Examine the quality_score table structure and understand scoring",
           "estimated_minutes": 10,
           "priority": 0,
           "learning_objectives": [
@@ -681,19 +758,32 @@
               "description": "Understand how water quality is scored and recorded"
             }
           ],
-          "content": "The quality of water sources is a pretty big deal. We'll turn to the water_quality table to find records where the subjective_quality_score is within a certain range and the visit_count is above a certain threshold.",
+          "content": "The quality of water sources is a pretty big deal. We'll turn to the quality_score table to find records where the subjective_quality_score is within a certain range and the visit_count is above a certain threshold.",
           "subtasks": [
             {
-              "title": "Query the water_quality table",
+              "title": "Query the quality_score table",
               "subtask_type": "exercise",
-              "description": "Explore the water_quality table to see its structure",
+              "description": "Explore the quality_score table to see its structure",
               "estimated_minutes": 5,
-              "acceptance_criteria": "- Query uses SELECT * FROM water_quality\n- Student can identify columns: record_id, subjective_quality_score, visit_count\n- Student understands the scoring system (1-10)",
-              "content": "Look through the table records to find the water quality table.\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_quality\n```",
+              "acceptance_criteria": "- Query uses SELECT * FROM quality_score\n- Student can identify columns: record_id, subjective_quality_score, visit_count\n- Student understands the scoring system (1-10)",
+              "content": "Look through the table records to find the quality score table.\n\n**Expected query:**\n```sql\nSELECT *\nFROM quality_score\n```",
+              "checks": [
+                {
+                  "query": "SELECT * FROM quality_score",
+                  "expect": {
+                    "min_rows": 1,
+                    "columns": [
+                      "record_id",
+                      "subjective_quality_score",
+                      "visit_count"
+                    ]
+                  }
+                }
+              ],
               "learning_objectives": [
                 {
                   "level": "understand",
-                  "description": "Understand the water_quality table structure"
+                  "description": "Understand the quality_score table structure"
                 }
               ]
             }
@@ -705,7 +795,7 @@
           "estimated_minutes": 20,
           "priority": 0,
           "dependencies": [
-            "Explore the water_quality table"
+            "Explore the quality_score table"
           ],
           "learning_objectives": [
             {
@@ -741,7 +831,7 @@
                 "Discuss why this query matters"
               ],
               "acceptance_criteria": "- Query uses WHERE with AND to combine both conditions\n- Query returns 218 suspicious rows\n- Student understands why these records indicate errors",
-              "content": "So please write a query to find records where the subjective_quality_score is 10 -- only looking for home taps -- and where the source was visited a second time. What will this tell us?\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_quality\nWHERE visit_count = 2\nAND subjective_quality_score = 10\n```\n\nI get 218 rows of data. But this should not be happening! I think some of our employees may have made mistakes. To be honest, I'll be surprised if there are no errors in our data at this scale! I'm going to send Pres. Naledi a message that we have to recheck some of these sources. We can appoint an Auditor to check some of the data independently, and make sure we have the right information!",
+              "content": "So please write a query to find records where the subjective_quality_score is 10 -- only looking for home taps -- and where the source was visited a second time. What will this tell us?\n\n**Expected query:**\n```sql\nSELECT *\nFROM quality_score\nWHERE visit_count = 2\nAND subjective_quality_score = 10\n```\n\nI get 218 rows of data. But this should not be happening! I think some of our employees may have made mistakes. To be honest, I'll be surprised if there are no errors in our data at this scale! I'm going to send Pres. Naledi a message that we have to recheck some of these sources. We can appoint an Auditor to check some of the data independently, and make sure we have the right information!",
               "learning_objectives": [
                 {
                   "level": "apply",
@@ -750,6 +840,14 @@
                 {
                   "level": "analyze",
                   "description": "Analyze data for logical inconsistencies"
+                }
+              ],
+              "checks": [
+                {
+                  "query": "SELECT * FROM quality_score WHERE visit_count = 2 AND subjective_quality_score = 10",
+                  "expect": {
+                    "row_count": 218
+                  }
                 }
               ],
               "tutor_guidance": {
@@ -822,6 +920,22 @@
                   "description": "Understand pollution data structure and contamination thresholds"
                 }
               ],
+              "checks": [
+                {
+                  "query": "SELECT * FROM well_pollution LIMIT 5",
+                  "expect": {
+                    "row_count": 5,
+                    "columns": [
+                      "source_id",
+                      "date",
+                      "description",
+                      "pollutant_ppm",
+                      "biological",
+                      "results"
+                    ]
+                  }
+                }
+              ],
               "tutor_guidance": {
                 "teaching_approach": "Emphasize the health implications - this data determines if water is safe to drink",
                 "hints_to_give": [
@@ -877,6 +991,14 @@
                   "description": "Analyze data for contradictory values"
                 }
               ],
+              "checks": [
+                {
+                  "query": "SELECT * FROM well_pollution WHERE results = 'Clean' AND biological > 0.01",
+                  "expect": {
+                    "min_rows": 1
+                  }
+                }
+              ],
               "tutor_guidance": {
                 "answer_rationale": "If results = 'Clean' the description is saying the well is clean, but AND biological > 0.01 says it is polluted. So this query finds the records that say clean, but are actually dirty."
               }
@@ -926,6 +1048,14 @@
                 {
                   "level": "apply",
                   "description": "Apply LIKE with wildcard patterns"
+                }
+              ],
+              "checks": [
+                {
+                  "query": "SELECT * FROM well_pollution WHERE description LIKE 'Clean_%'",
+                  "expect": {
+                    "row_count": 38
+                  }
                 }
               ],
               "tutor_guidance": {
@@ -989,11 +1119,19 @@
                 "Discuss the responsibility of modifying data"
               ],
               "acceptance_criteria": "- Copy table well_pollution_copy created successfully\n- Contains same data as original well_pollution table\n- Student understands why testing on a copy is essential",
-              "content": "The CREATE TABLE new_table AS (query) approach is a neat trick that allows you to create a new table from the results set of a query. This method is especially useful for creating backup tables or subsets without the need for a separate CREATE TABLE and INSERT INTO statement.\n\nSo if we run:\n\n**Expected query:**\n```sql\nCREATE TABLE well_pollution_copy AS (\n    SELECT *\n    FROM well_pollution\n)\n```\n\nWe will get a copy of well_pollution called well_pollution_copy. Now we can make the changes, and if we discover there is a mistake in our code, we can just delete this table, and run it again.",
+              "content": "The CREATE TABLE new_table AS query approach is a neat trick that allows you to create a new table from the results set of a query. This method is especially useful for creating backup tables or subsets without the need for a separate CREATE TABLE and INSERT INTO statement.\n\nSo if we run:\n\n**Expected query:**\n```sql\nCREATE TABLE well_pollution_copy AS\n    SELECT *\n    FROM well_pollution\n```\n\nWe will get a copy of well_pollution called well_pollution_copy. Now we can make the changes, and if we discover there is a mistake in our code, we can just delete this table, and run it again.",
               "learning_objectives": [
                 {
                   "level": "apply",
                   "description": "Apply CREATE TABLE AS SELECT to create backup copies"
+                }
+              ],
+              "checks": [
+                {
+                  "query": "CREATE TABLE well_pollution_copy AS SELECT * FROM well_pollution",
+                  "expect": {
+                    "modifies": true
+                  }
                 }
               ],
               "tutor_guidance": {
@@ -1020,6 +1158,26 @@
                   "description": "Create UPDATE statements with WHERE conditions"
                 }
               ],
+              "checks": [
+                {
+                  "query": "UPDATE well_pollution_copy SET description = 'Bacteria: E. coli' WHERE description = 'Clean Bacteria: E. coli'",
+                  "expect": {
+                    "modifies": true
+                  }
+                },
+                {
+                  "query": "UPDATE well_pollution_copy SET description = 'Bacteria: Giardia Lamblia' WHERE description = 'Clean Bacteria: Giardia Lamblia'",
+                  "expect": {
+                    "modifies": true
+                  }
+                },
+                {
+                  "query": "UPDATE well_pollution_copy SET results = 'Contaminated: Biological' WHERE biological > 0.01 AND results = 'Clean'",
+                  "expect": {
+                    "modifies": true
+                  }
+                }
+              ],
               "tutor_guidance": {
                 "answer_rationale": "Case 1a and 1b fix the description field by removing the erroneous 'Clean ' prefix. Case 2 fixes the results column by setting it to 'Contaminated: Biological' where the data shows contamination but was incorrectly marked as Clean."
               }
@@ -1034,6 +1192,14 @@
               ],
               "acceptance_criteria": "- Verification query returns 0 rows\n- Student understands how to verify data corrections",
               "content": "We can then check if our errors are fixed using a SELECT query on the well_pollution_copy table:\n\n**Expected query:**\n```sql\nSELECT *\nFROM well_pollution_copy\nWHERE description LIKE 'Clean_%'\nOR (results = 'Clean' AND biological > 0.01)\n```\n\nThis should return 0 rows if all our fixes worked correctly.",
+              "checks": [
+                {
+                  "query": "SELECT * FROM well_pollution_copy WHERE description LIKE 'Clean_%' OR (results = 'Clean' AND biological > 0.01)",
+                  "expect": {
+                    "row_count": 0
+                  }
+                }
+              ],
               "learning_objectives": [
                 {
                   "level": "evaluate",
@@ -1055,6 +1221,32 @@
                 {
                   "level": "apply",
                   "description": "Apply DROP TABLE to clean up temporary tables"
+                }
+              ],
+              "checks": [
+                {
+                  "query": "UPDATE well_pollution SET description = 'Bacteria: E. coli' WHERE description = 'Clean Bacteria: E. coli'",
+                  "expect": {
+                    "modifies": true
+                  }
+                },
+                {
+                  "query": "UPDATE well_pollution SET description = 'Bacteria: Giardia Lamblia' WHERE description = 'Clean Bacteria: Giardia Lamblia'",
+                  "expect": {
+                    "modifies": true
+                  }
+                },
+                {
+                  "query": "UPDATE well_pollution SET results = 'Contaminated: Biological' WHERE biological > 0.01 AND results = 'Clean'",
+                  "expect": {
+                    "modifies": true
+                  }
+                },
+                {
+                  "query": "DROP TABLE well_pollution_copy",
+                  "expect": {
+                    "modifies": true
+                  }
                 }
               ],
               "tutor_guidance": {

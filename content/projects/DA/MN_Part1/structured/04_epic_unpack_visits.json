@@ -65,11 +65,17 @@
           "estimated_minutes": 10,
           "dependencies": ["Consider the human impact of long queues"],
           "acceptance_criteria": "- Query uses SELECT * FROM visits WHERE time_in_queue > 500\n- Student can see the results showing extreme queue times\n- Student notices the visit_count column shows multiple visits",
-          "content": "Write a query to find all visits where people queued more than 500 minutes:\n\n**Expected query:**\n```sql\nSELECT *\nFROM visits\nWHERE time_in_queue > 500\n```\n\nThis is the table I get:\n\n| record_id | location_id | source_id | time_of_record | visit_count | time_in_queue | assigned_employee_id |\n|-----------|-------------|-----------|----------------|-------------|---------------|----------------------|\n| 899 | SoRu35083 | SoRu35083224 | 2021-01-16 10:14:00 | 6 | 515 | 28 |\n| 2304 | SoKo33124 | SoKo33124224 | 2021-02-06 07:53:00 | 5 | 512 | 16 |\n| 2315 | KiRu26095 | KiRu26095224 | 2021-02-06 14:32:00 | 3 | 529 | 8 |\n\nHow is this possible? Can you imagine queueing 8 hours for water?",
+          "content": "Write a query to find all visits where people queued more than 500 minutes:\n\n**Expected query:**\n```sql\nSELECT *\nFROM visits\nWHERE time_in_queue > 500\n```\n\nThis is the table I get:\n\n| record_id | location_id | source_id | time_of_record | visit_count | time_in_queue | assigned_employee_id |\n|-----------|-------------|-----------|----------------|-------------|---------------|----------------------|\n| 899 | SoRu35083 | SoRu35083224 | 2021-01-16 10:14:00 | 6 | 515 | 28 |\n| 2304 | SoKo33124 | SoKo33124224 | 2021-02-06 07:53:00 | 5 | 512 | 16 |\n| 2315 | KiRu26095 | KiRu26095224 | 2021-02-06 14:32:00 | 3 | 529 | 8 |\n| 3206 | SoRu38776 | SoRu38776224 | 2021-02-20 15:03:00 | 5 | 509 | 46 |\n| 3701 | HaRu19601 | HaRu19601224 | 2021-02-27 12:53:00 | 3 | 504 | 0 |\n| 4154 | SoRu38869 | SoRu38869224 | 2021-03-06 10:44:00 | 2 | 533 | 24 |\n| 5483 | AmRu14089 | AmRu14089224 | 2021-03-27 18:15:00 | 4 | 509 | 12 |\n| 9177 | SoRu37635 | SoRu37635224 | 2021-05-22 18:48:00 | 2 | 515 | 1 |\n| 9648 | SoRu36096 | SoRu36096224 | 2021-05-29 11:24:00 | 2 | 533 | 3 |\n| 11631 | AkKi00881 | AkKi00881224 | 2021-06-26 06:15:00 | 6 | 502 | 32 |\n\nHow is this possible? Can you imagine queueing 8 hours for water?",
           "learning_objectives": [
             {
               "level": "apply",
               "description": "Apply WHERE with greater-than comparison"
+            }
+          ],
+          "checks": [
+            {
+              "query": "SELECT * FROM visits WHERE time_in_queue > 500",
+              "expect": { "min_rows": 1 }
             }
           ],
           "tutor_guidance": {
@@ -120,7 +126,7 @@
           "estimated_minutes": 15,
           "dependencies": ["Note source IDs to investigate"],
           "acceptance_criteria": "- Query uses WHERE source_id IN(...) with multiple values\n- Student can see that shared_tap sources have the long queues\n- Student understands IN as an alternative to multiple OR conditions",
-          "content": "Ok, so now back to the water_source table. Let's check the records for those source_ids. You can probably remember there is a cool and a \"not so cool\" way to do it.\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_source\nWHERE source_id IN(\n    'AkRu05234224',\n    'AkKi00881224',\n    'SoRu37635224',\n    'SoRu36096224',\n    'HaZa21742224',\n    'AkLu01628224',\n    'SoRu38776224'\n)\n```\n\nThis is what I get:\n\n| source_id | type_of_water_source | number_of_people_served |\n|-----------|----------------------|-------------------------|\n| AkKi00881224 | shared_tap | 3398 |\n| AkLu01628224 | bio_dirty_well | 210 |\n| AkRu05234224 | tap_in_home_broken | 496 |\n| HaRu19601224 | shared_tap | 3322 |\n| HaZa21742224 | pol_dirty_well | 308 |\n| SoRu36096224 | shared_tap | 3786 |\n| SoRu37635224 | shared_tap | 3920 |\n\nI added a couple of others... Sorry! Well, if you check them you will see which sources have people queueing. The field surveyors also let us know that they measured sources that had queues a few times to see if the queue time changed.",
+          "content": "Ok, so now back to the water_source table. Let's check the records for those source_ids. You can probably remember there is a cool and a \"not so cool\" way to do it.\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_source\nWHERE source_id IN(\n    'AkRu05234224',\n    'AkKi00881224',\n    'SoRu37635224',\n    'SoRu36096224',\n    'HaZa21742224',\n    'AkLu01628224',\n    'SoRu38776224'\n)\n```\n\nThis is what I get:\n\n| source_id | type_of_water_source | number_of_people_served |\n|-----------|----------------------|-------------------------|\n| AkKi00881224 | shared_tap | 3398 |\n| AkLu01628224 | bio_dirty_well | 210 |\n| AkRu05234224 | tap_in_home_broken | 496 |\n| HaRu19601224 | shared_tap | 3322 |\n| HaZa21742224 | pol_dirty_well | 308 |\n| SoRu36096224 | shared_tap | 3786 |\n| SoRu37635224 | shared_tap | 3920 |\n| SoRu38776224 | shared_tap | 3180 |\n\nI added a couple of others... Sorry! Well, if you check them you will see which sources have people queueing. The field surveyors also let us know that they measured sources that had queues a few times to see if the queue time changed.",
           "learning_objectives": [
             {
               "level": "apply",
@@ -129,6 +135,15 @@
             {
               "level": "analyze",
               "description": "Analyze patterns between source types and queue times"
+            }
+          ],
+          "checks": [
+            {
+              "query": "SELECT * FROM water_source WHERE source_id IN('AkRu05234224', 'AkKi00881224', 'SoRu37635224', 'SoRu36096224', 'HaZa21742224', 'AkLu01628224', 'SoRu38776224')",
+              "expect": {
+                "min_rows": 5,
+                "columns": ["source_id", "type_of_water_source", "number_of_people_served"]
+              }
             }
           ],
           "tutor_guidance": {

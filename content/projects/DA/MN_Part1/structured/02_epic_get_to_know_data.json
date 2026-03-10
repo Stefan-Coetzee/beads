@@ -18,34 +18,40 @@
   "tasks": [
     {
       "title": "Discover what tables exist",
-      "description": "Use SHOW TABLES to explore an unfamiliar database",
+      "description": "Query sqlite_master to explore an unfamiliar database",
       "estimated_minutes": 10,
       "priority": 0,
       "learning_objectives": [
         {
           "level": "remember",
-          "description": "Recall SHOW TABLES as a database exploration command"
+          "description": "Recall how to query sqlite_master to list tables in a database"
         }
       ],
       "content": "Start by retrieving the first few records from each table. How many tables are there in our database? What are the names of these tables? Once you've identified the tables, write a SELECT statement to retrieve the first five records from each table. As you look at the data, take note of the columns and their respective data types in each table. What information does each table contain?",
       "subtasks": [
         {
-          "title": "Run SHOW TABLES command",
+          "title": "List all tables in the database",
           "subtask_type": "exercise",
-          "description": "Use SHOW TABLES to see all tables in the md_water_services database",
+          "description": "Query sqlite_master to see all tables in the md_water_services database",
           "estimated_minutes": 5,
-          "acceptance_criteria": "- Student runs SHOW TABLES\n- Student can list the 8 tables discovered\n- Student understands this is the first step when exploring unfamiliar databases",
-          "content": "I don't think they showed you this at the Academy, but when you access a new database in MySQL, a handy initial query to run is SHOW TABLES. This will give you a list of all the tables in the database.\n\n```sql\nSHOW TABLES\n```\n\nYou should see something like this:\n\n| Tables_in_md_water_services |\n|-----------------------------|\n| column_legend |\n| employee |\n| global_water_access |\n| location |\n| water_quality |\n| visits |\n| water_source |\n| well_pollution |\n\nIt looks like someone took the time to name all of these tables pretty well because we can kind of figure out what each table is about without really having to think too hard. water_source probably logs information about each source like where it is, what type of source it is and so on.",
+          "acceptance_criteria": "- Student queries sqlite_master to list tables\n- Student can list the 8 tables discovered\n- Student understands this is the first step when exploring unfamiliar databases",
+          "content": "I don't think they showed you this at the Academy, but when you access a new database, a handy first step is to find out what tables exist. In SQLite, every database has a special system table called `sqlite_master` that keeps track of all the tables. We can query it like this:\n\n```sql\nSELECT name FROM sqlite_master WHERE type='table' ORDER BY name\n```\n\nYou should see something like this:\n\n| name |\n|-----------------------------|\n| column_legend |\n| employee |\n| global_water_access |\n| location |\n| quality_score |\n| visits |\n| water_source |\n| well_pollution |\n\nIt looks like someone took the time to name all of these tables pretty well because we can kind of figure out what each table is about without really having to think too hard. water_source probably logs information about each source like where it is, what type of source it is and so on.",
           "learning_objectives": [
             {
               "level": "apply",
-              "description": "Apply SHOW TABLES to explore database structure"
+              "description": "Apply sqlite_master query to explore database structure"
+            }
+          ],
+          "checks": [
+            {
+              "query": "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
+              "expect": { "min_rows": 8 }
             }
           ],
           "tutor_guidance": {
             "teaching_approach": "Emphasize this as a foundational habit for database exploration",
             "hints_to_give": [
-              "SHOW TABLES is helpful when dealing with unfamiliar databases",
+              "Querying sqlite_master is helpful when dealing with unfamiliar databases",
               "Keep a data dictionary handy for quick reference"
             ]
           }
@@ -77,6 +83,15 @@
             {
               "level": "apply",
               "description": "Apply SELECT * with LIMIT to preview table data"
+            }
+          ],
+          "checks": [
+            {
+              "query": "SELECT * FROM location LIMIT 5",
+              "expect": {
+                "row_count": 5,
+                "columns": ["location_id", "address", "province_name", "town_name", "location_type"]
+              }
             }
           ],
           "tutor_guidance": {
@@ -117,6 +132,15 @@
               "description": "Understand how tables relate through foreign keys"
             }
           ],
+          "checks": [
+            {
+              "query": "SELECT * FROM visits LIMIT 5",
+              "expect": {
+                "row_count": 5,
+                "columns": ["record_id", "location_id", "source_id", "time_of_record", "visit_count", "time_in_queue", "assigned_employee_id"]
+              }
+            }
+          ],
           "tutor_guidance": {
             "answer_rationale": "The visits table logs each time an employee visited a location to record data about a water source",
             "hints_to_give": [
@@ -147,11 +171,20 @@
           "description": "Write a SELECT query to view the first 5 records from the water_source table",
           "estimated_minutes": 10,
           "acceptance_criteria": "- Query uses SELECT * FROM water_source LIMIT 5\n- Student can identify columns: source_id, type_of_water_source, number_of_people_served\n- Student understands that water sources serve different numbers of people",
-          "content": "Query the water_source table:\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_source\nLIMIT 5\n```\n\nI get:\n\n| source_id | type_of_water_source | number_of_people_served |\n|-----------|----------------------|-------------------------|\n| AkHa00000224 | tap_in_home | 956 |\n| AkHa00001224 | tap_in_home_broken | 930 |\n| AkHa00002224 | tap_in_home_broken | 486 |\n| AkHa00003224 | clean_well | 364 |\n| AkHa00004224 | tap_in_home_broken | 94 |\n\nNice! Ok, we're getting somewhere now... Water sources are where people get their water from! Ok, this database is actually complex, so maybe a good idea for you is to look at the rest of the tables quickly. You can just select them, but remember in good SQL there would be a data dictionary somewhere that documents all of this information, so you should read that as well, and even keep a copy of that close if we need to find information quickly.\n\nA data dictionary has been embedded into the database. If you query the data_dictionary table, an explanation of each column is given there.",
+          "content": "Query the water_source table:\n\n**Expected query:**\n```sql\nSELECT *\nFROM water_source\nLIMIT 5\n```\n\nI get:\n\n| source_id | type_of_water_source | number_of_people_served |\n|-----------|----------------------|-------------------------|\n| AkHa00000224 | tap_in_home | 956 |\n| AkHa00001224 | tap_in_home_broken | 930 |\n| AkHa00002224 | tap_in_home_broken | 486 |\n| AkHa00003224 | clean_well | 364 |\n| AkHa00004224 | tap_in_home_broken | 94 |\n\nNice! Ok, we're getting somewhere now... Water sources are where people get their water from! Ok, this database is actually complex, so maybe a good idea for you is to look at the rest of the tables quickly. You can just select them, but remember in good SQL there would be a data dictionary somewhere that documents all of this information, so you should read that as well, and even keep a copy of that close if we need to find information quickly.\n\nA data dictionary has been embedded into the database. If you query the column_legend table, an explanation of each column is given there.",
           "learning_objectives": [
             {
               "level": "understand",
               "description": "Understand the water_source table structure and its relationship to visits"
+            }
+          ],
+          "checks": [
+            {
+              "query": "SELECT * FROM water_source LIMIT 5",
+              "expect": {
+                "row_count": 5,
+                "columns": ["source_id", "type_of_water_source", "number_of_people_served"]
+              }
             }
           ],
           "tutor_guidance": {
@@ -159,7 +192,7 @@
             "hints_to_give": [
               "Notice the different types of water sources",
               "number_of_people_served tells us the scale of impact",
-              "The data_dictionary table can help explain columns"
+              "The column_legend table can help explain columns"
             ]
           }
         }

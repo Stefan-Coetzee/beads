@@ -42,6 +42,15 @@
               "description": "Apply SELECT DISTINCT to find unique values"
             }
           ],
+          "checks": [
+            {
+              "query": "SELECT DISTINCT type_of_water_source FROM water_source",
+              "expect": {
+                "min_rows": 5,
+                "columns": ["type_of_water_source"]
+              }
+            }
+          ],
           "tutor_guidance": {
             "answer_rationale": "SELECT DISTINCT removes duplicate rows, giving us one row per unique water source type",
             "common_mistakes": [
