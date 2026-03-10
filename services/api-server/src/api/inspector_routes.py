@@ -1,9 +1,8 @@
 """
-LLM Inspector — debug endpoint that shows what the tutor agent sees at each project step.
+LLM Inspector — debug endpoints for the tutor agent.
 
-Walks the task tree depth-first and pre-computes the system prompt, context, and
-tool call results for every leaf task.  The frontend fetches once and steps through
-client-side.
+1. ``/inspector/{project_id}`` — system prompt + context for every leaf task
+2. ``/memory/{learner_id}`` — learner memory (profile + global/project observations)
 
 Gated behind DEBUG=true.
 """
@@ -13,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from api.database import get_session_factory
@@ -268,3 +267,81 @@ async def get_inspector_data(project_id: str) -> InspectorResponse:
             total_steps=total_steps,
             steps=steps,
         )
+
+
+# =============================================================================
+# Memory inspector
+# =============================================================================
+
+
+class MemoryProfileResponse(BaseModel):
+    name: str | None = None
+    programming_experience: str | None = None
+    learning_style: str | None = None
+    communication_preferences: str | None = None
+    strengths: list[str] = []
+    areas_for_growth: list[str] = []
+    interests: list[str] = []
+    background: str | None = None
+
+
+class MemoryEntryResponse(BaseModel):
+    text: str
+    context: str | None = None
+    source: str = "agent"
+
+
+class MemoryResponse(BaseModel):
+    learner_id: str
+    project_slug: str | None = None
+    profile: MemoryProfileResponse
+    global_memories: list[MemoryEntryResponse]
+    project_memories: list[MemoryEntryResponse]
+    prompt_block: str
+
+
+@router.get("/memory/{learner_id}", response_model=MemoryResponse)
+async def get_learner_memory(
+    learner_id: str,
+    project_slug: str | None = Query(None, description="Project slug for project-scoped memories"),
+) -> MemoryResponse:
+    """Return the learner's stored memory (profile + observations).
+
+    Shows exactly what the agent sees at the start of each session.
+    """
+    if not get_settings().debug:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    from agent.memory.reader import format_memories_for_prompt
+    from agent.memory.store import LearnerMemory
+
+    from api.agents import get_store
+
+    store = get_store()
+    if store is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Memory store not initialised (no checkpoint DB configured)",
+        )
+
+    mem = LearnerMemory(store, learner_id, project_slug)
+
+    profile = await mem.get_profile()
+    global_memories = await mem.get_global_memories()
+    project_memories = await mem.get_project_memories()
+
+    prompt_block = format_memories_for_prompt(
+        profile=profile,
+        global_memories=global_memories,
+        project_memories=project_memories,
+        project_slug=project_slug,
+    )
+
+    return MemoryResponse(
+        learner_id=learner_id,
+        project_slug=project_slug,
+        profile=MemoryProfileResponse(**profile.model_dump()),
+        global_memories=[MemoryEntryResponse(**m.model_dump()) for m in global_memories],
+        project_memories=[MemoryEntryResponse(**m.model_dump()) for m in project_memories],
+        prompt_block=prompt_block,
+    )

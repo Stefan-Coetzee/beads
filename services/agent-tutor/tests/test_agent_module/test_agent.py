@@ -271,7 +271,7 @@ class TestToolsMounted:
     @pytest.mark.asyncio
     async def test_agent_has_all_tools_mounted(self, async_session):
         """Verify agent has all expected tools mounted."""
-        agent = create_agent(
+        agent = await create_agent(
             learner_id="test-learner",
             project_id="test-project",
             session=async_session,
@@ -330,7 +330,6 @@ class TestEnvironmentConfig:
         config = get_config()
 
         assert config.model.tutor_model, "Missing tutor_model in config"
-        assert config.model.learner_model, "Missing learner_model in config"
         assert config.model.tutor_temperature >= 0, "Invalid tutor_temperature"
         assert config.model.max_tokens > 0, "Invalid max_tokens"
 
@@ -340,9 +339,6 @@ class TestEnvironmentConfig:
 
         assert "haiku" in config.model.tutor_model.lower(), (
             f"Default tutor model should be haiku, got {config.model.tutor_model}"
-        )
-        assert "haiku" in config.model.learner_model.lower(), (
-            f"Default learner model should be haiku, got {config.model.learner_model}"
         )
 
     def test_anthropic_api_key_documented(self):
@@ -358,8 +354,9 @@ class TestEnvironmentConfig:
                 pytest.skip(f"{var} not set - required for live agent testing")
 
     def test_database_url_has_default(self):
-        """Verify DATABASE_URL has a sensible default."""
-        config = get_config()
+        """Verify DATABASE_URL has a sensible default via settings."""
+        from ltt_settings import get_settings
 
-        assert config.database_url, "Missing database_url in config"
-        assert "postgresql" in config.database_url, "database_url should be a PostgreSQL URL"
+        settings = get_settings()
+        assert settings.database_url, "Missing database_url in settings"
+        assert "postgresql" in settings.database_url, "database_url should be a PostgreSQL URL"

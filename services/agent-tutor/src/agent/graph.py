@@ -13,9 +13,10 @@ Supports two modes:
 """
 
 import json
+import logging
 from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -33,6 +34,11 @@ from agent.config import Config, get_config
 from agent.prompts import build_system_prompt
 from agent.state import AgentState, EpicContext, LearnerProgress, ProjectContext, TaskContext
 from agent.tools import create_tools
+
+if TYPE_CHECKING:
+    from langgraph.store.base import BaseStore
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Model Creation
@@ -389,7 +395,7 @@ def create_custom_graph() -> StateGraph:
 # =============================================================================
 
 
-def create_agent(
+async def create_agent(
     learner_id: str,
     project_id: str,
     session_factory: Callable[[], AsyncSession] | None = None,
@@ -397,13 +403,15 @@ def create_agent(
     checkpointer: BaseCheckpointSaver | None = None,
     config: Config | None = None,
     *,
+    store: "BaseStore | None" = None,
     session: AsyncSession | None = None,  # Deprecated, use session_factory
 ) -> "AgentWrapper":
     """
     Create a compiled tutor agent ready for use.
 
-    Uses either the prebuilt ReAct agent (recommended) or custom graph
-    based on config.agent.use_react_agent setting.
+    Async to allow eager loading of project context and learner memory
+    into the system prompt.  Agent construction itself is still cheap —
+    no LLM calls happen here.
 
     Args:
         learner_id: The learner's ID
@@ -413,6 +421,7 @@ def create_agent(
         model_name: Anthropic model to use (overrides config)
         checkpointer: Optional checkpointer for persistence
         config: Optional configuration (uses default if not provided)
+        store: Optional LangGraph store for learner memory.
         session: Deprecated. Use session_factory instead.
 
     Returns:
@@ -437,22 +446,102 @@ def create_agent(
 
             session_factory = get_session_factory()
 
+    # ── Eagerly load project context ─────────────────────────────────
+    project_context: ProjectContext | None = None
+    epic_context: EpicContext | None = None
+    project_slug: str | None = None
+
+    try:
+        from ltt.models import TaskType
+        from ltt.services.progress_service import get_or_create_progress
+        from ltt.services.task_service import get_children, get_task
+
+        async with session_factory() as sess:
+            project = await get_task(sess, project_id)
+            if project:
+                workspace_type = getattr(project, "workspace_type", None)
+                tutor_persona = getattr(project, "tutor_persona", None)
+                project_slug = getattr(project, "project_slug", None)
+
+                project_context = ProjectContext(
+                    project_id=project.id,
+                    title=project.title,
+                    description=project.description,
+                    narrative_context=project.narrative_context,
+                    workspace_type=workspace_type,
+                    tutor_persona=tutor_persona,
+                )
+
+                # Find current epic (in_progress > first open)
+                children = await get_children(sess, project_id, recursive=False)
+                epics = [c for c in children if c.task_type == TaskType.EPIC]
+                for epic in epics:
+                    progress = await get_or_create_progress(sess, epic.id, learner_id)
+                    status = progress.status.value if hasattr(progress.status, "value") else progress.status
+                    if status == "in_progress":
+                        epic_context = EpicContext(epic_id=epic.id, title=epic.title, description=epic.description)
+                        break
+                if epic_context is None:
+                    for epic in epics:
+                        progress = await get_or_create_progress(sess, epic.id, learner_id)
+                        status = progress.status.value if hasattr(progress.status, "value") else progress.status
+                        if status in ("open", "in_progress"):
+                            epic_context = EpicContext(epic_id=epic.id, title=epic.title, description=epic.description)
+                            break
+    except Exception:
+        logger.debug("Failed to load project context eagerly", exc_info=True)
+
+    # ── Load learner memory ──────────────────────────────────────────
+    memory_block = ""
+    if store is not None:
+        try:
+            from agent.memory import LearnerMemory, format_memories_for_prompt
+
+            mem = LearnerMemory(store, learner_id, project_slug)
+            profile = await mem.get_profile()
+            global_mems = await mem.get_global_memories(limit=20)
+            project_mems = await mem.get_project_memories(limit=20) if project_slug else []
+            memory_block = format_memories_for_prompt(profile, global_mems, project_mems, project_slug)
+        except Exception:
+            logger.debug("Failed to load learner memory", exc_info=True)
+
     # Create the model with thinking support if enabled
     model = create_model(config, model_name)
 
     # Create tools bound to session factory and learner
-    tools = create_tools(session_factory, learner_id, project_id)
+    tools = create_tools(
+        session_factory,
+        learner_id,
+        project_id,
+        store=store,
+        project_slug=project_slug,
+    )
 
     # Create checkpointer if not provided
     if checkpointer is None:
         checkpointer = MemorySaver()
 
+    # ── Build system prompt with full context ────────────────────────
+    epic_dict = None
+    if epic_context:
+        epic_dict = {"id": epic_context.epic_id, "title": epic_context.title, "description": epic_context.description}
+
+    system_prompt = build_system_prompt(
+        project_id=project_id,
+        narrative_context=project_context.narrative_context if project_context else None,
+        project_description=project_context.description if project_context else None,
+        project_content=None,
+        current_epic=epic_dict,
+        workspace_type=project_context.workspace_type if project_context else None,
+        custom_persona=project_context.tutor_persona if project_context else None,
+        include_memory_instructions=store is not None,
+    )
+
+    if memory_block:
+        system_prompt = system_prompt + "\n\n" + memory_block
+
     # Choose agent implementation based on config
     if config.agent.use_react_agent:
-        # Use prebuilt ReAct agent (recommended)
-        # Note: Project context is loaded at first invocation and cached
-        # For now, build a minimal prompt - full context comes from tools
-        system_prompt = build_system_prompt(project_id=project_id)
         graph = create_react_agent(
             model=model,
             tools=tools,
@@ -699,7 +788,7 @@ class AgentWrapper:
             return None
 
 
-def create_agent_simple(
+async def create_agent_simple(
     learner_id: str,
     project_id: str,
     model_name: str | None = None,
@@ -721,12 +810,12 @@ def create_agent_simple(
         AgentWrapper ready for use
 
     Usage:
-        agent = create_agent_simple("learner-1", "proj-1")
+        agent = await create_agent_simple("learner-1", "proj-1")
         response = await agent.ainvoke("Hello!")
     """
     from ltt.db.connection import get_session_factory
 
-    return create_agent(
+    return await create_agent(
         learner_id=learner_id,
         project_id=project_id,
         session_factory=get_session_factory(),
@@ -735,149 +824,3 @@ def create_agent_simple(
     )
 
 
-async def create_agent_with_context(
-    learner_id: str,
-    project_id: str,
-    session_factory: Callable[[], AsyncSession] | None = None,
-    model_name: str | None = None,
-    checkpointer: BaseCheckpointSaver | None = None,
-    config: Config | None = None,
-) -> "AgentWrapper":
-    """
-    Create an agent with full project context loaded.
-
-    This async factory function loads the project context from the database
-    before creating the agent, ensuring the system prompt includes:
-    - Project description
-    - Narrative context
-    - Project content
-
-    Args:
-        learner_id: The learner's ID
-        project_id: The project ID
-        session_factory: Callable that returns an async context manager for sessions
-        model_name: Anthropic model to use (overrides config)
-        checkpointer: Optional checkpointer for persistence
-        config: Optional configuration
-
-    Returns:
-        AgentWrapper with full project context
-
-    Usage:
-        agent = await create_agent_with_context("learner-1", "proj-1")
-        response = await agent.ainvoke("Hello!")
-    """
-    if config is None:
-        config = get_config()
-
-    if session_factory is None:
-        from ltt.db.connection import get_session_factory
-
-        session_factory = get_session_factory()
-
-    # Load project context from database
-    project_description = None
-    narrative_context = None
-    project_content = None
-    workspace_type = None
-    tutor_persona = None
-    current_epic_dict = None
-
-    try:
-        from ltt.services.progress_service import get_or_create_progress
-        from ltt.services.task_service import get_children, get_task
-
-        async with session_factory() as session:
-            project = await get_task(session, project_id)
-            if project:
-                project_description = project.description
-                narrative_context = project.narrative_context
-                project_content = project.content
-                workspace_type = getattr(project, "workspace_type", None)
-                tutor_persona = getattr(project, "tutor_persona", None)
-
-                # Find current epic (in-progress or first open)
-                children = await get_children(session, project_id, recursive=False)
-                epics = [c for c in children if c.task_type == "epic"]
-
-                for epic in epics:
-                    progress = await get_or_create_progress(session, epic.id, learner_id)
-                    status = (
-                        progress.status.value
-                        if hasattr(progress.status, "value")
-                        else progress.status
-                    )
-                    if status in ("in_progress", "open"):
-                        current_epic_dict = {
-                            "id": epic.id,
-                            "title": epic.title,
-                            "description": epic.description,
-                        }
-                        break
-    except Exception:
-        pass  # Context is optional, proceed with defaults
-
-    # Create model
-    model = create_model(config, model_name)
-
-    # Create tools
-    tools = create_tools(session_factory, learner_id, project_id)
-
-    # Create checkpointer
-    if checkpointer is None:
-        checkpointer = MemorySaver()
-
-    # Build system prompt with full context
-    system_prompt = build_system_prompt(
-        project_id=project_id,
-        narrative_context=narrative_context,
-        project_description=project_description,
-        project_content=project_content,
-        current_epic=current_epic_dict,
-        workspace_type=workspace_type,
-        custom_persona=tutor_persona,
-    )
-
-    # Create the graph
-    if config.agent.use_react_agent:
-        graph = create_react_agent(
-            model=model,
-            tools=tools,
-            prompt=system_prompt,
-            checkpointer=checkpointer,
-        )
-    else:
-        workflow = create_custom_graph()
-        graph = workflow.compile(checkpointer=checkpointer)
-
-    # Return wrapper
-    wrapper = AgentWrapper(
-        graph=graph,
-        model=model,
-        tools=tools,
-        learner_id=learner_id,
-        project_id=project_id,
-        session_factory=session_factory,
-        config=config,
-    )
-
-    # Pre-populate cached context
-    if project_description or narrative_context or workspace_type:
-        wrapper._project_context = ProjectContext(
-            project_id=project_id,
-            title="",  # We don't store title separately
-            description=project_description or "",
-            narrative_context=narrative_context,
-            workspace_type=workspace_type,
-            tutor_persona=tutor_persona,
-        )
-        wrapper._context_loaded = True
-
-    if current_epic_dict:
-        wrapper._current_epic = EpicContext(
-            epic_id=current_epic_dict["id"],
-            title=current_epic_dict["title"],
-            description=current_epic_dict["description"],
-        )
-
-    return wrapper

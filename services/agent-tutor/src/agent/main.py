@@ -69,7 +69,7 @@ async def run_chat(learner_id: str, project_id: str, show_tools: bool = False):
     # Create session and agent
     factory = get_session_factory()
     async with factory() as session:
-        agent = create_agent(
+        agent = await create_agent(
             learner_id=learner_id,
             project_id=project_id,
             session=session,
@@ -145,7 +145,7 @@ async def run_single_message(
     """Run a single message through the agent."""
     factory = get_session_factory()
     async with factory() as session:
-        agent = create_agent(
+        agent = await create_agent(
             learner_id=learner_id,
             project_id=project_id,
             session=session,

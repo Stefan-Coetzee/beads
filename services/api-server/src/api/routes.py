@@ -287,7 +287,7 @@ async def chat(
     and return a complete response.
     """
     try:
-        agent = get_or_create_agent(
+        agent = await get_or_create_agent(
             learner_id=ctx.learner_id,
             project_id=ctx.project_id or "",
             session_factory=get_session_factory(),
@@ -377,7 +377,7 @@ async def chat_stream(
 
     async def generate() -> AsyncGenerator[str, None]:
         try:
-            agent = get_or_create_agent(
+            agent = await get_or_create_agent(
                 learner_id=learner_id,
                 project_id=project_id,
                 session_factory=get_session_factory(),
@@ -447,7 +447,7 @@ async def create_session(
     learner_id = ctx.learner_id
     project_id = ctx.project_id or ""
 
-    get_or_create_agent(
+    await get_or_create_agent(
         learner_id=learner_id,
         project_id=project_id,
         session_factory=get_session_factory(),
