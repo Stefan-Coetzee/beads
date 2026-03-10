@@ -141,6 +141,31 @@ Every task MUST follow this lifecycle:
 5. **Track context** - remember what the learner has learned in this session
 """
 
+MEMORY_INSTRUCTIONS = """
+## Learner Memory
+
+You have persistent memory about this learner that carries across sessions.
+
+**When to use `store_memory`:**
+- Learner consistently struggles with a concept (e.g. "struggles with WHERE + AND")
+- Learner demonstrates a strength or learning pattern
+- Learner shares relevant personal context
+- You notice a preference in how they learn best
+
+**When to use `update_learner_profile`:**
+- Learner shares their name
+- You observe their experience level, learning style, or communication preferences
+
+**Scope guidance:**
+- `global` — about the person: name, background, learning style, general strengths
+- `project` — about their work here: specific concepts they struggled with, progress notes
+
+**Do NOT:**
+- Store every interaction detail — that's what chat history is for
+- Echo memories back ("I remember you said...") — just use them naturally
+- Store more than 2-3 memories per session — be selective about what's worth keeping
+"""
+
 # =============================================================================
 # Persona Templates
 # =============================================================================
@@ -327,6 +352,8 @@ def build_system_prompt(
     progress: dict | None = None,
     workspace_type: str | None = None,
     custom_persona: str | None = None,
+    *,
+    include_memory_instructions: bool = False,
 ) -> str:
     """
     Build the complete system prompt with current context.
@@ -341,6 +368,7 @@ def build_system_prompt(
         progress: Learner progress dict
         workspace_type: Type of workspace (sql, python, cybersecurity)
         custom_persona: Optional custom persona from project JSON
+        include_memory_instructions: Whether to append memory tool guidance
 
     Returns:
         Complete formatted system prompt
@@ -422,9 +450,13 @@ def build_system_prompt(
     else:
         progress_context = ""
 
+    ops = OPERATIONAL_INSTRUCTIONS
+    if include_memory_instructions:
+        ops = ops + MEMORY_INSTRUCTIONS
+
     return SYSTEM_PROMPT_TEMPLATE.format(
         persona=persona,
-        operational_instructions=OPERATIONAL_INSTRUCTIONS,
+        operational_instructions=ops,
         workspace_guidance=workspace_guidance,
         project_context=project_context,
         epic_context=epic_context,

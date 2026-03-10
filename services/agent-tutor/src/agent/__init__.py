@@ -9,7 +9,7 @@ Usage:
     from agent import create_agent, get_config
 
     config = get_config()
-    agent = create_agent(learner_id, project_id, session, config=config)
+    agent = await create_agent(learner_id, project_id, session=session, config=config)
     response = await agent.ainvoke("Hello!")
 """
 

@@ -42,18 +42,8 @@ sed -n '1,40p' content/projects/DA/MN_Part1/structured/water_analysis_project.js
 
 ```output
 {
-  "project_id": "maji-ndogo-part1",
-  "version": 1,
-  "version_tag": "initial",
   "title": "Maji Ndogo Water Crisis - Part 1: Beginning Your Data Driven Journey",
   "description": "Explore survey data from President Naledi's water quality initiative. Learn to navigate databases, understand water source types, identify data quality issues, and make corrections using SQL.",
-  "narrative": true,
-  "workspace_type": "sql",
-  "tutor_config": {
-    "persona": "You are Chidi Kunto, a senior data analyst at the Maji Ndogo water authority. You're mentoring a junior analyst who just joined President Naledi's initiative. You're warm, encouraging, and passionate about using data to improve lives. You share professional tips and relate technical work back to the real communities affected.",
-    "teaching_style": "socratic",
-    "encouragement_level": "high"
-  },
   "estimated_minutes": 300,
   "learning_objectives": [
     {
@@ -74,13 +64,23 @@ sed -n '1,40p' content/projects/DA/MN_Part1/structured/water_analysis_project.js
     }
   ],
   "narrative_context": "You've joined President Aziza Naledi's initiative to solve Maji Ndogo's water crisis. A team of engineers, field workers, scientists, and analysts has collected 60,000 survey records about water sources across the country. Your mentor Chidi Kunto will guide you through this data - every query you write helps uncover the story of communities struggling for clean water. The insights you extract will shape real decisions about where to install water purification systems.",
-  "content": "# Welcome to the Maji Ndogo Water Analysis Project\n\nThis project takes you through a real-world data analysis scenario where you'll explore survey data about water sources in the fictional country of Maji Ndogo.\n\n## Database: md_water_services\n\nThe database contains the following tables:\n- **column_legend**: Data dictionary explaining each column\n- **employee**: Survey team member information\n- **global_water_access**: Comparative water access statistics\n- **location**: Geographic information (address, province, town, urban/rural)\n- **water_quality**: Subjective quality scores from surveyors\n- **visits**: Log of visits to water sources with queue times\n- **water_source**: Types of water sources and people served\n- **well_pollution**: Contamination test results for wells\n\n## Your Mentor: Chidi Kunto\n\nChidi is a senior data analyst who will guide you through this project. He'll break down President Naledi's instructions into clear tasks, share professional tips, and help you develop good data analysis habits.\n\n## What You'll Learn\n\n1. **Database exploration** - Using SHOW TABLES and SELECT to understand unfamiliar data\n2. **Data filtering** - Using WHERE clauses to find specific records\n3. **Pattern matching** - Using LIKE for text pattern searches\n4. **Data integrity** - Identifying contradictions and errors in data\n5. **Safe modifications** - Using backup tables and tested UPDATE queries",
+  "content": "# Welcome to the Maji Ndogo Water Analysis Project\n\nThis project takes you through a real-world data analysis scenario where you'll explore survey data about water sources in the fictional country of Maji Ndogo.\n\n## Database: md_water_services\n\nThe database contains the following tables:\n- **column_legend**: Data dictionary explaining each column\n- **employee**: Survey team member information\n- **global_water_access**: Comparative water access statistics\n- **location**: Geographic information (address, province, town, urban/rural)\n- **quality_score**: Subjective quality scores from surveyors\n- **visits**: Log of visits to water sources with queue times\n- **water_source**: Types of water sources and people served\n- **well_pollution**: Contamination test results for wells\n\n## Your Mentor: Chidi Kunto\n\nChidi is a senior data analyst who will guide you through this project. He'll break down President Naledi's instructions into clear tasks, share professional tips, and help you develop good data analysis habits.\n\n## What You'll Learn\n\n1. **Database exploration** - Querying sqlite_master and using SELECT to understand unfamiliar data\n2. **Data filtering** - Using WHERE clauses to find specific records\n3. **Pattern matching** - Using LIKE for text pattern searches\n4. **Data integrity** - Identifying contradictions and errors in data\n5. **Safe modifications** - Using backup tables and tested UPDATE queries",
   "epics": [
     {
       "title": "Introduction",
       "description": "Setting the stage for our data exploration journey",
       "estimated_minutes": 30,
       "priority": 0,
+      "learning_objectives": [
+        {
+          "level": "understand",
+          "description": "Understand the mission and context of the water crisis data analysis"
+        },
+        {
+          "level": "remember",
+          "description": "Recall the 5 main tasks that will guide the data exploration"
+        }
+      ],
 ```
 
 Key fields to note:
@@ -122,7 +122,6 @@ sed -n '26,49p' services/ltt-core/src/ltt/models/project_schema.py
 ```
 
 ```output
-class BloomLevel(StrEnum):
     REMEMBER = "remember"
     UNDERSTAND = "understand"
     APPLY = "apply"
@@ -146,6 +145,7 @@ class EncouragementLevel(StrEnum):
     HIGH = "high"
     MODERATE = "moderate"
     MINIMAL = "minimal"
+
 ```
 
 ```bash
@@ -153,7 +153,6 @@ sed -n '87,109p' services/ltt-core/src/ltt/models/project_schema.py
 ```
 
 ```output
-class SubtaskSchema(BaseModel):
     """Atomic work item — the leaf of the hierarchy."""
 
     title: str = Field(..., min_length=1)
@@ -176,6 +175,7 @@ class SubtaskSchema(BaseModel):
             # omit AC if they're trivial. The validator can flag this.
             pass
         return self
+
 ```
 
 `subtask_type` distinguishes **exercise** subtasks (learner writes code, needs validation to close) from **conversational** subtasks (discussion with the tutor, no code required). The model validator warns but doesn't reject exercises missing acceptance criteria — some are trivially obvious.
@@ -187,7 +187,6 @@ sed -n '141,193p' services/ltt-core/src/ltt/models/project_schema.py
 ```
 
 ```output
-class ProjectSchema(BaseModel):
     """Root project — the top of the hierarchy.
 
     Validate a project JSON file::
@@ -315,36 +314,36 @@ sed -n '64,100p' services/ltt-core/src/ltt/services/ingest.py
 ```
 
 ```output
-async def ingest_project_file(
+async def ingest_project_data(
     session: AsyncSession,
-    file_path: Path,
+    data: dict,
     dry_run: bool = False,
     use_llm_summaries: bool = True,
+    require_slug: bool = False,
 ) -> IngestResult:
     """
-    Ingest a project from a JSON file.
+    Ingest a project from an already-parsed dict.
+
+    This is the core ingestion function used by both the CLI (via
+    ``ingest_project_file``) and the REST endpoint.
 
     Args:
         session: Database session
-        file_path: Path to JSON file
-        dry_run: If True, validate without creating
+        data: Parsed project JSON dict
+        dry_run: If True, validate without persisting
         use_llm_summaries: If True, use LLM to generate hierarchical summaries
+        require_slug: If True, ``project_id`` slug is mandatory (admin endpoint)
 
     Returns:
         IngestResult with project_id and counts
 
     Raises:
-        ValueError: If structure is invalid
-        FileNotFoundError: If file doesn't exist
+        ValueError: If structure is invalid (and not dry_run)
     """
-    # Load and parse file
-    with open(file_path) as f:
-        data = json.load(f)
-
     # Validate structure
-    errors = validate_project_structure(data)
+    errors = validate_project_structure(data, require_slug=require_slug)
     if errors and not dry_run:
-        raise ValueError(f"Invalid project structure: {', '.join(errors)}")
+        raise ValueError(f"Invalid project structure: {'; '.join(errors)}")
 
     # Check for duplicate slug before any DB changes (also during dry_run)
     slug = data.get("project_id")
@@ -458,7 +457,7 @@ sed -n '180,201p' services/ltt-core/src/ltt/services/ingest.py
     # Track tasks by title for dependency resolution
     dependency_map: dict[str, str] = {data["title"]: project.id}
 
-    # Process epics (sequentially to maintain dependency order, but tasks within can be parallel)
+    # Process epics (sequentially to maintain dependency order)
     task_count = 1  # Count project itself
     for epic_data in data.get("epics", []):
         epic_count, epic_obj_count = await ingest_epic(
@@ -485,32 +484,32 @@ sed -n '355,380p' services/ltt-core/src/ltt/services/ingest.py
 ```
 
 ```output
-        (task_count, objective_count, task_info)
+            f"- {t.title}: {t.description}" for t in tasks_with_summaries
+        )
+        await update_task_summary(session, epic.id, simple_summary)
+
+    return task_count, obj_count
+
+
+async def ingest_task(
+    session: AsyncSession,
+    data: dict,
+    parent_id: str,
+    project_id: str,
+    dependency_map: dict[str, str],
+    project_ctx: ProjectContext,
+    epic_ctx: EpicContext,
+    use_llm_summaries: bool = True,
+) -> tuple[int, int, TaskWithSummary]:
     """
-    # Determine task type
-    has_subtasks = bool(data.get("subtasks"))
-    task_type = TaskType.TASK if has_subtasks else TaskType.SUBTASK
+    Recursively ingest a task with its subtasks.
 
-    # Create task
-    task = await create_task(
-        session,
-        TaskCreate(
-            title=data["title"],
-            description=data.get("description", ""),
-            acceptance_criteria=data.get("acceptance_criteria", ""),
-            parent_id=parent_id,
-            project_id=project_id,
-            task_type=task_type,
-            priority=data.get("priority", 2),
-            content=data.get("content"),
-            tutor_guidance=data.get("tutor_guidance"),
-            requires_submission=data.get("requires_submission"),
-            estimated_minutes=data.get("estimated_minutes"),
-            subtask_type=data.get("subtask_type", "exercise"),
-            max_grade=data.get("max_grade"),
-        ),
-    )
-
+    Args:
+        session: Database session
+        data: Task data dict
+        parent_id: Parent task ID
+        project_id: Root project ID
+        dependency_map: Title -> ID mapping for dependency resolution
 ```
 
 ### 1.4 Task Models: The Template Layer
@@ -1142,9 +1141,7 @@ sed -n '215,272p' services/api-server/src/api/routes.py
 ```
 
 ```output
-async def _try_grade_passback(
-    new_messages: list, learner_id: str, project_id: str
-) -> None:
+async def _try_grade_passback(new_messages: list, learner_id: str, project_id: str) -> None:
     """
     Check if any submit tool calls in this turn closed a task.
     If so, compute progress and send grade to the LMS.
@@ -1200,6 +1197,8 @@ async def _try_grade_passback(
         )
     except Exception:
         logger.debug("Grade passback skipped (LTI not available or error)", exc_info=True)
+
+
 ```
 
 The function scans the agent's tool result messages for a `submit` tool call whose content contains "closed". This is how it detects that a task was just closed by the agent's tool call — without adding any new coupling between ltt-core and the API layer.
@@ -1211,13 +1210,13 @@ sed -n '344,350p' services/api-server/src/api/routes.py
 ```
 
 ```output
-                break
-
         # Fire-and-forget grade passback if a task was closed
         await _try_grade_passback(new_messages, ctx.learner_id, ctx.project_id or "")
 
         return ChatResponse(
             response=response_text,
+            thread_id=thread_id,
+            tool_calls=all_tool_calls if all_tool_calls else None,
 ```
 
 And in the streaming endpoint, grade passback fires after the stream completes but before the `done` signal is sent to the client:
@@ -1227,8 +1226,6 @@ sed -n '418,428p' services/api-server/src/api/routes.py
 ```
 
 ```output
-                        yield f"data: {chunk.model_dump_json()}\n\n"
-
             # Fire-and-forget grade passback if a task was closed
             await _try_grade_passback(all_messages, learner_id, project_id)
 
@@ -1238,6 +1235,8 @@ sed -n '418,428p' services/api-server/src/api/routes.py
         except Exception as e:
             error_chunk = StreamChunk(type="error", content=str(e))
             yield f"data: {error_chunk.model_dump_json()}\n\n"
+
+    return StreamingResponse(
 ```
 
 ---

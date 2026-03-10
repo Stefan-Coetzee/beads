@@ -1019,6 +1019,9 @@ Tests co-located with source: `src/**/*.test.{ts,tsx}`
 - `docs/schema/project-ingestion.md` - Complete schema guide
 - `docs/cli/usage.md` - Full CLI reference
 - `docs/adr/` - Architecture Decision Records (ADR-001, ADR-002, ADR-003)
+- `docs/explainers/` - System walkthroughs and explainers:
+  - `learner-memory.md` - How the tutor remembers things about learners across sessions
+  - `ingestion-grading-walkthrough.md` - Ingestion pipeline + grading data flow
 
 ---
 
@@ -1205,4 +1208,5 @@ See [BUILD-STATUS.md](BUILD-STATUS.md) for detailed phase reports.
 - **CLI Reference**: [docs/cli/usage.md](docs/cli/usage.md)
 - **Build Status**: [BUILD-STATUS.md](BUILD-STATUS.md)
 - **Architecture Decisions**: [docs/architecture/adr/](docs/architecture/adr/)
+- **Explainers**: [docs/explainers/](docs/explainers/) — System walkthroughs and deep-dives
 - **Beads (Original)**: https://github.com/steveyegge/beads

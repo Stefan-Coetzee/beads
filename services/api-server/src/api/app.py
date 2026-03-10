@@ -22,7 +22,7 @@ from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from api.admin_routes import router as admin_router
-from api.agents import close_checkpointer, init_checkpointer
+from api.agents import close_checkpointer, close_store, init_checkpointer, init_store
 from api.database import close_database, get_session_factory, init_database
 from api.frontend_routes import router as frontend_router
 from api.lti.routes import init_lti_storage
@@ -97,13 +97,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize agent checkpointer (PostgresSaver or MemorySaver)
     await init_checkpointer()
 
+    # Initialize learner memory store (PostgresStore or InMemoryStore)
+    await init_store()
+
     # Ensure at least one project exists (local dev only)
     if settings.env == "local":
         await ensure_projects_exist()
 
     yield
 
-    # Shutdown: Close checkpointer pool, then database connections
+    # Shutdown: Close store, checkpointer, then database connections
+    await close_store()
     await close_checkpointer()
     await close_database()
     print("Database connections closed")
@@ -148,6 +152,12 @@ def get_app() -> FastAPI:
     app.include_router(frontend_router)  # Frontend routes already have /api/v1 prefix
     app.include_router(admin_router)  # Admin routes already have /api/v1 prefix
     app.include_router(lti_router)  # LTI routes at /lti/*
+
+    # Debug tools (inspector, etc.) — only when LTT_DEBUG=true
+    if settings.debug:
+        from api.inspector_routes import router as inspector_router
+
+        app.include_router(inspector_router)
 
     # Health check — verifies DB connectivity so ECS/ALB know the task is
     # actually ready, not just running.  Returns 503 if the DB is unreachable.

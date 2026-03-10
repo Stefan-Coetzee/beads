@@ -3,16 +3,7 @@
   "description": "Setting the stage for our data exploration journey",
   "estimated_minutes": 30,
   "priority": 0,
-  "learning_objectives": [
-    {
-      "level": "understand",
-      "description": "Understand the mission and context of the water crisis data analysis"
-    },
-    {
-      "level": "remember",
-      "description": "Recall the 5 main tasks that will guide the data exploration"
-    }
-  ],
+  "learning_objectives": [],
   "content": "Welcome to the Maji Ndogo Water Crisis project. You've been brought onto a team tasked with analyzing 60,000 survey records about water sources. President Aziza Naledi has called on her team to make sense of this data and extract meaningful insights that will help solve the country's water crisis.",
   "tasks": [
     {
@@ -20,12 +11,7 @@
       "description": "Read President Naledi's message and understand the importance of the data analysis mission",
       "estimated_minutes": 15,
       "priority": 0,
-      "learning_objectives": [
-        {
-          "level": "understand",
-          "description": "Understand the real-world context and stakes of the data analysis"
-        }
-      ],
+      "learning_objectives": [],
       "content": "President Naledi has sent a message to the team about the importance of this work.",
       "subtasks": [
         {
@@ -35,12 +21,7 @@
           "estimated_minutes": 5,
           "acceptance_criteria": "- Learner has read and acknowledged the message\n- Learner shows understanding of the mission (analyzing 60,000 water survey records)\n- Learner expresses readiness or curiosity to proceed",
           "content": "Dear Team,\n\nCongratulations on the successful completion of our extensive survey. Your dedication and hard work have resulted in an invaluable asset - a database of 60,000 records, meticulously collected by our devoted team of engineers, field workers, scientists, and analysts.\n\nNow, the next crucial phase of our mission begins. We need to make sense of this immense data trove and extract meaningful insights. We must breathe life into these records and listen to the story they are telling us.\n\nI urge you to load this database and thoroughly acquaint yourselves with it. Dive deep, explore its structure, understand the variables and the connections between them. Each record is a chapter of our story; each query you run is a thread weaving that story together. This is a process of discovery - to uncover the patterns and nuances in our data. It's a chance to ask the right questions, to identify the pressing problems, and to set the course for our data-driven solutions.\n\nAs you proceed, always remember that every bit of information is a piece of the bigger puzzle. Every insight, no matter how small, brings us one step closer to solving our water crisis. Together, we have embarked on this journey to bring about change. Let's continue to march ahead with the same determination and resolve.\n\nI believe in our collective potential. Together, we will unravel the secrets held within these records, and use this knowledge to shape a brighter future for Maji Ndogo.\n\nBest regards,\nAziza Naledi",
-          "learning_objectives": [
-            {
-              "level": "understand",
-              "description": "Understand the importance and human impact of the data analysis work"
-            }
-          ],
+          "learning_objectives": [],
           "tutor_guidance": {
             "teaching_approach": "Let this message sink in - emphasize that this is real-world context, not just an exercise",
             "discussion_prompts": [
@@ -57,12 +38,7 @@
           "estimated_minutes": 5,
           "dependencies": ["Read President Naledi's message"],
           "content": "Hey Team,\n\nHope this message finds you well. I'm Chidi Kunto, and I'm really excited to be working with all of you on this upcoming project.\n\nOur president, Aziza Naledi, has given us a monumental task. We've got this mountain of data, and it's our job to sift through it, finding those nuggets of insight that will help us solve our water crisis here in Maji Ndogo.\n\nBut you won't be doing this alone. As your mentor, I'll be here not just to guide you but also to show you firsthand how a real data project kicks off. I'll be taking Naledi's instructions and breaking them down into clear, manageable tasks. And of course, I'll be sharing a few valuable tricks of the trade along the way.\n\nI'll help you navigate through this data landscape, turning those raw numbers into meaningful insights. Just remember, every data point can be part of our solution, and every step you take in this project helps us get closer to our goal.\n\nI'm looking forward to working closely with each of you, learning about your unique perspectives, and figuring out how we can best collaborate as a team. With your skills and dedication, I'm confident we can unlock the potential of this data and make a real difference to the people of Maji Ndogo.\n\nPlease know that my virtual door is always open. If you need some guidance, want to clarify something, or just have something cool to share, feel free to reach out.\n\nHere's to an exciting journey ahead and the valuable lessons we'll learn together!\n\nCheers,\nChidi",
-          "learning_objectives": [
-            {
-              "level": "understand",
-              "description": "Understand the mentorship relationship and support available"
-            }
-          ]
+          "learning_objectives": []
         },
         {
           "title": "Review the 5 epics ahead",
@@ -72,16 +48,7 @@
           "dependencies": ["Meet your mentor Chidi Kunto"],
           "acceptance_criteria": "- Learner understands there are 5 major phases (epics) ahead\n- Learner can name at least 3 of the 5 epics\n- Learner understands this is just a preview - actual work happens in each epic separately",
           "content": "Hey there,\n\nYou've probably seen President Naledi's message by now. She has emphasised the importance of our newly collected survey data and how vital it is for us to dive in and start making sense of it. As the senior data analyst, I've taken a close look at her message and have broken it down into **5 major phases** - think of them as chapters in our journey. Each phase has its own set of tasks we'll work through together.\n\n**Here are the 5 phases (epics) of our project:**\n\n**Epic 1: Get to know our data** - Before we do anything else, let's take a good look at our data. We'll load up the database and pull up the first few records from each table. It's like getting to know a new city - we need to explore the lay of the land before we can start our journey.\n\n**Epic 2: Dive into the water sources** - We've got a whole table dedicated to the types of water sources in our database. Let's dig into it and figure out all the unique types of water sources we're dealing with.\n\n**Epic 3: Unpack the visits to water sources** - The 'visits' table in our database is like a logbook of all the trips made to different water sources. We need to unravel this logbook to understand the frequency and distribution of these visits.\n\n**Epic 4: Assess the quality of water sources** - The quality of our water sources is a pretty big deal. We'll turn to the quality_score table to find records and spot the water sources that are frequently visited and have a decent quality score.\n\n**Epic 5: Investigate any pollution issues** - We can't overlook the pollution status of our water sources. Let's find those water sources where the pollution_tests result came back as 'dirty' or 'biologically contaminated'.\n\n**Important:** Right now, we're just previewing the road ahead. You don't need to do anything with these epics yet - each one has its own tasks that we'll tackle one by one when we get there. Think of this as looking at a map before a journey.\n\nSo, are you ready to start the journey? Once you understand the roadmap, we'll begin with Epic 1.\n\nLet's do this!",
-          "learning_objectives": [
-            {
-              "level": "remember",
-              "description": "Recall the 5 major epics (phases) and their purposes"
-            },
-            {
-              "level": "understand",
-              "description": "Understand that each epic contains separate tasks to complete"
-            }
-          ],
+          "learning_objectives": [],
           "tutor_guidance": {
             "teaching_approach": "This is ONLY an overview - don't dive into details yet. The goal is awareness, not action. Once learner shows they understand the roadmap, move on. Do NOT start working on Epic 1 content here - that's a separate epic with its own tasks.",
             "discussion_prompts": [

@@ -142,12 +142,7 @@
           "description": "Understand why some descriptions have 'Clean' prefix incorrectly",
           "estimated_minutes": 5,
           "content": "Vuyisile has told me that the descriptions should only have the word 'Clean' if there is no biological contamination (and no chemical pollutants). Some data personnel must have copied the data from the scientist's notes into our database incorrectly. We need to find and remove the 'Clean' part from all the descriptions that do have a biological contamination so this mistake is not made again.\n\nFirst, let's look at the descriptions. We need to identify the records that mistakenly have the word Clean in the description. However, it is important to remember that not all of our field surveyors used the description to set the results - some checked the actual data.",
-          "learning_objectives": [
-            {
-              "level": "understand",
-              "description": "Understand the root cause of data entry errors"
-            }
-          ]
+          "learning_objectives": []
         },
         {
           "title": "Write LIKE query for wrong descriptions",
@@ -204,12 +199,7 @@
           "description": "Understand the risks and best practices for UPDATE statements",
           "estimated_minutes": 5,
           "content": "Before we make any changes, here is another nugget of advice: Begin complex queries by commenting on what you will do. This helps us to think through the problem before we write code to solve it, and once we're done, we have a well-documented code.\n\nNow, when we change any data on the database, we need to be SURE there are no errors, as this could fill the database with incorrect values. A safer way to do the UPDATE is by testing the changes on a copy of the table first.\n\n**Don't worry about breaking things:** If anything goes wrong with your data modifications, you can always reset the database back to its original state. The system can reload a fresh copy of the database for you, so feel free to experiment - that's how you learn! The copy-table approach we're about to use is how professionals do it, but knowing you have a safety net means you can focus on learning without fear.",
-          "learning_objectives": [
-            {
-              "level": "understand",
-              "description": "Understand the importance of safe data modification practices"
-            }
-          ],
+          "learning_objectives": [],
           "tutor_guidance": {
             "teaching_approach": "Emphasize this as a professional best practice that prevents disasters",
             "discussion_prompts": [
